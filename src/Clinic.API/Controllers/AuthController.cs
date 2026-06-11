@@ -155,7 +155,7 @@ public class AuthController : ControllerBase
             Title = role == UserRole.Patient ? "Registered Patient" :
                     role == UserRole.Doctor ? (request.Title ?? "Specialist") :
                     role == UserRole.Assistant ? "Clinical Assistant" : "Clinic Staff",
-            ClinicId = request.ClinicId,
+            ClinicId = string.IsNullOrWhiteSpace(request.ClinicId) ? null : request.ClinicId,
             DoctorId = request.DoctorId,
             PatientId = role == UserRole.Patient ? patientId : null,
             PasswordHash = BCrypt.Net.BCrypt.HashPassword(request.Password ?? "password123")
@@ -178,7 +178,7 @@ public class AuthController : ControllerBase
                 DateOfBirth = request.Dob ?? "1996-01-01",
                 BloodGroup = request.BloodGroup ?? "O+",
                 Address = "",
-                ClinicId = request.ClinicId ?? "clinic-1",
+                ClinicId = string.IsNullOrWhiteSpace(request.ClinicId) ? "clinic-1" : request.ClinicId,
                 RegistrationDate = DateTime.UtcNow.ToString("yyyy-MM-dd")
             };
             await _patientRepo.AddAsync(patient);
