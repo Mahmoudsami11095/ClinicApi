@@ -33,6 +33,8 @@ public static class DependencyInjection
         // ── Services ──
         services.AddScoped<IJwtService, JwtService>();
         services.AddSingleton<IOtpService, OtpService>();
+        services.AddTransient<IEmailService, EmailService>();
+        services.AddTransient<ISocialAuthService, SocialAuthService>();
 
         // ── JWT Authentication ──
         services.AddAuthentication(options =>

@@ -15,19 +15,25 @@ public class AuthController : ControllerBase
     private readonly IDoctorRepository _doctorRepo;
     private readonly IJwtService _jwtService;
     private readonly IOtpService _otpService;
+    private readonly IEmailService _emailService;
+    private readonly ISocialAuthService _socialAuth;
 
     public AuthController(
         IUserRepository userRepo,
         IPatientRepository patientRepo,
         IDoctorRepository doctorRepo,
         IJwtService jwtService,
-        IOtpService otpService)
+        IOtpService otpService,
+        IEmailService emailService,
+        ISocialAuthService socialAuth)
     {
         _userRepo = userRepo;
         _patientRepo = patientRepo;
         _doctorRepo = doctorRepo;
         _jwtService = jwtService;
         _otpService = otpService;
+        _emailService = emailService;
+        _socialAuth = socialAuth;
     }
 
     [HttpPost("login")]
@@ -62,6 +68,7 @@ public class AuthController : ControllerBase
             return NotFound(new { message = "Email not registered" });
 
         var code = _otpService.GenerateOtp(request.Email);
+        await _emailService.SendEmailAsync(request.Email, "Clinic Access Code", $"Your access verification code is: <strong>{code}</strong>. It is valid for 10 minutes.");
         return Ok(new { message = "OTP sent", otp = code });
     }
 
@@ -90,18 +97,58 @@ public class AuthController : ControllerBase
     [HttpPost("social")]
     public async Task<IActionResult> SocialLogin([FromBody] SocialLoginRequest request)
     {
-        // Demo stub: Google → Dr. Jenkins, others → John Doe
-        var email = request.Provider == "google" ? "dr.jenkins@clinic.com" : "john.doe@example.com";
-        var user = await _userRepo.GetByEmailAsync(email);
+        if (string.IsNullOrWhiteSpace(request.Provider) || string.IsNullOrWhiteSpace(request.Token))
+            return BadRequest(new { message = "Provider and Token are required" });
+
+        var socialInfo = await _socialAuth.ValidateTokenAsync(request.Provider, request.Token);
+        if (socialInfo == null)
+            return Unauthorized(new { message = "Social authentication failed: Invalid token" });
+
+        var user = await _userRepo.GetByEmailAsync(socialInfo.Email);
 
         if (user == null)
-            return StatusCode(500, new { message = "Social authentication failed" });
+        {
+            // Auto-register user as Patient
+            var allPatients = await _patientRepo.GetAllAsync();
+            var patientId = (allPatients.Count + 1).ToString();
+
+            var nameParts = socialInfo.Name.Split(' ', 2);
+            var patient = new Patient
+            {
+                Id = patientId,
+                FirstName = nameParts[0],
+                LastName = nameParts.Length > 1 ? nameParts[1] : "",
+                Email = socialInfo.Email,
+                ContactNumber = "+1234567890",
+                Gender = "Male",
+                DateOfBirth = "1996-01-01",
+                BloodGroup = "O+",
+                Address = "",
+                ClinicId = "clinic-1",
+                RegistrationDate = DateTime.UtcNow.ToString("yyyy-MM-dd")
+            };
+            await _patientRepo.AddAsync(patient);
+
+            user = new User
+            {
+                Id = Guid.NewGuid().ToString(),
+                Name = socialInfo.Name,
+                Email = socialInfo.Email,
+                Role = UserRole.Patient,
+                Title = "Registered Patient",
+                ClinicId = "clinic-1",
+                PatientId = patientId,
+                PasswordHash = BCrypt.Net.BCrypt.HashPassword("social-default-password-" + Guid.NewGuid().ToString())
+            };
+
+            await _userRepo.AddAsync(user);
+        }
 
         var clinicIds = await GetDoctorClinicIds(user);
-        var token = _jwtService.GenerateToken(user, clinicIds);
+        var appToken = _jwtService.GenerateToken(user, clinicIds);
         var userDto = MapToUserDto(user, clinicIds);
 
-        return Ok(new { message = $"Logged in via {request.Provider}", data = userDto, token });
+        return Ok(new { message = $"Logged in via {request.Provider}", data = userDto, token = appToken });
     }
 
     [HttpPost("register-send-otp")]
@@ -115,6 +162,7 @@ public class AuthController : ControllerBase
             return BadRequest(new { message = "Email already registered" });
 
         var code = _otpService.GenerateOtp(request.Email);
+        await _emailService.SendEmailAsync(request.Email, "Clinic Registration Verification", $"Your registration verification code is: <strong>{code}</strong>. It is valid for 10 minutes.");
         return Ok(new { message = "OTP sent", otp = code });
     }
 
@@ -146,23 +194,6 @@ public class AuthController : ControllerBase
             patientId = (allPatients.Count + 1).ToString();
         }
 
-        var newUser = new User
-        {
-            Id = Guid.NewGuid().ToString(),
-            Name = request.Name,
-            Email = request.Email,
-            Role = role,
-            Title = role == UserRole.Patient ? "Registered Patient" :
-                    role == UserRole.Doctor ? (request.Title ?? "Specialist") :
-                    role == UserRole.Assistant ? "Clinical Assistant" : "Clinic Staff",
-            ClinicId = string.IsNullOrWhiteSpace(request.ClinicId) ? null : request.ClinicId,
-            DoctorId = request.DoctorId,
-            PatientId = role == UserRole.Patient ? patientId : null,
-            PasswordHash = BCrypt.Net.BCrypt.HashPassword(request.Password ?? "password123")
-        };
-
-        await _userRepo.AddAsync(newUser);
-
         // Create corresponding patient record
         if (role == UserRole.Patient)
         {
@@ -183,6 +214,23 @@ public class AuthController : ControllerBase
             };
             await _patientRepo.AddAsync(patient);
         }
+
+        var newUser = new User
+        {
+            Id = Guid.NewGuid().ToString(),
+            Name = request.Name,
+            Email = request.Email,
+            Role = role,
+            Title = role == UserRole.Patient ? "Registered Patient" :
+                    role == UserRole.Doctor ? (request.Title ?? "Specialist") :
+                    role == UserRole.Assistant ? "Clinical Assistant" : "Clinic Staff",
+            ClinicId = string.IsNullOrWhiteSpace(request.ClinicId) ? null : request.ClinicId,
+            DoctorId = request.DoctorId,
+            PatientId = role == UserRole.Patient ? patientId : null,
+            PasswordHash = BCrypt.Net.BCrypt.HashPassword(request.Password ?? "password123")
+        };
+
+        await _userRepo.AddAsync(newUser);
 
         var clinicIds = request.ClinicIds ??
             (string.IsNullOrEmpty(request.ClinicId) ? new List<string>() : new List<string> { request.ClinicId });
