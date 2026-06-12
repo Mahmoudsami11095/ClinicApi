@@ -108,38 +108,79 @@ public class AuthController : ControllerBase
 
         if (user == null)
         {
-            // Auto-register user as Patient
-            var allPatients = await _patientRepo.GetAllAsync();
-            var patientId = (allPatients.Count + 1).ToString();
-
-            var nameParts = socialInfo.Name.Split(' ', 2);
-            var patient = new Patient
+            if (string.IsNullOrWhiteSpace(request.Role))
             {
-                Id = patientId,
-                FirstName = nameParts[0],
-                LastName = nameParts.Length > 1 ? nameParts[1] : "",
-                Email = socialInfo.Email,
-                ContactNumber = "+1234567890",
-                Gender = "Male",
-                DateOfBirth = "1996-01-01",
-                BloodGroup = "O+",
-                Address = "",
-                ClinicId = "clinic-1",
-                RegistrationDate = DateTime.UtcNow.ToString("yyyy-MM-dd")
-            };
-            await _patientRepo.AddAsync(patient);
+                return Ok(new { requiresRoleSelection = true, email = socialInfo.Email, name = socialInfo.Name });
+            }
 
-            user = new User
+            var isDoctor = string.Equals(request.Role, "doctor", StringComparison.OrdinalIgnoreCase);
+
+            if (isDoctor)
             {
-                Id = Guid.NewGuid().ToString(),
-                Name = socialInfo.Name,
-                Email = socialInfo.Email,
-                Role = UserRole.Patient,
-                Title = "Registered Patient",
-                ClinicId = "clinic-1",
-                PatientId = patientId,
-                PasswordHash = BCrypt.Net.BCrypt.HashPassword("social-default-password-" + Guid.NewGuid().ToString())
-            };
+                var allDoctors = await _doctorRepo.GetAllAsync();
+                var doctorId = (allDoctors.Count + 101).ToString();
+
+                var nameParts = socialInfo.Name.Split(' ', 2);
+                var doctor = new Doctor
+                {
+                    Id = doctorId,
+                    FirstName = nameParts[0],
+                    LastName = nameParts.Length > 1 ? nameParts[1] : "",
+                    Email = socialInfo.Email,
+                    ContactNumber = "+1234567890",
+                    Specialization = "General Medicine",
+                    AvailabilityDays = "[\"Monday\",\"Tuesday\",\"Wednesday\",\"Thursday\",\"Friday\"]",
+                    AvailabilityHours = "09:00-17:00"
+                };
+
+                await _doctorRepo.AddWithClinicsAsync(doctor, new List<string> { "clinic-1" });
+
+                user = new User
+                {
+                    Id = Guid.NewGuid().ToString(),
+                    Name = socialInfo.Name,
+                    Email = socialInfo.Email,
+                    Role = UserRole.Doctor,
+                    Title = "Specialist",
+                    DoctorId = doctorId,
+                    PasswordHash = BCrypt.Net.BCrypt.HashPassword("social-default-password-" + Guid.NewGuid().ToString())
+                };
+            }
+            else
+            {
+                // Auto-register user as Patient
+                var allPatients = await _patientRepo.GetAllAsync();
+                var patientId = (allPatients.Count + 1).ToString();
+
+                var nameParts = socialInfo.Name.Split(' ', 2);
+                var patient = new Patient
+                {
+                    Id = patientId,
+                    FirstName = nameParts[0],
+                    LastName = nameParts.Length > 1 ? nameParts[1] : "",
+                    Email = socialInfo.Email,
+                    ContactNumber = "+1234567890",
+                    Gender = "Male",
+                    DateOfBirth = "1996-01-01",
+                    BloodGroup = "O+",
+                    Address = "",
+                    ClinicId = "clinic-1",
+                    RegistrationDate = DateTime.UtcNow.ToString("yyyy-MM-dd")
+                };
+                await _patientRepo.AddAsync(patient);
+
+                user = new User
+                {
+                    Id = Guid.NewGuid().ToString(),
+                    Name = socialInfo.Name,
+                    Email = socialInfo.Email,
+                    Role = UserRole.Patient,
+                    Title = "Registered Patient",
+                    ClinicId = "clinic-1",
+                    PatientId = patientId,
+                    PasswordHash = BCrypt.Net.BCrypt.HashPassword("social-default-password-" + Guid.NewGuid().ToString())
+                };
+            }
 
             await _userRepo.AddAsync(user);
         }
@@ -194,6 +235,29 @@ public class AuthController : ControllerBase
             patientId = (allPatients.Count + 1).ToString();
         }
 
+        // Create corresponding doctor record if needed
+        string? doctorId = request.DoctorId;
+        if (role == UserRole.Doctor && string.IsNullOrEmpty(doctorId))
+        {
+            var allDoctors = await _doctorRepo.GetAllAsync();
+            doctorId = (allDoctors.Count + 101).ToString();
+            var nameParts = request.Name.Split(' ', 2);
+            var doctor = new Doctor
+            {
+                Id = doctorId,
+                FirstName = nameParts[0],
+                LastName = nameParts.Length > 1 ? nameParts[1] : "",
+                Email = request.Email,
+                ContactNumber = request.Phone ?? "+1234567890",
+                Specialization = "General Medicine",
+                AvailabilityDays = "[\"Monday\",\"Tuesday\",\"Wednesday\",\"Thursday\",\"Friday\"]",
+                AvailabilityHours = "09:00-17:00"
+            };
+            var clinics = request.ClinicIds ?? 
+                (string.IsNullOrEmpty(request.ClinicId) ? new List<string> { "clinic-1" } : new List<string> { request.ClinicId });
+            await _doctorRepo.AddWithClinicsAsync(doctor, clinics);
+        }
+
         // Create corresponding patient record
         if (role == UserRole.Patient)
         {
@@ -225,7 +289,7 @@ public class AuthController : ControllerBase
                     role == UserRole.Doctor ? (request.Title ?? "Specialist") :
                     role == UserRole.Assistant ? "Clinical Assistant" : "Clinic Staff",
             ClinicId = string.IsNullOrWhiteSpace(request.ClinicId) ? null : request.ClinicId,
-            DoctorId = request.DoctorId,
+            DoctorId = role == UserRole.Doctor ? doctorId : request.DoctorId,
             PatientId = role == UserRole.Patient ? patientId : null,
             PasswordHash = BCrypt.Net.BCrypt.HashPassword(request.Password ?? "password123")
         };
