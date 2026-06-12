@@ -18,6 +18,9 @@ public interface IPatientRepository : IGenericRepository<Patient> { }
 public interface IDoctorRepository : IGenericRepository<Doctor>
 {
     Task<Doctor> AddWithClinicsAsync(Doctor doctor, List<string> clinicIds);
+    Task AssignToClinicAsync(string doctorId, string clinicId);
+    Task AssignDoctorsToClinicAsync(string clinicId, List<string> doctorIds);
+    Task RespondToAssignmentAsync(string doctorId, string clinicId, string status);
 }
 
 public interface IAppointmentRepository : IGenericRepository<Appointment> { }
