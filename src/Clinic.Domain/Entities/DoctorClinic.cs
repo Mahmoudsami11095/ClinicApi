@@ -7,4 +7,6 @@ public class DoctorClinic
 
     public string ClinicId { get; set; } = string.Empty;
     public ClinicEntity Clinic { get; set; } = null!;
+
+    public string Status { get; set; } = "Accepted";
 }

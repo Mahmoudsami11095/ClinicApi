@@ -12,13 +12,30 @@ namespace Clinic.API.Controllers;
 public class AppointmentsController : ControllerBase
 {
     private readonly IAppointmentRepository _repo;
+    private readonly IClinicRepository _clinicRepo;
 
-    public AppointmentsController(IAppointmentRepository repo) => _repo = repo;
+    public AppointmentsController(IAppointmentRepository repo, IClinicRepository clinicRepo)
+    {
+        _repo = repo;
+        _clinicRepo = clinicRepo;
+    }
 
     [HttpGet]
     public async Task<IActionResult> GetAll()
     {
         var appointments = await _repo.GetAllAsync();
+        var doctorIdClaim = User.FindFirst("doctorId")?.Value;
+        if (!string.IsNullOrEmpty(doctorIdClaim))
+        {
+            var clinics = await _clinicRepo.GetAllAsync();
+            var allowedClinicIds = clinics
+                .Where(c => c.CreatorDoctorId == doctorIdClaim || 
+                            c.DoctorClinics.Any(dc => dc.DoctorId == doctorIdClaim && dc.Status == "Accepted"))
+                .Select(c => c.Id)
+                .ToList();
+            appointments = appointments.Where(a => allowedClinicIds.Contains(a.ClinicId ?? "")).ToList();
+        }
+
         var dtos = appointments.Select(a => new AppointmentDto
         {
             Id = a.Id, PatientId = a.PatientId, DoctorId = a.DoctorId,
@@ -31,6 +48,17 @@ public class AppointmentsController : ControllerBase
     [HttpPost]
     public async Task<IActionResult> Create([FromBody] AppointmentDto dto)
     {
+        var doctorIdClaim = User.FindFirst("doctorId")?.Value;
+        if (!string.IsNullOrEmpty(doctorIdClaim))
+        {
+            var clinics = await _clinicRepo.GetAllAsync();
+            var isAllowed = clinics.Any(c => c.Id == dto.ClinicId && 
+                (c.CreatorDoctorId == doctorIdClaim || 
+                 c.DoctorClinics.Any(dc => dc.DoctorId == doctorIdClaim && dc.Status == "Accepted")));
+            if (!isAllowed)
+                return StatusCode(403, new { message = "You can only manage appointments for your clinics" });
+        }
+
         var entity = new Appointment
         {
             Id = string.IsNullOrEmpty(dto.Id) ? Guid.NewGuid().ToString() : dto.Id,
@@ -47,6 +75,17 @@ public class AppointmentsController : ControllerBase
     {
         var entity = await _repo.GetByIdAsync(id);
         if (entity == null) return NotFound(new { message = "Not found" });
+
+        var doctorIdClaim = User.FindFirst("doctorId")?.Value;
+        if (!string.IsNullOrEmpty(doctorIdClaim))
+        {
+            var clinics = await _clinicRepo.GetAllAsync();
+            var isAllowed = clinics.Any(c => c.Id == entity.ClinicId && 
+                (c.CreatorDoctorId == doctorIdClaim || 
+                 c.DoctorClinics.Any(dc => dc.DoctorId == doctorIdClaim && dc.Status == "Accepted")));
+            if (!isAllowed)
+                return StatusCode(403, new { message = "You can only manage appointments for your clinics" });
+        }
 
         entity.PatientId = dto.PatientId;
         entity.DoctorId = dto.DoctorId;
@@ -65,6 +104,17 @@ public class AppointmentsController : ControllerBase
     {
         var entity = await _repo.GetByIdAsync(id);
         if (entity == null) return NotFound(new { message = "Not found" });
+
+        var doctorIdClaim = User.FindFirst("doctorId")?.Value;
+        if (!string.IsNullOrEmpty(doctorIdClaim))
+        {
+            var clinics = await _clinicRepo.GetAllAsync();
+            var isAllowed = clinics.Any(c => c.Id == entity.ClinicId && 
+                (c.CreatorDoctorId == doctorIdClaim || 
+                 c.DoctorClinics.Any(dc => dc.DoctorId == doctorIdClaim && dc.Status == "Accepted")));
+            if (!isAllowed)
+                return StatusCode(403, new { message = "You can only manage appointments for your clinics" });
+        }
 
         await _repo.DeleteAsync(id);
         return Ok(new { message = "Deleted" });

@@ -12,13 +12,30 @@ namespace Clinic.API.Controllers;
 public class PatientsController : ControllerBase
 {
     private readonly IPatientRepository _repo;
+    private readonly IClinicRepository _clinicRepo;
 
-    public PatientsController(IPatientRepository repo) => _repo = repo;
+    public PatientsController(IPatientRepository repo, IClinicRepository clinicRepo)
+    {
+        _repo = repo;
+        _clinicRepo = clinicRepo;
+    }
 
     [HttpGet]
     public async Task<IActionResult> GetAll()
     {
         var patients = await _repo.GetAllAsync();
+        var doctorIdClaim = User.FindFirst("doctorId")?.Value;
+        if (!string.IsNullOrEmpty(doctorIdClaim))
+        {
+            var clinics = await _clinicRepo.GetAllAsync();
+            var allowedClinicIds = clinics
+                .Where(c => c.CreatorDoctorId == doctorIdClaim || 
+                            c.DoctorClinics.Any(dc => dc.DoctorId == doctorIdClaim && dc.Status == "Accepted"))
+                .Select(c => c.Id)
+                .ToList();
+            patients = patients.Where(p => allowedClinicIds.Contains(p.ClinicId ?? "")).ToList();
+        }
+
         var dtos = patients.Select(p => new PatientDto
         {
             Id = p.Id, FirstName = p.FirstName, LastName = p.LastName,
@@ -33,6 +50,17 @@ public class PatientsController : ControllerBase
     [HttpPost]
     public async Task<IActionResult> Create([FromBody] PatientDto dto)
     {
+        var doctorIdClaim = User.FindFirst("doctorId")?.Value;
+        if (!string.IsNullOrEmpty(doctorIdClaim))
+        {
+            var clinics = await _clinicRepo.GetAllAsync();
+            var isAllowed = clinics.Any(c => c.Id == dto.ClinicId && 
+                (c.CreatorDoctorId == doctorIdClaim || 
+                 c.DoctorClinics.Any(dc => dc.DoctorId == doctorIdClaim && dc.Status == "Accepted")));
+            if (!isAllowed)
+                return StatusCode(403, new { message = "You can only manage patients for your clinics" });
+        }
+
         var entity = new Patient
         {
             Id = string.IsNullOrEmpty(dto.Id) ? Guid.NewGuid().ToString() : dto.Id,

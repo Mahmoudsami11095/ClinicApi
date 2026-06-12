@@ -81,6 +81,10 @@ public class ClinicDbContext : DbContext
             entity.ToTable("DoctorClinics");
             entity.HasKey(dc => new { dc.DoctorId, dc.ClinicId });
 
+            entity.Property(dc => dc.Status)
+                  .HasMaxLength(50)
+                  .HasDefaultValue("Accepted");
+
             entity.HasOne(dc => dc.Doctor)
                   .WithMany(d => d.DoctorClinics)
                   .HasForeignKey(dc => dc.DoctorId);
