@@ -24,29 +24,9 @@ public class SocialAuthService : ISocialAuthService
     {
         var prov = provider.ToLowerInvariant();
 
-        // ── Demo / Development Fallback ──
-        // If the configuration contains placeholder values, or if a developer provides a demo token,
-        // we simulate a valid response to ensure local testing remains unblocked.
         var googleClientId = _config["Authentication:Google:ClientId"];
         var msClientId = _config["Authentication:Microsoft:ClientId"];
         var appleClientId = _config["Authentication:Apple:ClientId"];
-
-        if (token.StartsWith("demo_", StringComparison.OrdinalIgnoreCase) || 
-            (prov == "google" && (string.IsNullOrEmpty(googleClientId) || googleClientId == "YOUR_GOOGLE_CLIENT_ID")) ||
-            (prov == "microsoft" && (string.IsNullOrEmpty(msClientId) || msClientId == "YOUR_MICROSOFT_CLIENT_ID")) ||
-            (prov == "apple" && (string.IsNullOrEmpty(appleClientId) || appleClientId == "YOUR_APPLE_CLIENT_ID")))
-        {
-            _logger.LogInformation("Social Auth: Using mock authentication fallback for provider '{Provider}'.", provider);
-            
-            if (prov == "google")
-            {
-                return new SocialUserInfo { Email = "dr.jenkins@clinic.com", Name = "Dr. Sarah Jenkins" };
-            }
-            else
-            {
-                return new SocialUserInfo { Email = "john.doe@example.com", Name = "John Doe" };
-            }
-        }
 
         try
         {
