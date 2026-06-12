@@ -14,6 +14,7 @@ public class OtpService : IOtpService
         var code = Random.Shared.Next(100000, 999999).ToString();
         var key = email.ToLowerInvariant();
         _otpStore[key] = (code, DateTime.UtcNow.AddMinutes(10));
+        Console.WriteLine($"[OTP] Generated Code for {email}: {code}");
         return code;
     }
 
