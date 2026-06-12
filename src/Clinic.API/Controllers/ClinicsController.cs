@@ -58,6 +58,15 @@ public class ClinicsController : ControllerBase
     public async Task<IActionResult> Create([FromBody] ClinicDto dto)
     {
         var doctorIdClaim = User.FindFirst("doctorId")?.Value;
+        if (!string.IsNullOrEmpty(doctorIdClaim))
+        {
+            var doctor = await _doctorRepo.GetByIdAsync(doctorIdClaim);
+            if (doctor == null)
+            {
+                return Unauthorized(new { message = "Doctor profile not found. Please log in again." });
+            }
+        }
+
         var entity = new ClinicEntity
         {
             Id = string.IsNullOrEmpty(dto.Id) ? Guid.NewGuid().ToString() : dto.Id,

@@ -117,8 +117,7 @@ public class AuthController : ControllerBase
 
             if (isDoctor)
             {
-                var allDoctors = await _doctorRepo.GetAllAsync();
-                var doctorId = (allDoctors.Count + 101).ToString();
+                var doctorId = Guid.NewGuid().ToString();
 
                 var nameParts = socialInfo.Name.Split(' ', 2);
                 var doctor = new Doctor
@@ -149,8 +148,7 @@ public class AuthController : ControllerBase
             else
             {
                 // Auto-register user as Patient
-                var allPatients = await _patientRepo.GetAllAsync();
-                var patientId = (allPatients.Count + 1).ToString();
+                var patientId = Guid.NewGuid().ToString();
 
                 var nameParts = socialInfo.Name.Split(' ', 2);
                 var patient = new Patient
@@ -231,16 +229,14 @@ public class AuthController : ControllerBase
         string? patientId = request.PatientId;
         if (role == UserRole.Patient && string.IsNullOrEmpty(patientId))
         {
-            var allPatients = await _patientRepo.GetAllAsync();
-            patientId = (allPatients.Count + 1).ToString();
+            patientId = Guid.NewGuid().ToString();
         }
 
         // Create corresponding doctor record if needed
         string? doctorId = request.DoctorId;
         if (role == UserRole.Doctor && string.IsNullOrEmpty(doctorId))
         {
-            var allDoctors = await _doctorRepo.GetAllAsync();
-            doctorId = (allDoctors.Count + 101).ToString();
+            doctorId = Guid.NewGuid().ToString();
             var nameParts = request.Name.Split(' ', 2);
             var doctor = new Doctor
             {
