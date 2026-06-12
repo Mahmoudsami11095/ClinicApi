@@ -150,6 +150,23 @@ public class ClinicsController : ControllerBase
         var result = new ClinicDto { Id = entity.Id, Name = entity.Name, Address = entity.Address, Phone = entity.Phone, CreatorDoctorId = entity.CreatorDoctorId };
         return Ok(new { message = "Success", data = result });
     }
+
+    [HttpDelete("{id}")]
+    public async Task<IActionResult> Delete(string id)
+    {
+        var entity = await _repo.GetByIdAsync(id);
+        if (entity == null) return NotFound(new { message = "Clinic not found" });
+
+        var doctorIdClaim = User.FindFirst("doctorId")?.Value;
+        var isAdmin = User.IsInRole("admin");
+        if (!isAdmin && !string.IsNullOrEmpty(doctorIdClaim) && entity.CreatorDoctorId != doctorIdClaim)
+        {
+            return StatusCode(403, new { message = "Only the clinic creator or an admin can delete the clinic" });
+        }
+
+        await _repo.DeleteAsync(id);
+        return Ok(new { message = "Clinic deleted successfully" });
+    }
 }
 
 public class RespondAssignmentRequest
