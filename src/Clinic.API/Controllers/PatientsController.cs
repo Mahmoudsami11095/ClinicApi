@@ -73,4 +73,59 @@ public class PatientsController : ControllerBase
         await _repo.AddAsync(entity);
         return Ok(new { message = "Success" });
     }
+
+    [HttpPut("{id}")]
+    public async Task<IActionResult> Update(string id, [FromBody] PatientDto dto)
+    {
+        var existing = await _repo.GetByIdAsync(id);
+        if (existing == null)
+            return NotFound();
+
+        var doctorIdClaim = User.FindFirst("doctorId")?.Value;
+        if (!string.IsNullOrEmpty(doctorIdClaim))
+        {
+            var clinics = await _clinicRepo.GetAllAsync();
+            var isAllowed = clinics.Any(c => c.Id == dto.ClinicId && 
+                (c.CreatorDoctorId == doctorIdClaim || 
+                 c.DoctorClinics.Any(dc => dc.DoctorId == doctorIdClaim && dc.Status == "Accepted")));
+            if (!isAllowed)
+                return StatusCode(403, new { message = "You can only manage patients for your clinics" });
+        }
+
+        existing.FirstName = dto.FirstName;
+        existing.LastName = dto.LastName;
+        existing.Gender = dto.Gender;
+        existing.DateOfBirth = dto.DateOfBirth;
+        existing.ContactNumber = dto.ContactNumber;
+        existing.Email = dto.Email;
+        existing.BloodGroup = dto.BloodGroup;
+        existing.Address = dto.Address;
+        existing.ClinicId = dto.ClinicId;
+
+        await _repo.UpdateAsync(existing);
+        return Ok(new { message = "Success" });
+    }
+
+    [HttpDelete("{id}")]
+    public async Task<IActionResult> Delete(string id)
+    {
+        var existing = await _repo.GetByIdAsync(id);
+        if (existing == null)
+            return NotFound();
+
+        var doctorIdClaim = User.FindFirst("doctorId")?.Value;
+        if (!string.IsNullOrEmpty(doctorIdClaim))
+        {
+            var clinics = await _clinicRepo.GetAllAsync();
+            var isAllowed = clinics.Any(c => c.Id == existing.ClinicId && 
+                (c.CreatorDoctorId == doctorIdClaim || 
+                 c.DoctorClinics.Any(dc => dc.DoctorId == doctorIdClaim && dc.Status == "Accepted")));
+            if (!isAllowed)
+                return StatusCode(403, new { message = "You can only manage patients for your clinics" });
+        }
+
+        await _repo.DeleteAsync(id);
+        return Ok(new { message = "Success" });
+    }
 }
+
