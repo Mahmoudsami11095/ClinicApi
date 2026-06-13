@@ -39,7 +39,8 @@ public class DentalController : ControllerBase
             PainLevel = dto.PainLevel,
             PainDetails = dto.PainDetails,
             Treatment = dto.Treatment,
-            Medication = dto.Medication
+            Medication = dto.Medication,
+            IsPlanned = dto.IsPlanned
         };
         await _repo.AddAsync(entity);
         return Ok(new { message = "Success", data = dto });
@@ -57,7 +58,7 @@ public class DentalController : ControllerBase
             DoctorId = d.DoctorId, DoctorName = d.DoctorName, Date = d.Date,
             Status = statusList, PainLevel = d.PainLevel,
             PainDetails = d.PainDetails, Treatment = d.Treatment,
-            Medication = d.Medication
+            Medication = d.Medication, IsPlanned = d.IsPlanned
         };
     }
 }
