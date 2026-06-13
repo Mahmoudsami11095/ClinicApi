@@ -51,6 +51,13 @@ public class RegisterRequest
     public string? BloodGroup { get; set; }
 }
 
+public class DoctorClinicAvailabilityRequest
+{
+    public string ClinicId { get; set; } = string.Empty;
+    public string AvailabilityHours { get; set; } = string.Empty;
+    public List<string> AvailabilityDays { get; set; } = new();
+}
+
 // ── Social Login ──
 public class SocialLoginRequest
 {
@@ -69,6 +76,7 @@ public class SocialLoginRequest
     public string? BloodGroup { get; set; }
     public string? Address { get; set; }
     public string? ClinicId { get; set; }
+    public List<DoctorClinicAvailabilityRequest>? ClinicAvailabilities { get; set; }
 }
 
 // ── User DTO ──

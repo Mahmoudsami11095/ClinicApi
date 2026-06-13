@@ -47,13 +47,27 @@ public class DoctorsController : ControllerBase
         try { days = JsonSerializer.Deserialize<List<string>>(d.AvailabilityDays) ?? new(); }
         catch { days = new List<string>(); }
 
+        var clinicAvails = d.DoctorClinics?.Select(dc => {
+            List<string> cDays;
+            try { cDays = !string.IsNullOrEmpty(dc.AvailabilityDays) ? JsonSerializer.Deserialize<List<string>>(dc.AvailabilityDays) ?? new() : new(); }
+            catch { cDays = new List<string>(); }
+
+            return new DoctorClinicAvailabilityDto
+            {
+                ClinicId = dc.ClinicId,
+                AvailabilityHours = dc.AvailabilityHours ?? "",
+                AvailabilityDays = cDays
+            };
+        }).ToList();
+
         return new DoctorDto
         {
             Id = d.Id, FirstName = d.FirstName, LastName = d.LastName,
             Specialization = d.Specialization, Email = d.Email,
             ContactNumber = d.ContactNumber, Avatar = d.Avatar,
             Availability = new DoctorAvailabilityDto { Days = days, Hours = d.AvailabilityHours },
-            ClinicIds = d.DoctorClinics?.Select(dc => dc.ClinicId).ToList()
+            ClinicIds = d.DoctorClinics?.Select(dc => dc.ClinicId).ToList(),
+            ClinicAvailabilities = clinicAvails
         };
     }
 }

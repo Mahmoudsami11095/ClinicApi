@@ -13,11 +13,82 @@ public class AppointmentsController : ControllerBase
 {
     private readonly IAppointmentRepository _repo;
     private readonly IClinicRepository _clinicRepo;
+    private readonly IDoctorRepository _doctorRepo;
 
-    public AppointmentsController(IAppointmentRepository repo, IClinicRepository clinicRepo)
+    public AppointmentsController(IAppointmentRepository repo, IClinicRepository clinicRepo, IDoctorRepository doctorRepo)
     {
         _repo = repo;
         _clinicRepo = clinicRepo;
+        _doctorRepo = doctorRepo;
+    }
+
+    private async Task<string?> ValidateDoctorAvailability(string doctorId, string clinicId, string appointmentDateStr)
+    {
+        if (string.IsNullOrEmpty(doctorId) || string.IsNullOrEmpty(clinicId) || string.IsNullOrEmpty(appointmentDateStr))
+            return null;
+
+        var doctors = await _doctorRepo.GetAllAsync();
+        var d = doctors.FirstOrDefault(x => x.Id == doctorId);
+        if (d == null)
+            return "Doctor not found";
+
+        if (!DateTime.TryParse(appointmentDateStr, out var apptDate))
+        {
+            return "Invalid appointment date format";
+        }
+
+        var dayOfWeek = apptDate.DayOfWeek.ToString();
+        var timeOfDay = apptDate.TimeOfDay;
+
+        var dc = d.DoctorClinics.FirstOrDefault(x => x.ClinicId == clinicId);
+        
+        string? hoursStr = null;
+        string? daysStr = null;
+
+        if (dc != null && !string.IsNullOrEmpty(dc.AvailabilityHours))
+        {
+            hoursStr = dc.AvailabilityHours;
+            daysStr = dc.AvailabilityDays;
+        }
+        else
+        {
+            hoursStr = d.AvailabilityHours;
+            daysStr = d.AvailabilityDays;
+        }
+
+        if (string.IsNullOrEmpty(hoursStr))
+        {
+            return null;
+        }
+
+        if (!string.IsNullOrEmpty(daysStr))
+        {
+            try
+            {
+                var days = System.Text.Json.JsonSerializer.Deserialize<List<string>>(daysStr);
+                if (days != null && days.Any() && !days.Contains(dayOfWeek, StringComparer.OrdinalIgnoreCase))
+                {
+                    return $"Doctor is not available on {dayOfWeek} at this clinic.";
+                }
+            }
+            catch
+            {
+            }
+        }
+
+        var parts = hoursStr.Split('-');
+        if (parts.Length == 2)
+        {
+            if (TimeSpan.TryParse(parts[0], out var startTime) && TimeSpan.TryParse(parts[1], out var endTime))
+            {
+                if (timeOfDay < startTime || timeOfDay > endTime)
+                {
+                    return $"Appointment time {timeOfDay:hh\\:mm} is outside the doctor's availability hours ({hoursStr}) for this clinic.";
+                }
+            }
+        }
+
+        return null;
     }
 
     [HttpGet]
@@ -59,6 +130,12 @@ public class AppointmentsController : ControllerBase
                 return StatusCode(403, new { message = "You can only manage appointments for your clinics" });
         }
 
+        var validationError = await ValidateDoctorAvailability(dto.DoctorId, dto.ClinicId ?? "", dto.Date);
+        if (validationError != null)
+        {
+            return BadRequest(new { message = validationError });
+        }
+
         var entity = new Appointment
         {
             Id = string.IsNullOrEmpty(dto.Id) ? Guid.NewGuid().ToString() : dto.Id,
@@ -85,6 +162,12 @@ public class AppointmentsController : ControllerBase
                  c.DoctorClinics.Any(dc => dc.DoctorId == doctorIdClaim && dc.Status == "Accepted")));
             if (!isAllowed)
                 return StatusCode(403, new { message = "You can only manage appointments for your clinics" });
+        }
+
+        var validationError = await ValidateDoctorAvailability(dto.DoctorId, dto.ClinicId ?? "", dto.Date);
+        if (validationError != null)
+        {
+            return BadRequest(new { message = validationError });
         }
 
         entity.PatientId = dto.PatientId;

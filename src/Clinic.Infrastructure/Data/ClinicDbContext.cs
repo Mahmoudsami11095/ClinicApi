@@ -85,6 +85,9 @@ public class ClinicDbContext : DbContext
                   .HasMaxLength(50)
                   .HasDefaultValue("Accepted");
 
+            entity.Property(dc => dc.AvailabilityHours).HasMaxLength(50);
+            entity.Property(dc => dc.AvailabilityDays).HasMaxLength(500);
+
             entity.HasOne(dc => dc.Doctor)
                   .WithMany(d => d.DoctorClinics)
                   .HasForeignKey(dc => dc.DoctorId);
