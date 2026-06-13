@@ -299,6 +299,19 @@ public class AuthController : ControllerBase
         return Ok(new { message = "Registration successful", data = userDto });
     }
 
+    [HttpGet("users")]
+    public async Task<IActionResult> GetUsers()
+    {
+        var users = await _userRepo.GetAllAsync();
+        var dtos = new List<UserDto>();
+        foreach (var u in users)
+        {
+            var clinicIds = await GetDoctorClinicIds(u);
+            dtos.Add(MapToUserDto(u, clinicIds));
+        }
+        return Ok(new { data = dtos });
+    }
+
     // ── Helpers ──
     private async Task<List<string>?> GetDoctorClinicIds(User user)
     {
