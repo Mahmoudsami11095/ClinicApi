@@ -47,8 +47,11 @@ public class RegisterRequest
     public List<string>? ClinicIds { get; set; }
     public string? DoctorId { get; set; }
     public string? PatientId { get; set; }
+    public string? Specialization { get; set; }
     public string? Dob { get; set; }
     public string? BloodGroup { get; set; }
+    public string? Address { get; set; }
+    public List<DoctorClinicAvailabilityRequest>? ClinicAvailabilities { get; set; }
 }
 
 public class DoctorClinicAvailabilityRequest
