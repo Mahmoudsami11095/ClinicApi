@@ -13,6 +13,7 @@ public class DentalLog
     public string? PainDetails { get; set; }
     public string? Treatment { get; set; }
     public string? Medication { get; set; }
+    public bool IsPlanned { get; set; }
 
     // Navigation properties
     public Patient Patient { get; set; } = null!;

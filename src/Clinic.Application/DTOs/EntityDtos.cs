@@ -110,4 +110,5 @@ public class DentalLogDto
     public string? PainDetails { get; set; }
     public string? Treatment { get; set; }
     public string? Medication { get; set; }
+    public bool IsPlanned { get; set; }
 }
