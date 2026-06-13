@@ -7,6 +7,8 @@ public class ClinicEntity
     public string Address { get; set; } = string.Empty;
     public string Phone { get; set; } = string.Empty;
     public string? CreatorDoctorId { get; set; }
+    public string? AvailabilityHours { get; set; }
+    public string? AvailabilityDays { get; set; }
 
     // Navigation properties
     public ICollection<DoctorClinic> DoctorClinics { get; set; } = new List<DoctorClinic>();

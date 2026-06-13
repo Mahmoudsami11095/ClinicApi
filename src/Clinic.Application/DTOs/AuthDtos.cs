@@ -39,6 +39,13 @@ public class RegisterRequest
     public string? Password { get; set; }
     public string Role { get; set; } = string.Empty; // "admin", "doctor", "assistant", "patient"
     public string ClinicId { get; set; } = string.Empty;
+    public string? ClinicName { get; set; }
+    public string? ClinicAddress { get; set; }
+    public string? ClinicPhone { get; set; }
+    public string? AvailabilityHours { get; set; }
+    public string? AvailabilityDays { get; set; }
+    public string? ClinicAvailabilityHours { get; set; }
+    public string? ClinicAvailabilityDays { get; set; }
     public string? Phone { get; set; }
     public string? Gender { get; set; }
     public int? Age { get; set; }
@@ -68,6 +75,9 @@ public class SocialLoginRequest
     // Missing data fields:
     public string? ContactNumber { get; set; }
     public string? Specialization { get; set; }
+    public string? ClinicName { get; set; }
+    public string? ClinicAddress { get; set; }
+    public string? ClinicPhone { get; set; }
     public List<string>? ClinicIds { get; set; }
     public string? AvailabilityDays { get; set; }
     public string? AvailabilityHours { get; set; }
