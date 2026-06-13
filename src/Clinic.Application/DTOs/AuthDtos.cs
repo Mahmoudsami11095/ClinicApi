@@ -57,6 +57,18 @@ public class SocialLoginRequest
     public string Provider { get; set; } = string.Empty;
     public string Token { get; set; } = string.Empty;
     public string? Role { get; set; }
+
+    // Missing data fields:
+    public string? ContactNumber { get; set; }
+    public string? Specialization { get; set; }
+    public List<string>? ClinicIds { get; set; }
+    public string? AvailabilityDays { get; set; }
+    public string? AvailabilityHours { get; set; }
+    public string? Gender { get; set; }
+    public string? DateOfBirth { get; set; }
+    public string? BloodGroup { get; set; }
+    public string? Address { get; set; }
+    public string? ClinicId { get; set; }
 }
 
 // ── User DTO ──

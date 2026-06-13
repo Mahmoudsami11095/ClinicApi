@@ -126,13 +126,14 @@ public class AuthController : ControllerBase
                     FirstName = nameParts[0],
                     LastName = nameParts.Length > 1 ? nameParts[1] : "",
                     Email = socialInfo.Email,
-                    ContactNumber = "+1234567890",
-                    Specialization = "General Medicine",
-                    AvailabilityDays = "[\"Monday\",\"Tuesday\",\"Wednesday\",\"Thursday\",\"Friday\"]",
-                    AvailabilityHours = "09:00-17:00"
+                    ContactNumber = request.ContactNumber ?? "+1234567890",
+                    Specialization = request.Specialization ?? "General Medicine",
+                    AvailabilityDays = request.AvailabilityDays ?? "[\"Monday\",\"Tuesday\",\"Wednesday\",\"Thursday\",\"Friday\"]",
+                    AvailabilityHours = request.AvailabilityHours ?? "09:00-17:00"
                 };
 
-                await _doctorRepo.AddWithClinicsAsync(doctor, new List<string> { "clinic-1" });
+                var clinics = request.ClinicIds ?? new List<string> { "clinic-1" };
+                await _doctorRepo.AddWithClinicsAsync(doctor, clinics);
 
                 user = new User
                 {
@@ -157,12 +158,12 @@ public class AuthController : ControllerBase
                     FirstName = nameParts[0],
                     LastName = nameParts.Length > 1 ? nameParts[1] : "",
                     Email = socialInfo.Email,
-                    ContactNumber = "+1234567890",
-                    Gender = "Male",
-                    DateOfBirth = "1996-01-01",
-                    BloodGroup = "O+",
-                    Address = "",
-                    ClinicId = "clinic-1",
+                    ContactNumber = request.ContactNumber ?? "+1234567890",
+                    Gender = request.Gender ?? "Male",
+                    DateOfBirth = request.DateOfBirth ?? "1996-01-01",
+                    BloodGroup = request.BloodGroup ?? "O+",
+                    Address = request.Address ?? "",
+                    ClinicId = string.IsNullOrEmpty(request.ClinicId) ? "clinic-1" : request.ClinicId,
                     RegistrationDate = DateTime.UtcNow.ToString("yyyy-MM-dd")
                 };
                 await _patientRepo.AddAsync(patient);
@@ -174,7 +175,7 @@ public class AuthController : ControllerBase
                     Email = socialInfo.Email,
                     Role = UserRole.Patient,
                     Title = "Registered Patient",
-                    ClinicId = "clinic-1",
+                    ClinicId = string.IsNullOrEmpty(request.ClinicId) ? "clinic-1" : request.ClinicId,
                     PatientId = patientId,
                     PasswordHash = BCrypt.Net.BCrypt.HashPassword("social-default-password-" + Guid.NewGuid().ToString())
                 };
