@@ -132,8 +132,38 @@ public class AuthController : ControllerBase
                     AvailabilityHours = request.AvailabilityHours ?? "09:00-17:00"
                 };
 
-                var clinics = request.ClinicIds ?? new List<string> { "clinic-1" };
-                await _doctorRepo.AddWithClinicsAsync(doctor, clinics);
+                var doctorClinics = new List<DoctorClinic>();
+                if (request.ClinicAvailabilities != null && request.ClinicAvailabilities.Any())
+                {
+                    foreach (var ca in request.ClinicAvailabilities)
+                    {
+                        doctorClinics.Add(new DoctorClinic
+                        {
+                            DoctorId = doctorId,
+                            ClinicId = ca.ClinicId,
+                            AvailabilityHours = ca.AvailabilityHours,
+                            AvailabilityDays = System.Text.Json.JsonSerializer.Serialize(ca.AvailabilityDays),
+                            Status = "Accepted"
+                        });
+                    }
+                }
+                else
+                {
+                    var clinics = request.ClinicIds ?? new List<string> { "clinic-1" };
+                    foreach (var c in clinics)
+                    {
+                        doctorClinics.Add(new DoctorClinic
+                        {
+                            DoctorId = doctorId,
+                            ClinicId = c,
+                            AvailabilityHours = request.AvailabilityHours ?? "09:00-17:00",
+                            AvailabilityDays = request.AvailabilityDays ?? "[\"Monday\",\"Tuesday\",\"Wednesday\",\"Thursday\",\"Friday\"]",
+                            Status = "Accepted"
+                        });
+                    }
+                }
+                doctor.DoctorClinics = doctorClinics;
+                await _doctorRepo.AddAsync(doctor);
 
                 user = new User
                 {

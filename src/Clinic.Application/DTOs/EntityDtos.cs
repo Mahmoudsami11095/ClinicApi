@@ -34,6 +34,13 @@ public class DoctorAvailabilityDto
     public string Hours { get; set; } = string.Empty;
 }
 
+public class DoctorClinicAvailabilityDto
+{
+    public string ClinicId { get; set; } = string.Empty;
+    public string AvailabilityHours { get; set; } = string.Empty;
+    public List<string> AvailabilityDays { get; set; } = new();
+}
+
 public class DoctorDto
 {
     public string Id { get; set; } = string.Empty;
@@ -45,6 +52,7 @@ public class DoctorDto
     public string? Avatar { get; set; }
     public DoctorAvailabilityDto Availability { get; set; } = new();
     public List<string>? ClinicIds { get; set; }
+    public List<DoctorClinicAvailabilityDto>? ClinicAvailabilities { get; set; }
 }
 
 public class AppointmentDto

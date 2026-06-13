@@ -9,4 +9,7 @@ public class DoctorClinic
     public ClinicEntity Clinic { get; set; } = null!;
 
     public string Status { get; set; } = "Accepted";
+    
+    public string? AvailabilityHours { get; set; } // e.g. "09:00-17:00"
+    public string? AvailabilityDays { get; set; } // JSON array: e.g. ["Monday","Wednesday"]
 }
