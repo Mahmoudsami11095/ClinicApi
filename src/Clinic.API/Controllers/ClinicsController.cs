@@ -47,7 +47,9 @@ public class ClinicsController : ControllerBase
                 Address = c.Address, 
                 Phone = c.Phone,
                 CreatorDoctorId = c.CreatorDoctorId,
-                Status = status
+                Status = status,
+                AvailabilityHours = c.AvailabilityHours,
+                AvailabilityDays = c.AvailabilityDays
             };
         }).ToList();
 
@@ -73,7 +75,9 @@ public class ClinicsController : ControllerBase
             Name = dto.Name, 
             Address = dto.Address, 
             Phone = dto.Phone,
-            CreatorDoctorId = doctorIdClaim
+            CreatorDoctorId = doctorIdClaim,
+            AvailabilityHours = dto.AvailabilityHours,
+            AvailabilityDays = dto.AvailabilityDays
         };
         await _repo.AddAsync(entity);
 
@@ -90,7 +94,9 @@ public class ClinicsController : ControllerBase
             Address = entity.Address, 
             Phone = entity.Phone,
             CreatorDoctorId = entity.CreatorDoctorId,
-            Status = "Accepted"
+            Status = "Accepted",
+            AvailabilityHours = entity.AvailabilityHours,
+            AvailabilityDays = entity.AvailabilityDays
         };
         return Ok(new { message = "Success", data = result });
     }
@@ -145,9 +151,11 @@ public class ClinicsController : ControllerBase
         entity.Name = dto.Name;
         entity.Address = dto.Address;
         entity.Phone = dto.Phone;
+        entity.AvailabilityHours = dto.AvailabilityHours;
+        entity.AvailabilityDays = dto.AvailabilityDays;
         await _repo.UpdateAsync(entity);
 
-        var result = new ClinicDto { Id = entity.Id, Name = entity.Name, Address = entity.Address, Phone = entity.Phone, CreatorDoctorId = entity.CreatorDoctorId };
+        var result = new ClinicDto { Id = entity.Id, Name = entity.Name, Address = entity.Address, Phone = entity.Phone, CreatorDoctorId = entity.CreatorDoctorId, AvailabilityHours = entity.AvailabilityHours, AvailabilityDays = entity.AvailabilityDays };
         return Ok(new { message = "Success", data = result });
     }
 
