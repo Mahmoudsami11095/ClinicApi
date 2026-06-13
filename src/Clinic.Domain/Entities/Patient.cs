@@ -12,6 +12,9 @@ public class Patient
     public string BloodGroup { get; set; } = string.Empty;
     public string Address { get; set; } = string.Empty;
     public string RegistrationDate { get; set; } = string.Empty;
+    public string? Allergies { get; set; }
+    public string? ChronicDiseases { get; set; }
+    public string? PastIllnesses { get; set; }
 
     // FK
     public string? ClinicId { get; set; }

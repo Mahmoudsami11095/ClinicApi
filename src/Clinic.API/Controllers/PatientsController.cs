@@ -42,7 +42,8 @@ public class PatientsController : ControllerBase
             Gender = p.Gender, DateOfBirth = p.DateOfBirth,
             ContactNumber = p.ContactNumber, Email = p.Email,
             BloodGroup = p.BloodGroup, Address = p.Address,
-            RegistrationDate = p.RegistrationDate, ClinicId = p.ClinicId
+            RegistrationDate = p.RegistrationDate, ClinicId = p.ClinicId,
+            Allergies = p.Allergies, ChronicDiseases = p.ChronicDiseases, PastIllnesses = p.PastIllnesses
         }).ToList();
         return Ok(new { data = dtos });
     }
@@ -68,7 +69,8 @@ public class PatientsController : ControllerBase
             Gender = dto.Gender, DateOfBirth = dto.DateOfBirth,
             ContactNumber = dto.ContactNumber, Email = dto.Email,
             BloodGroup = dto.BloodGroup, Address = dto.Address,
-            RegistrationDate = dto.RegistrationDate, ClinicId = dto.ClinicId
+            RegistrationDate = dto.RegistrationDate, ClinicId = dto.ClinicId,
+            Allergies = dto.Allergies, ChronicDiseases = dto.ChronicDiseases, PastIllnesses = dto.PastIllnesses
         };
         await _repo.AddAsync(entity);
         return Ok(new { message = "Success" });
@@ -101,6 +103,9 @@ public class PatientsController : ControllerBase
         existing.BloodGroup = dto.BloodGroup;
         existing.Address = dto.Address;
         existing.ClinicId = dto.ClinicId;
+        existing.Allergies = dto.Allergies;
+        existing.ChronicDiseases = dto.ChronicDiseases;
+        existing.PastIllnesses = dto.PastIllnesses;
 
         await _repo.UpdateAsync(existing);
         return Ok(new { message = "Success" });
