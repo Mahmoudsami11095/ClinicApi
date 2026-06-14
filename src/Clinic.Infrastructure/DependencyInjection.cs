@@ -18,7 +18,8 @@ public static class DependencyInjection
     {
         // ── EF Core ──
         services.AddDbContext<ClinicDbContext>(options =>
-            options.UseSqlServer(configuration.GetConnectionString("DefaultConnection")));
+            options.UseSqlServer(configuration.GetConnectionString("DefaultConnection"))
+                   .ConfigureWarnings(w => w.Ignore(Microsoft.EntityFrameworkCore.Diagnostics.RelationalEventId.PendingModelChangesWarning)));
 
         // ── Repositories ──
         services.AddScoped<IClinicRepository, ClinicRepository>();
