@@ -144,4 +144,15 @@ public class UserRepository : GenericRepository<User>, IUserRepository
 
     public async Task<User?> GetByEmailAsync(string email)
         => await _dbSet.FirstOrDefaultAsync(u => u.Email.ToLower() == email.ToLower());
+
+    public async Task<User?> GetByPhoneNumberAsync(string phoneNumber)
+    {
+        var normalizedPhone = phoneNumber.Replace(" ", "").Replace("-", "").Replace("+", "").Trim();
+        return await _dbSet
+            .Include(u => u.Patient)
+            .Include(u => u.Doctor)
+            .FirstOrDefaultAsync(u => 
+                (u.Patient != null && u.Patient.ContactNumber.Replace(" ", "").Replace("-", "").Replace("+", "") == normalizedPhone) ||
+                (u.Doctor != null && u.Doctor.ContactNumber.Replace(" ", "").Replace("-", "").Replace("+", "") == normalizedPhone));
+    }
 }

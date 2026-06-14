@@ -25,9 +25,15 @@ public class OtpResponse
     public string Otp { get; set; } = string.Empty;
 }
 
+public class WhatsAppOtpRequest
+{
+    public string PhoneNumber { get; set; } = string.Empty;
+}
+
 public class VerifyOtpRequest
 {
-    public string Email { get; set; } = string.Empty;
+    public string? Email { get; set; }
+    public string? PhoneNumber { get; set; }
     public string Code { get; set; } = string.Empty;
 }
 

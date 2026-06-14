@@ -18,6 +18,7 @@ public class AuthController : ControllerBase
     private readonly IOtpService _otpService;
     private readonly IEmailService _emailService;
     private readonly ISocialAuthService _socialAuth;
+    private readonly IWhatsAppOtpService _whatsappOtpService;
 
     public AuthController(
         IUserRepository userRepo,
@@ -27,7 +28,8 @@ public class AuthController : ControllerBase
         IJwtService jwtService,
         IOtpService otpService,
         IEmailService emailService,
-        ISocialAuthService socialAuth)
+        ISocialAuthService socialAuth,
+        IWhatsAppOtpService whatsappOtpService)
     {
         _userRepo = userRepo;
         _patientRepo = patientRepo;
@@ -37,6 +39,7 @@ public class AuthController : ControllerBase
         _otpService = otpService;
         _emailService = emailService;
         _socialAuth = socialAuth;
+        _whatsappOtpService = whatsappOtpService;
     }
 
     [HttpPost("login")]
@@ -75,26 +78,70 @@ public class AuthController : ControllerBase
         return Ok(new { message = "OTP sent", otp = code });
     }
 
+    [HttpPost("request-otp")]
+    public async Task<IActionResult> RequestOtp([FromBody] WhatsAppOtpRequest request)
+    {
+        if (string.IsNullOrWhiteSpace(request.PhoneNumber))
+            return BadRequest(new { message = "Phone number is required." });
+
+        var (success, message) = await _whatsappOtpService.RequestOtpAsync(request.PhoneNumber);
+        if (!success)
+        {
+            if (message.Contains("Too many OTP requests", StringComparison.OrdinalIgnoreCase))
+            {
+                return StatusCode(429, new { message });
+            }
+            return BadRequest(new { message });
+        }
+
+        return Ok(new { message = "OTP sent via WhatsApp successfully." });
+    }
+
     [HttpPost("verify-otp")]
     public async Task<IActionResult> VerifyOtp([FromBody] VerifyOtpRequest request)
     {
-        if (string.IsNullOrWhiteSpace(request.Email) || string.IsNullOrWhiteSpace(request.Code))
-            return BadRequest(new { message = "Email and verification code are required" });
+        if (string.IsNullOrWhiteSpace(request.Code))
+            return BadRequest(new { message = "Verification code is required" });
+
+        // WhatsApp OTP Flow (Phone Number)
+        if (!string.IsNullOrWhiteSpace(request.PhoneNumber))
+        {
+            if (!_whatsappOtpService.VerifyOtp(request.PhoneNumber, request.Code))
+                return Unauthorized(new { message = "Invalid or expired verification code" });
+
+            _whatsappOtpService.RemoveOtp(request.PhoneNumber);
+
+            var user = await _userRepo.GetByPhoneNumberAsync(request.PhoneNumber);
+            if (user == null)
+            {
+                return Ok(new { message = "Phone number verified successfully" });
+            }
+
+            var clinicIds = await GetDoctorClinicIds(user);
+            var token = _jwtService.GenerateToken(user, clinicIds);
+            var userDto = MapToUserDto(user, clinicIds);
+
+            return Ok(new { message = "OTP verified", data = userDto, token });
+        }
+
+        // Email OTP Flow
+        if (string.IsNullOrWhiteSpace(request.Email))
+            return BadRequest(new { message = "Email or Phone Number is required" });
 
         if (!_otpService.VerifyOtp(request.Email, request.Code))
             return Unauthorized(new { message = "Invalid verification code" });
 
         _otpService.RemoveOtp(request.Email);
 
-        var user = await _userRepo.GetByEmailAsync(request.Email);
-        if (user == null)
+        var emailUser = await _userRepo.GetByEmailAsync(request.Email);
+        if (emailUser == null)
             return Unauthorized(new { message = "Invalid verification code" });
 
-        var clinicIds = await GetDoctorClinicIds(user);
-        var token = _jwtService.GenerateToken(user, clinicIds);
-        var userDto = MapToUserDto(user, clinicIds);
+        var emailClinicIds = await GetDoctorClinicIds(emailUser);
+        var emailToken = _jwtService.GenerateToken(emailUser, emailClinicIds);
+        var emailUserDto = MapToUserDto(emailUser, emailClinicIds);
 
-        return Ok(new { message = "OTP verified", data = userDto, token });
+        return Ok(new { message = "OTP verified", data = emailUserDto, token = emailToken });
     }
 
     [HttpPost("social")]
