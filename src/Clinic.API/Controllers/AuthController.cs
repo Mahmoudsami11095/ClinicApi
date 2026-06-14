@@ -132,13 +132,16 @@ public class AuthController : ControllerBase
         if (string.IsNullOrWhiteSpace(request.Code))
             return BadRequest(new { message = "Verification code is required" });
 
+        bool remove = request.RemoveAfterVerification ?? true;
+
         // WhatsApp OTP Flow (Explicit Phone Number)
         if (!string.IsNullOrWhiteSpace(request.PhoneNumber))
         {
             if (!_whatsappOtpService.VerifyOtp(request.PhoneNumber, request.Code))
                 return Unauthorized(new { message = "Invalid or expired verification code" });
 
-            _whatsappOtpService.RemoveOtp(request.PhoneNumber);
+            if (remove)
+                _whatsappOtpService.RemoveOtp(request.PhoneNumber);
 
             var user = await _userRepo.GetByPhoneNumberAsync(request.PhoneNumber);
             if (user == null)
@@ -164,11 +167,12 @@ public class AuthController : ControllerBase
             if (!_whatsappOtpService.VerifyOtp(request.Email, request.Code))
                 return Unauthorized(new { message = "Invalid or expired verification code" });
 
-            _whatsappOtpService.RemoveOtp(request.Email);
+            if (remove)
+                _whatsappOtpService.RemoveOtp(request.Email);
 
             var user = await _userRepo.GetByPhoneNumberAsync(request.Email);
             if (user == null)
-                return Unauthorized(new { message = "Invalid verification code" });
+                return Ok(new { message = "Phone number verified successfully" });
 
             var clinicIds = await GetDoctorClinicIds(user);
             var token = _jwtService.GenerateToken(user, clinicIds);
@@ -181,11 +185,12 @@ public class AuthController : ControllerBase
         if (!_otpService.VerifyOtp(request.Email, request.Code))
             return Unauthorized(new { message = "Invalid verification code" });
 
-        _otpService.RemoveOtp(request.Email);
+        if (remove)
+            _otpService.RemoveOtp(request.Email);
 
         var emailUser = await _userRepo.GetByEmailAsync(request.Email);
         if (emailUser == null)
-            return Unauthorized(new { message = "Invalid verification code" });
+            return Ok(new { message = "Email verified successfully" });
 
         var emailClinicIds = await GetDoctorClinicIds(emailUser);
         var emailToken = _jwtService.GenerateToken(emailUser, emailClinicIds);
