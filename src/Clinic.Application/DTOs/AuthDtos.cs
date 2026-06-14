@@ -141,4 +141,14 @@ public class UserProfileDto
     public string? Allergies { get; set; }
     public string? ChronicDiseases { get; set; }
     public string? PastIllnesses { get; set; }
+
+    // Security verification codes
+    public string? EmailOtpCode { get; set; }
+    public string? PhoneOtpCode { get; set; }
+}
+
+public class ProfileOtpRequest
+{
+    public string? Email { get; set; }
+    public string? ContactNumber { get; set; }
 }
