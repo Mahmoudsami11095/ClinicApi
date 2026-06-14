@@ -13,6 +13,7 @@ public class AuthController : ControllerBase
     private readonly IUserRepository _userRepo;
     private readonly IPatientRepository _patientRepo;
     private readonly IDoctorRepository _doctorRepo;
+    private readonly IClinicRepository _clinicRepo;
     private readonly IJwtService _jwtService;
     private readonly IOtpService _otpService;
     private readonly IEmailService _emailService;
@@ -22,6 +23,7 @@ public class AuthController : ControllerBase
         IUserRepository userRepo,
         IPatientRepository patientRepo,
         IDoctorRepository doctorRepo,
+        IClinicRepository clinicRepo,
         IJwtService jwtService,
         IOtpService otpService,
         IEmailService emailService,
@@ -30,6 +32,7 @@ public class AuthController : ControllerBase
         _userRepo = userRepo;
         _patientRepo = patientRepo;
         _doctorRepo = doctorRepo;
+        _clinicRepo = clinicRepo;
         _jwtService = jwtService;
         _otpService = otpService;
         _emailService = emailService;
@@ -133,7 +136,30 @@ public class AuthController : ControllerBase
                 };
 
                 var doctorClinics = new List<DoctorClinic>();
-                if (request.ClinicAvailabilities != null && request.ClinicAvailabilities.Any())
+                if (!string.IsNullOrEmpty(request.ClinicName))
+                {
+                    var newClinic = new ClinicEntity
+                    {
+                        Id = Guid.NewGuid().ToString(),
+                        Name = request.ClinicName,
+                        Address = request.ClinicAddress ?? "Primary Address",
+                        Phone = request.ClinicPhone ?? request.ContactNumber ?? "+1234567890",
+                        CreatorDoctorId = doctorId,
+                        AvailabilityHours = request.AvailabilityHours ?? "09:00-17:00",
+                        AvailabilityDays = request.AvailabilityDays ?? "[\"Monday\",\"Tuesday\",\"Wednesday\",\"Thursday\",\"Friday\"]"
+                    };
+                    await _clinicRepo.AddAsync(newClinic);
+
+                    doctorClinics.Add(new DoctorClinic
+                    {
+                        DoctorId = doctorId,
+                        ClinicId = newClinic.Id,
+                        AvailabilityHours = request.AvailabilityHours ?? "09:00-17:00",
+                        AvailabilityDays = request.AvailabilityDays ?? "[\"Monday\",\"Tuesday\",\"Wednesday\",\"Thursday\",\"Friday\"]",
+                        Status = "Accepted"
+                    });
+                }
+                else if (request.ClinicAvailabilities != null && request.ClinicAvailabilities.Any())
                 {
                     foreach (var ca in request.ClinicAvailabilities)
                     {
@@ -143,21 +169,6 @@ public class AuthController : ControllerBase
                             ClinicId = ca.ClinicId,
                             AvailabilityHours = ca.AvailabilityHours,
                             AvailabilityDays = System.Text.Json.JsonSerializer.Serialize(ca.AvailabilityDays),
-                            Status = "Accepted"
-                        });
-                    }
-                }
-                else
-                {
-                    var clinics = request.ClinicIds ?? new List<string> { "clinic-1" };
-                    foreach (var c in clinics)
-                    {
-                        doctorClinics.Add(new DoctorClinic
-                        {
-                            DoctorId = doctorId,
-                            ClinicId = c,
-                            AvailabilityHours = request.AvailabilityHours ?? "09:00-17:00",
-                            AvailabilityDays = request.AvailabilityDays ?? "[\"Monday\",\"Tuesday\",\"Wednesday\",\"Thursday\",\"Friday\"]",
                             Status = "Accepted"
                         });
                     }
@@ -263,6 +274,8 @@ public class AuthController : ControllerBase
             patientId = Guid.NewGuid().ToString();
         }
 
+        List<string>? registeredClinicIds = request.ClinicIds;
+
         // Create corresponding doctor record if needed
         string? doctorId = request.DoctorId;
         if (role == UserRole.Doctor && string.IsNullOrEmpty(doctorId))
@@ -280,6 +293,33 @@ public class AuthController : ControllerBase
                 AvailabilityDays = "[\"Monday\",\"Tuesday\",\"Wednesday\",\"Thursday\",\"Friday\"]",
                 AvailabilityHours = "09:00-17:00"
             };
+            var clinics = request.ClinicIds ?? new List<string>();
+            if (clinics.Count == 0)
+            {
+                if (!string.IsNullOrEmpty(request.ClinicName))
+                {
+                    var newClinic = new ClinicEntity
+                    {
+                        Id = Guid.NewGuid().ToString(),
+                        Name = request.ClinicName,
+                        Address = request.ClinicAddress ?? "Primary Address",
+                        Phone = request.ClinicPhone ?? request.Phone ?? "+1234567890",
+                        CreatorDoctorId = doctorId,
+                        AvailabilityHours = request.ClinicAvailabilityHours ?? request.AvailabilityHours ?? "09:00-17:00",
+                        AvailabilityDays = request.ClinicAvailabilityDays ?? request.AvailabilityDays ?? "[\"Monday\",\"Tuesday\",\"Wednesday\",\"Thursday\",\"Friday\"]"
+                    };
+                    await _clinicRepo.AddAsync(newClinic);
+                    clinics.Add(newClinic.Id);
+                }
+                else if (!string.IsNullOrEmpty(request.ClinicId))
+                {
+                    clinics.Add(request.ClinicId);
+                }
+                else
+                {
+                    clinics.Add("clinic-1");
+                }
+            }
 
             var doctorClinics = new List<DoctorClinic>();
             if (request.ClinicAvailabilities != null && request.ClinicAvailabilities.Any())
@@ -295,11 +335,10 @@ public class AuthController : ControllerBase
                         Status = "Accepted"
                     });
                 }
+                registeredClinicIds = request.ClinicAvailabilities.Select(ca => ca.ClinicId).ToList();
             }
             else
             {
-                var clinics = request.ClinicIds ?? 
-                    (string.IsNullOrEmpty(request.ClinicId) ? new List<string> { "clinic-1" } : new List<string> { request.ClinicId });
                 foreach (var c in clinics)
                 {
                     doctorClinics.Add(new DoctorClinic
@@ -311,6 +350,7 @@ public class AuthController : ControllerBase
                         Status = "Accepted"
                     });
                 }
+                registeredClinicIds = clinics;
             }
             doctor.DoctorClinics = doctorClinics;
             await _doctorRepo.AddAsync(doctor);
@@ -354,7 +394,7 @@ public class AuthController : ControllerBase
 
         await _userRepo.AddAsync(newUser);
 
-        var clinicIds = request.ClinicIds ??
+        var clinicIds = registeredClinicIds ??
             (string.IsNullOrEmpty(request.ClinicId) ? new List<string>() : new List<string> { request.ClinicId });
         var userDto = MapToUserDto(newUser, clinicIds);
 

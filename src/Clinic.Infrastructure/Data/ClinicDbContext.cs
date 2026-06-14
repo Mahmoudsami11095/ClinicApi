@@ -30,6 +30,8 @@ public class ClinicDbContext : DbContext
             entity.Property(e => e.Name).HasMaxLength(200).IsRequired();
             entity.Property(e => e.Address).HasMaxLength(500);
             entity.Property(e => e.Phone).HasMaxLength(50);
+            entity.Property(e => e.AvailabilityHours).HasMaxLength(50);
+            entity.Property(e => e.AvailabilityDays).HasMaxLength(500);
         });
 
         // ── User ──

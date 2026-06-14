@@ -8,6 +8,8 @@ public class ClinicDto
     public string Phone { get; set; } = string.Empty;
     public string? CreatorDoctorId { get; set; }
     public string? Status { get; set; }
+    public string? AvailabilityHours { get; set; }
+    public string? AvailabilityDays { get; set; }
 }
 
 public class PatientDto
