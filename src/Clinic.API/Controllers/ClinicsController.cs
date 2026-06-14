@@ -1,8 +1,11 @@
 using Clinic.Application.DTOs;
 using Clinic.Application.Interfaces;
 using Clinic.Domain.Entities;
+using Clinic.Domain.Enums;
+using Clinic.Infrastructure.Data;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 
 namespace Clinic.API.Controllers;
 
@@ -13,11 +16,13 @@ public class ClinicsController : ControllerBase
 {
     private readonly IClinicRepository _repo;
     private readonly IDoctorRepository _doctorRepo;
+    private readonly ClinicDbContext _context;
 
-    public ClinicsController(IClinicRepository repo, IDoctorRepository doctorRepo)
+    public ClinicsController(IClinicRepository repo, IDoctorRepository doctorRepo, ClinicDbContext context)
     {
         _repo = repo;
         _doctorRepo = doctorRepo;
+        _context = context;
     }
 
     [HttpGet]
@@ -121,6 +126,105 @@ public class ClinicsController : ControllerBase
         return Ok(new { message = "Doctors assigned successfully" });
     }
 
+    [HttpPost("{id}/assign-doctors-by-emails")]
+    public async Task<IActionResult> AssignDoctorsByEmails(string id, [FromBody] List<string> emails)
+    {
+        var clinic = await _repo.GetByIdAsync(id);
+        if (clinic == null) return NotFound(new { message = "Clinic not found" });
+
+        var doctorIdClaim = User.FindFirst("doctorId")?.Value;
+        // If doctor role, they must be the creator of the clinic
+        if (!string.IsNullOrEmpty(doctorIdClaim) && clinic.CreatorDoctorId != doctorIdClaim)
+        {
+            return StatusCode(403, new { message = "Only the clinic creator can manage doctor assignments" });
+        }
+
+        if (emails == null || !emails.Any())
+            return BadRequest(new { message = "Email list cannot be empty" });
+
+        var notFoundEmails = new List<string>();
+        var assignedEmails = new List<string>();
+
+        foreach (var email in emails)
+        {
+            var cleanEmail = email.Trim().ToLower();
+            var doctor = await _context.Doctors.FirstOrDefaultAsync(d => d.Email.ToLower() == cleanEmail);
+            if (doctor == null)
+            {
+                notFoundEmails.Add(email);
+                continue;
+            }
+
+            var exists = await _context.DoctorClinics.AnyAsync(dc => dc.DoctorId == doctor.Id && dc.ClinicId == id);
+            if (!exists)
+            {
+                await _context.DoctorClinics.AddAsync(new DoctorClinic
+                {
+                    DoctorId = doctor.Id,
+                    ClinicId = id,
+                    Status = "Pending"
+                });
+                assignedEmails.Add(email);
+            }
+        }
+
+        await _context.SaveChangesAsync();
+
+        if (notFoundEmails.Any())
+        {
+            return Ok(new { 
+                message = $"Assigned {assignedEmails.Count} doctor(s). Note: Some emails were not found or already assigned.",
+                assigned = assignedEmails,
+                notFound = notFoundEmails
+            });
+        }
+
+        return Ok(new { message = "Doctors assigned successfully", assigned = assignedEmails });
+    }
+
+    [HttpPost("{id}/assign-assistant")]
+    public async Task<IActionResult> AssignAssistant(string id, [FromBody] AssignAssistantRequest request)
+    {
+        var clinic = await _repo.GetByIdAsync(id);
+        if (clinic == null) return NotFound(new { message = "Clinic not found" });
+
+        var doctorIdClaim = User.FindFirst("doctorId")?.Value;
+        // Verify user has permission: only the clinic creator, assigned doctor or admin can manage it
+        if (!string.IsNullOrEmpty(doctorIdClaim))
+        {
+            var isCreator = clinic.CreatorDoctorId == doctorIdClaim;
+            var isAssigned = await _context.DoctorClinics.AnyAsync(dc => dc.DoctorId == doctorIdClaim && dc.ClinicId == id && dc.Status == "Accepted");
+            if (!isCreator && !isAssigned)
+            {
+                return StatusCode(403, new { message = "You do not have permission to manage this clinic" });
+            }
+        }
+
+        if (string.IsNullOrWhiteSpace(request.Email))
+            return BadRequest(new { message = "Assistant email is required" });
+
+        var cleanEmail = request.Email.Trim().ToLower();
+        var assistantUser = await _context.Users.FirstOrDefaultAsync(u => u.Email.ToLower() == cleanEmail);
+        
+        if (assistantUser == null)
+            return NotFound(new { message = $"No user found with email {request.Email}" });
+
+        if (assistantUser.Role != UserRole.Assistant)
+            return BadRequest(new { message = $"User with email {request.Email} is not an Assistant" });
+
+        // Update assistant's clinic and supervising doctor
+        assistantUser.ClinicId = id;
+        if (!string.IsNullOrEmpty(doctorIdClaim))
+        {
+            assistantUser.DoctorId = doctorIdClaim;
+        }
+
+        _context.Users.Update(assistantUser);
+        await _context.SaveChangesAsync();
+
+        return Ok(new { message = "Assistant assigned successfully", assistant = assistantUser.Name });
+    }
+
     [HttpPost("{id}/respond-assignment")]
     public async Task<IActionResult> RespondAssignment(string id, [FromBody] RespondAssignmentRequest request)
     {
@@ -180,4 +284,9 @@ public class ClinicsController : ControllerBase
 public class RespondAssignmentRequest
 {
     public string Status { get; set; } = string.Empty;
+}
+
+public class AssignAssistantRequest
+{
+    public string Email { get; set; } = string.Empty;
 }
