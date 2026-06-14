@@ -3,6 +3,7 @@ using Clinic.Application.Interfaces;
 using Clinic.Domain.Entities;
 using Clinic.Domain.Enums;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Authorization;
 
 namespace Clinic.API.Controllers;
 
@@ -554,6 +555,130 @@ public class AuthController : ControllerBase
             dtos.Add(MapToUserDto(u, clinicIds));
         }
         return Ok(new { data = dtos });
+    }
+
+    [HttpGet("profile")]
+    [Authorize]
+    public async Task<IActionResult> GetProfile()
+    {
+        var userId = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+        if (string.IsNullOrEmpty(userId))
+            return Unauthorized();
+
+        var user = await _userRepo.GetByIdAsync(userId);
+        if (user == null)
+            return NotFound(new { message = "User not found" });
+
+        var profile = new UserProfileDto
+        {
+            Name = user.Name,
+            Email = user.Email,
+            Role = user.Role.ToString().ToLower(),
+            Title = user.Title ?? "",
+            ClinicId = user.ClinicId,
+            DoctorId = user.DoctorId,
+            PatientId = user.PatientId
+        };
+
+        if (user.Role == UserRole.Doctor && !string.IsNullOrEmpty(user.DoctorId))
+        {
+            var doctor = await _doctorRepo.GetByIdAsync(user.DoctorId);
+            if (doctor != null)
+            {
+                profile.Specialization = doctor.Specialization;
+                profile.ContactNumber = doctor.ContactNumber;
+                profile.Avatar = doctor.Avatar;
+                profile.AvailabilityDays = doctor.AvailabilityDays;
+                profile.AvailabilityHours = doctor.AvailabilityHours;
+            }
+        }
+        else if (user.Role == UserRole.Patient && !string.IsNullOrEmpty(user.PatientId))
+        {
+            var patient = await _patientRepo.GetByIdAsync(user.PatientId);
+            if (patient != null)
+            {
+                profile.Gender = patient.Gender;
+                profile.DateOfBirth = patient.DateOfBirth;
+                profile.BloodGroup = patient.BloodGroup;
+                profile.Address = patient.Address;
+                profile.ContactNumber = patient.ContactNumber;
+                profile.Allergies = patient.Allergies;
+                profile.ChronicDiseases = patient.ChronicDiseases;
+                profile.PastIllnesses = patient.PastIllnesses;
+            }
+        }
+
+        return Ok(new { data = profile });
+    }
+
+    [HttpPut("profile")]
+    [Authorize]
+    public async Task<IActionResult> UpdateProfile([FromBody] UserProfileDto dto)
+    {
+        var userId = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+        if (string.IsNullOrEmpty(userId))
+            return Unauthorized();
+
+        var user = await _userRepo.GetByIdAsync(userId);
+        if (user == null)
+            return NotFound(new { message = "User not found" });
+
+        if (!string.Equals(user.Email, dto.Email, StringComparison.OrdinalIgnoreCase))
+        {
+            var existing = await _userRepo.GetByEmailAsync(dto.Email);
+            if (existing != null)
+                return BadRequest(new { message = "Email is already in use by another account" });
+        }
+
+        user.Name = dto.Name;
+        user.Email = dto.Email;
+
+        if (!string.IsNullOrWhiteSpace(dto.Password))
+        {
+            user.PasswordHash = BCrypt.Net.BCrypt.HashPassword(dto.Password);
+        }
+
+        await _userRepo.UpdateAsync(user);
+
+        if (user.Role == UserRole.Doctor && !string.IsNullOrEmpty(user.DoctorId))
+        {
+            var doctor = await _doctorRepo.GetByIdAsync(user.DoctorId);
+            if (doctor != null)
+            {
+                var nameParts = dto.Name.Split(' ', 2);
+                doctor.FirstName = nameParts[0];
+                doctor.LastName = nameParts.Length > 1 ? nameParts[1] : "";
+                doctor.Email = dto.Email;
+                doctor.Specialization = dto.Specialization ?? doctor.Specialization;
+                doctor.ContactNumber = dto.ContactNumber ?? doctor.ContactNumber;
+                doctor.Avatar = dto.Avatar ?? doctor.Avatar;
+                doctor.AvailabilityDays = dto.AvailabilityDays ?? doctor.AvailabilityDays;
+                doctor.AvailabilityHours = dto.AvailabilityHours ?? doctor.AvailabilityHours;
+                await _doctorRepo.UpdateAsync(doctor);
+            }
+        }
+        else if (user.Role == UserRole.Patient && !string.IsNullOrEmpty(user.PatientId))
+        {
+            var patient = await _patientRepo.GetByIdAsync(user.PatientId);
+            if (patient != null)
+            {
+                var nameParts = dto.Name.Split(' ', 2);
+                patient.FirstName = nameParts[0];
+                patient.LastName = nameParts.Length > 1 ? nameParts[1] : "";
+                patient.Email = dto.Email;
+                patient.Gender = dto.Gender ?? patient.Gender;
+                patient.DateOfBirth = dto.DateOfBirth ?? patient.DateOfBirth;
+                patient.BloodGroup = dto.BloodGroup ?? patient.BloodGroup;
+                patient.Address = dto.Address ?? patient.Address;
+                patient.ContactNumber = dto.ContactNumber ?? patient.ContactNumber;
+                patient.Allergies = dto.Allergies ?? patient.Allergies;
+                patient.ChronicDiseases = dto.ChronicDiseases ?? patient.ChronicDiseases;
+                patient.PastIllnesses = dto.PastIllnesses ?? patient.PastIllnesses;
+                await _patientRepo.UpdateAsync(patient);
+            }
+        }
+
+        return Ok(new { message = "Profile updated successfully", data = dto });
     }
 
     // ── Helpers ──

@@ -113,3 +113,32 @@ public class UserDto
     public string? DoctorId { get; set; }
     public string? PatientId { get; set; }
 }
+
+// ── User Profile DTO ──
+public class UserProfileDto
+{
+    public string Name { get; set; } = string.Empty;
+    public string Email { get; set; } = string.Empty;
+    public string? Password { get; set; } // For optional updates
+    public string Role { get; set; } = string.Empty;
+    public string Title { get; set; } = string.Empty;
+    public string? ClinicId { get; set; }
+
+    // Doctor Specific fields
+    public string? DoctorId { get; set; }
+    public string? Specialization { get; set; }
+    public string? ContactNumber { get; set; }
+    public string? Avatar { get; set; }
+    public string? AvailabilityDays { get; set; }
+    public string? AvailabilityHours { get; set; }
+
+    // Patient Specific fields
+    public string? PatientId { get; set; }
+    public string? Gender { get; set; }
+    public string? DateOfBirth { get; set; }
+    public string? BloodGroup { get; set; }
+    public string? Address { get; set; }
+    public string? Allergies { get; set; }
+    public string? ChronicDiseases { get; set; }
+    public string? PastIllnesses { get; set; }
+}
