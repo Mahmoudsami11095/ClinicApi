@@ -3,6 +3,7 @@ using Clinic.Application.Interfaces;
 using Clinic.Domain.Entities;
 using Clinic.Domain.Enums;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Authorization;
 
 namespace Clinic.API.Controllers;
 
@@ -131,13 +132,16 @@ public class AuthController : ControllerBase
         if (string.IsNullOrWhiteSpace(request.Code))
             return BadRequest(new { message = "Verification code is required" });
 
+        bool remove = request.RemoveAfterVerification ?? true;
+
         // WhatsApp OTP Flow (Explicit Phone Number)
         if (!string.IsNullOrWhiteSpace(request.PhoneNumber))
         {
             if (!_whatsappOtpService.VerifyOtp(request.PhoneNumber, request.Code))
                 return Unauthorized(new { message = "Invalid or expired verification code" });
 
-            _whatsappOtpService.RemoveOtp(request.PhoneNumber);
+            if (remove)
+                _whatsappOtpService.RemoveOtp(request.PhoneNumber);
 
             var user = await _userRepo.GetByPhoneNumberAsync(request.PhoneNumber);
             if (user == null)
@@ -163,11 +167,12 @@ public class AuthController : ControllerBase
             if (!_whatsappOtpService.VerifyOtp(request.Email, request.Code))
                 return Unauthorized(new { message = "Invalid or expired verification code" });
 
-            _whatsappOtpService.RemoveOtp(request.Email);
+            if (remove)
+                _whatsappOtpService.RemoveOtp(request.Email);
 
             var user = await _userRepo.GetByPhoneNumberAsync(request.Email);
             if (user == null)
-                return Unauthorized(new { message = "Invalid verification code" });
+                return Ok(new { message = "Phone number verified successfully" });
 
             var clinicIds = await GetDoctorClinicIds(user);
             var token = _jwtService.GenerateToken(user, clinicIds);
@@ -180,11 +185,12 @@ public class AuthController : ControllerBase
         if (!_otpService.VerifyOtp(request.Email, request.Code))
             return Unauthorized(new { message = "Invalid verification code" });
 
-        _otpService.RemoveOtp(request.Email);
+        if (remove)
+            _otpService.RemoveOtp(request.Email);
 
         var emailUser = await _userRepo.GetByEmailAsync(request.Email);
         if (emailUser == null)
-            return Unauthorized(new { message = "Invalid verification code" });
+            return Ok(new { message = "Email verified successfully" });
 
         var emailClinicIds = await GetDoctorClinicIds(emailUser);
         var emailToken = _jwtService.GenerateToken(emailUser, emailClinicIds);
@@ -554,6 +560,225 @@ public class AuthController : ControllerBase
             dtos.Add(MapToUserDto(u, clinicIds));
         }
         return Ok(new { data = dtos });
+    }
+
+    [HttpGet("profile")]
+    [Authorize]
+    public async Task<IActionResult> GetProfile()
+    {
+        var userId = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+        if (string.IsNullOrEmpty(userId))
+            return Unauthorized();
+
+        var user = await _userRepo.GetByIdAsync(userId);
+        if (user == null)
+            return NotFound(new { message = "User not found" });
+
+        var profile = new UserProfileDto
+        {
+            Name = user.Name,
+            Email = user.Email,
+            Role = user.Role.ToString().ToLower(),
+            Title = user.Title ?? "",
+            ClinicId = user.ClinicId,
+            DoctorId = user.DoctorId,
+            PatientId = user.PatientId
+        };
+
+        if (user.Role == UserRole.Doctor && !string.IsNullOrEmpty(user.DoctorId))
+        {
+            var doctor = await _doctorRepo.GetByIdAsync(user.DoctorId);
+            if (doctor != null)
+            {
+                profile.Specialization = doctor.Specialization;
+                profile.ContactNumber = doctor.ContactNumber;
+                profile.Avatar = doctor.Avatar;
+                profile.AvailabilityDays = doctor.AvailabilityDays;
+                profile.AvailabilityHours = doctor.AvailabilityHours;
+            }
+        }
+        else if (user.Role == UserRole.Patient && !string.IsNullOrEmpty(user.PatientId))
+        {
+            var patient = await _patientRepo.GetByIdAsync(user.PatientId);
+            if (patient != null)
+            {
+                profile.Gender = patient.Gender;
+                profile.DateOfBirth = patient.DateOfBirth;
+                profile.BloodGroup = patient.BloodGroup;
+                profile.Address = patient.Address;
+                profile.ContactNumber = patient.ContactNumber;
+                profile.Allergies = patient.Allergies;
+                profile.ChronicDiseases = patient.ChronicDiseases;
+                profile.PastIllnesses = patient.PastIllnesses;
+            }
+        }
+
+        return Ok(new { data = profile });
+    }
+
+    [HttpPost("profile-send-otp")]
+    [Authorize]
+    public async Task<IActionResult> ProfileSendOtp([FromBody] ProfileOtpRequest request)
+    {
+        var userId = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+        if (string.IsNullOrEmpty(userId))
+            return Unauthorized();
+
+        if (string.IsNullOrWhiteSpace(request.Email) && string.IsNullOrWhiteSpace(request.ContactNumber))
+            return BadRequest(new { message = "Email or Contact Number is required" });
+
+        if (!string.IsNullOrWhiteSpace(request.Email))
+        {
+            var existing = await _userRepo.GetByEmailAsync(request.Email);
+            if (existing != null && existing.Id != userId)
+                return BadRequest(new { message = "Email is already in use by another account" });
+
+            var emailCode = _otpService.GenerateOtp(request.Email);
+            await _emailService.SendEmailAsync(request.Email, "Clinic Profile Email Verification", $"Your profile email verification code is: <strong>{emailCode}</strong>. It is valid for 10 minutes.");
+            return Ok(new { message = "OTP sent to your email successfully", emailOtp = emailCode });
+        }
+
+        if (!string.IsNullOrWhiteSpace(request.ContactNumber))
+        {
+            var existingUser = await _userRepo.GetByPhoneNumberAsync(request.ContactNumber);
+            if (existingUser != null && existingUser.Id != userId)
+                return BadRequest(new { message = "Phone number is already in use by another account" });
+
+            var (success, message, whatsappCode) = await _whatsappOtpService.RequestOtpAsync(request.ContactNumber);
+            if (!success)
+            {
+                if (message.Contains("Too many OTP requests", StringComparison.OrdinalIgnoreCase))
+                {
+                    return StatusCode(429, new { message });
+                }
+                return BadRequest(new { message });
+            }
+
+            return Ok(new { message = "OTP sent to your phone via WhatsApp successfully", whatsappOtp = whatsappCode });
+        }
+
+        return BadRequest(new { message = "Invalid request" });
+    }
+
+    [HttpPut("profile")]
+    [Authorize]
+    public async Task<IActionResult> UpdateProfile([FromBody] UserProfileDto dto)
+    {
+        var userId = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+        if (string.IsNullOrEmpty(userId))
+            return Unauthorized();
+
+        var user = await _userRepo.GetByIdAsync(userId);
+        if (user == null)
+            return NotFound(new { message = "User not found" });
+
+        // 1. Email OTP Check
+        if (!string.Equals(user.Email, dto.Email, StringComparison.OrdinalIgnoreCase))
+        {
+            var existing = await _userRepo.GetByEmailAsync(dto.Email);
+            if (existing != null && existing.Id != userId)
+                return BadRequest(new { message = "Email is already in use by another account" });
+
+            if (string.IsNullOrWhiteSpace(dto.EmailOtpCode))
+                return BadRequest(new { message = "Email verification code is required to update email" });
+
+            if (!_otpService.VerifyOtp(dto.Email, dto.EmailOtpCode))
+                return BadRequest(new { message = "Invalid or expired Email verification code" });
+
+            _otpService.RemoveOtp(dto.Email);
+        }
+
+        Doctor? doctor = null;
+        Patient? patient = null;
+
+        if (user.Role == UserRole.Doctor && !string.IsNullOrEmpty(user.DoctorId))
+        {
+            doctor = await _doctorRepo.GetByIdAsync(user.DoctorId);
+        }
+        else if (user.Role == UserRole.Patient && !string.IsNullOrEmpty(user.PatientId))
+        {
+            patient = await _patientRepo.GetByIdAsync(user.PatientId);
+        }
+
+        // 2. Phone OTP Check
+        if (doctor != null && !string.Equals(doctor.ContactNumber, dto.ContactNumber, StringComparison.OrdinalIgnoreCase))
+        {
+            if (string.IsNullOrWhiteSpace(dto.ContactNumber))
+                return BadRequest(new { message = "Contact number cannot be empty" });
+
+            var existingUser = await _userRepo.GetByPhoneNumberAsync(dto.ContactNumber);
+            if (existingUser != null && existingUser.Id != userId)
+                return BadRequest(new { message = "Phone number is already in use by another account" });
+
+            if (string.IsNullOrWhiteSpace(dto.PhoneOtpCode))
+                return BadRequest(new { message = "WhatsApp verification code is required to update phone number" });
+
+            if (!_whatsappOtpService.VerifyOtp(dto.ContactNumber, dto.PhoneOtpCode))
+                return BadRequest(new { message = "Invalid or expired WhatsApp verification code" });
+
+            _whatsappOtpService.RemoveOtp(dto.ContactNumber);
+        }
+        else if (patient != null && !string.Equals(patient.ContactNumber, dto.ContactNumber, StringComparison.OrdinalIgnoreCase))
+        {
+            if (string.IsNullOrWhiteSpace(dto.ContactNumber))
+                return BadRequest(new { message = "Contact number cannot be empty" });
+
+            var existingUser = await _userRepo.GetByPhoneNumberAsync(dto.ContactNumber);
+            if (existingUser != null && existingUser.Id != userId)
+                return BadRequest(new { message = "Phone number is already in use by another account" });
+
+            if (string.IsNullOrWhiteSpace(dto.PhoneOtpCode))
+                return BadRequest(new { message = "WhatsApp verification code is required to update phone number" });
+
+            if (!_whatsappOtpService.VerifyOtp(dto.ContactNumber, dto.PhoneOtpCode))
+                return BadRequest(new { message = "Invalid or expired WhatsApp verification code" });
+
+            _whatsappOtpService.RemoveOtp(dto.ContactNumber);
+        }
+
+        // Update core User
+        user.Name = dto.Name;
+        user.Email = dto.Email;
+
+        if (!string.IsNullOrWhiteSpace(dto.Password))
+        {
+            user.PasswordHash = BCrypt.Net.BCrypt.HashPassword(dto.Password);
+        }
+
+        await _userRepo.UpdateAsync(user);
+
+        // Update Role-specific models
+        if (doctor != null)
+        {
+            var nameParts = dto.Name.Split(' ', 2);
+            doctor.FirstName = nameParts[0];
+            doctor.LastName = nameParts.Length > 1 ? nameParts[1] : "";
+            doctor.Email = dto.Email;
+            doctor.Specialization = dto.Specialization ?? doctor.Specialization;
+            doctor.ContactNumber = dto.ContactNumber ?? doctor.ContactNumber;
+            doctor.Avatar = dto.Avatar ?? doctor.Avatar;
+            doctor.AvailabilityDays = dto.AvailabilityDays ?? doctor.AvailabilityDays;
+            doctor.AvailabilityHours = dto.AvailabilityHours ?? doctor.AvailabilityHours;
+            await _doctorRepo.UpdateAsync(doctor);
+        }
+        else if (patient != null)
+        {
+            var nameParts = dto.Name.Split(' ', 2);
+            patient.FirstName = nameParts[0];
+            patient.LastName = nameParts.Length > 1 ? nameParts[1] : "";
+            patient.Email = dto.Email;
+            patient.Gender = dto.Gender ?? patient.Gender;
+            patient.DateOfBirth = dto.DateOfBirth ?? patient.DateOfBirth;
+            patient.BloodGroup = dto.BloodGroup ?? patient.BloodGroup;
+            patient.Address = dto.Address ?? patient.Address;
+            patient.ContactNumber = dto.ContactNumber ?? patient.ContactNumber;
+            patient.Allergies = dto.Allergies ?? patient.Allergies;
+            patient.ChronicDiseases = dto.ChronicDiseases ?? patient.ChronicDiseases;
+            patient.PastIllnesses = dto.PastIllnesses ?? patient.PastIllnesses;
+            await _patientRepo.UpdateAsync(patient);
+        }
+
+        return Ok(new { message = "Profile updated successfully", data = dto });
     }
 
     // ── Helpers ──
