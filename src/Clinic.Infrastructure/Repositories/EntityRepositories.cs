@@ -148,11 +148,29 @@ public class UserRepository : GenericRepository<User>, IUserRepository
     public async Task<User?> GetByPhoneNumberAsync(string phoneNumber)
     {
         var normalizedPhone = phoneNumber.Replace(" ", "").Replace("-", "").Replace("+", "").Trim();
-        return await _dbSet
+        if (normalizedPhone.Length > 9)
+        {
+            normalizedPhone = normalizedPhone.Substring(normalizedPhone.Length - 9);
+        }
+
+        var users = await _dbSet
             .Include(u => u.Patient)
             .Include(u => u.Doctor)
-            .FirstOrDefaultAsync(u => 
-                (u.Patient != null && u.Patient.ContactNumber.Replace(" ", "").Replace("-", "").Replace("+", "") == normalizedPhone) ||
-                (u.Doctor != null && u.Doctor.ContactNumber.Replace(" ", "").Replace("-", "").Replace("+", "") == normalizedPhone));
+            .ToListAsync();
+
+        return users.FirstOrDefault(u => 
+        {
+            if (u.Patient != null)
+            {
+                var patientPhone = u.Patient.ContactNumber.Replace(" ", "").Replace("-", "").Replace("+", "").Trim();
+                if (patientPhone.EndsWith(normalizedPhone)) return true;
+            }
+            if (u.Doctor != null)
+            {
+                var doctorPhone = u.Doctor.ContactNumber.Replace(" ", "").Replace("-", "").Replace("+", "").Trim();
+                if (doctorPhone.EndsWith(normalizedPhone)) return true;
+            }
+            return false;
+        });
     }
 }

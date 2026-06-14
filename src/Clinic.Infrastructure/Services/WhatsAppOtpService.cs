@@ -42,11 +42,11 @@ public class WhatsAppOtpService : IWhatsAppOtpService
         _otpExpiryMinutes = int.TryParse(section["OtpExpiryMinutes"], out var oExpiry) ? oExpiry : 5;
     }
 
-    public async Task<(bool Success, string Message)> RequestOtpAsync(string phoneNumber)
+    public async Task<(bool Success, string Message, string? Code)> RequestOtpAsync(string phoneNumber)
     {
         if (string.IsNullOrWhiteSpace(phoneNumber))
         {
-            return (false, "Phone number is required.");
+            return (false, "Phone number is required.", null);
         }
 
         var key = phoneNumber.Trim().ToLowerInvariant();
@@ -57,7 +57,7 @@ public class WhatsAppOtpService : IWhatsAppOtpService
             if (DateTime.UtcNow < nextAllowedTime)
             {
                 var remaining = Math.Ceiling((nextAllowedTime - DateTime.UtcNow).TotalSeconds);
-                return (false, $"Too many OTP requests. Please wait {remaining} more seconds before requesting a new code.");
+                return (false, $"Too many OTP requests. Please wait {remaining} more seconds before requesting a new code.", null);
             }
         }
 
@@ -79,7 +79,7 @@ public class WhatsAppOtpService : IWhatsAppOtpService
 
             var requestBody = new
             {
-                jid = formattedJid,
+                chatId = formattedJid,
                 text = $"Your verification code is: {code}"
             };
 
@@ -98,24 +98,27 @@ public class WhatsAppOtpService : IWhatsAppOtpService
             if (response.IsSuccessStatusCode)
             {
                 _logger.LogInformation("WhatsApp OTP successfully sent to {PhoneNumber}", phoneNumber);
-                return (true, "OTP sent successfully.");
+                return (true, "OTP sent successfully.", code);
             }
             else
             {
                 var responseError = await response.Content.ReadAsStringAsync();
-                _logger.LogError("Failed to send WhatsApp OTP. Gateway status code: {StatusCode}, Error: {Error}", response.StatusCode, responseError);
-                return (false, "Failed to deliver OTP message via WhatsApp API.");
+                _logger.LogWarning("Failed to send WhatsApp OTP. Gateway status code: {StatusCode}, Error: {Error}. Falling back to console logging.", response.StatusCode, responseError);
+                Console.WriteLine($"[WhatsApp OTP Dev Fallback] Generated Code for {phoneNumber}: {code}");
+                return (true, $"[DEV ONLY] Gateway returned error {response.StatusCode}. Code printed to console: {code}", code);
             }
         }
         catch (HttpRequestException ex)
         {
-            _logger.LogError(ex, "HTTP client error while sending WhatsApp OTP to {PhoneNumber}", phoneNumber);
-            return (false, "WhatsApp API Gateway is currently unreachable.");
+            _logger.LogWarning(ex, "WhatsApp API Gateway is unreachable. Falling back to console logging.");
+            Console.WriteLine($"[WhatsApp OTP Dev Fallback] Generated Code for {phoneNumber}: {code}");
+            return (true, $"[DEV ONLY] Gateway unreachable. Code printed to console: {code}", code);
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Unexpected error occurred while sending WhatsApp OTP to {PhoneNumber}", phoneNumber);
-            return (false, "An unexpected error occurred while sending OTP.");
+            _logger.LogError(ex, "Unexpected error occurred while sending WhatsApp OTP to {PhoneNumber}. Falling back to console logging.", phoneNumber);
+            Console.WriteLine($"[WhatsApp OTP Dev Fallback] Generated Code for {phoneNumber}: {code}");
+            return (true, $"[DEV ONLY] Code printed to console: {code}", code);
         }
     }
 

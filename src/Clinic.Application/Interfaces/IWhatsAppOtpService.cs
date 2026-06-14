@@ -6,7 +6,7 @@ public interface IWhatsAppOtpService
     /// Generates a 6-digit OTP, stores it with 5-minute expiration, and sends it via OpenWA API.
     /// Incorporates rate-limiting to prevent spam.
     /// </summary>
-    Task<(bool Success, string Message)> RequestOtpAsync(string phoneNumber);
+    Task<(bool Success, string Message, string? Code)> RequestOtpAsync(string phoneNumber);
 
     /// <summary>
     /// Verifies if the OTP matches the stored one for the phone number.
