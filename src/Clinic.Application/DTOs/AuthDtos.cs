@@ -17,6 +17,7 @@ public class LoginResponse
 public class OtpRequest
 {
     public string Email { get; set; } = string.Empty;
+    public string? Phone { get; set; }
 }
 
 public class OtpResponse
@@ -25,9 +26,15 @@ public class OtpResponse
     public string Otp { get; set; } = string.Empty;
 }
 
+public class WhatsAppOtpRequest
+{
+    public string PhoneNumber { get; set; } = string.Empty;
+}
+
 public class VerifyOtpRequest
 {
-    public string Email { get; set; } = string.Empty;
+    public string? Email { get; set; }
+    public string? PhoneNumber { get; set; }
     public string Code { get; set; } = string.Empty;
 }
 
@@ -50,6 +57,7 @@ public class RegisterRequest
     public string? Gender { get; set; }
     public int? Age { get; set; }
     public string? OtpCode { get; set; }
+    public string? PhoneOtpCode { get; set; }
     public string? Title { get; set; }
     public List<string>? ClinicIds { get; set; }
     public string? DoctorId { get; set; }

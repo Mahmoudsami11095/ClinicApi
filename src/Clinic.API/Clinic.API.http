@@ -4,3 +4,69 @@ GET {{Clinic.API_HostAddress}}/weatherforecast/
 Accept: application/json
 
 ###
+
+# 1. Request WhatsApp OTP
+POST {{Clinic.API_HostAddress}}/api/auth/request-otp
+Content-Type: application/json
+
+{
+  "phoneNumber": "+1234567890"
+}
+
+###
+
+# 2. Verify WhatsApp OTP
+POST {{Clinic.API_HostAddress}}/api/auth/verify-otp
+Content-Type: application/json
+
+{
+  "phoneNumber": "+1234567890",
+  "code": "123456"
+}
+
+###
+
+# 3. Register with WhatsApp OTP
+POST {{Clinic.API_HostAddress}}/api/auth/register
+Content-Type: application/json
+
+{
+  "name": "John Doe",
+  "email": "johndoe@example.com",
+  "password": "SecurePassword123!",
+  "role": "patient",
+  "phone": "+1234567890",
+  "otpCode": "123456"
+}
+
+###
+
+# 4. Login using Phone Number in Email field
+POST {{Clinic.API_HostAddress}}/api/auth/login
+Content-Type: application/json
+
+{
+  "email": "+1234567890",
+  "password": "SecurePassword123!"
+}
+
+###
+
+# 5. Send OTP using Phone Number in Email field
+POST {{Clinic.API_HostAddress}}/api/auth/send-otp
+Content-Type: application/json
+
+{
+  "email": "+1234567890"
+}
+
+###
+
+# 6. Verify OTP using Phone Number in Email field
+POST {{Clinic.API_HostAddress}}/api/auth/verify-otp
+Content-Type: application/json
+
+{
+  "email": "+1234567890",
+  "code": "123456"
+}

@@ -34,6 +34,7 @@ public static class DependencyInjection
         // ── Services ──
         services.AddScoped<IJwtService, JwtService>();
         services.AddSingleton<IOtpService, OtpService>();
+        services.AddHttpClient<IWhatsAppOtpService, WhatsAppOtpService>();
         services.AddTransient<IEmailService, EmailService>();
         services.AddTransient<ISocialAuthService, SocialAuthService>();
 
