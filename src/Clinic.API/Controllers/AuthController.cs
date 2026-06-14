@@ -289,11 +289,10 @@ public class AuthController : ControllerBase
                 LastName = nameParts.Length > 1 ? nameParts[1] : "",
                 Email = request.Email,
                 ContactNumber = request.Phone ?? "+1234567890",
-                Specialization = "General Medicine",
+                Specialization = request.Specialization ?? "General Medicine",
                 AvailabilityDays = "[\"Monday\",\"Tuesday\",\"Wednesday\",\"Thursday\",\"Friday\"]",
                 AvailabilityHours = "09:00-17:00"
             };
-
             var clinics = request.ClinicIds ?? new List<string>();
             if (clinics.Count == 0)
             {
@@ -312,9 +311,49 @@ public class AuthController : ControllerBase
                     await _clinicRepo.AddAsync(newClinic);
                     clinics.Add(newClinic.Id);
                 }
+                else if (!string.IsNullOrEmpty(request.ClinicId))
+                {
+                    clinics.Add(request.ClinicId);
+                }
+                else
+                {
+                    clinics.Add("clinic-1");
+                }
             }
-            registeredClinicIds = clinics;
-            await _doctorRepo.AddWithClinicsAsync(doctor, clinics);
+
+            var doctorClinics = new List<DoctorClinic>();
+            if (request.ClinicAvailabilities != null && request.ClinicAvailabilities.Any())
+            {
+                foreach (var ca in request.ClinicAvailabilities)
+                {
+                    doctorClinics.Add(new DoctorClinic
+                    {
+                        DoctorId = doctorId,
+                        ClinicId = ca.ClinicId,
+                        AvailabilityHours = ca.AvailabilityHours,
+                        AvailabilityDays = System.Text.Json.JsonSerializer.Serialize(ca.AvailabilityDays),
+                        Status = "Accepted"
+                    });
+                }
+                registeredClinicIds = request.ClinicAvailabilities.Select(ca => ca.ClinicId).ToList();
+            }
+            else
+            {
+                foreach (var c in clinics)
+                {
+                    doctorClinics.Add(new DoctorClinic
+                    {
+                        DoctorId = doctorId,
+                        ClinicId = c,
+                        AvailabilityHours = "09:00-17:00",
+                        AvailabilityDays = "[\"Monday\",\"Tuesday\",\"Wednesday\",\"Thursday\",\"Friday\"]",
+                        Status = "Accepted"
+                    });
+                }
+                registeredClinicIds = clinics;
+            }
+            doctor.DoctorClinics = doctorClinics;
+            await _doctorRepo.AddAsync(doctor);
         }
 
         // Create corresponding patient record
@@ -331,7 +370,7 @@ public class AuthController : ControllerBase
                 Gender = request.Gender ?? "Male",
                 DateOfBirth = request.Dob ?? "1996-01-01",
                 BloodGroup = request.BloodGroup ?? "O+",
-                Address = "",
+                Address = request.Address ?? "",
                 ClinicId = string.IsNullOrWhiteSpace(request.ClinicId) ? "clinic-1" : request.ClinicId,
                 RegistrationDate = DateTime.UtcNow.ToString("yyyy-MM-dd")
             };
