@@ -15,7 +15,15 @@ public static class DataSeeder
         using var scope = serviceProvider.CreateScope();
         var context = scope.ServiceProvider.GetRequiredService<ClinicDbContext>();
 
-        await context.Database.MigrateAsync();
+        try
+        {
+            await context.Database.MigrateAsync();
+        }
+        catch (Exception ex)
+        {
+            System.IO.File.WriteAllText("startup-error.txt", ex.ToString());
+            return; // Exit seeder gracefully so the app can still start!
+        }
 
         if (await context.Clinics.AnyAsync()) return; // Already seeded
 

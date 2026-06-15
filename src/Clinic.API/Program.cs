@@ -51,4 +51,11 @@ app.UseAuthentication();
 app.UseAuthorization();
 app.MapControllers();
 
+app.MapGet("/api/debug-error", () => 
+{
+    if (System.IO.File.Exists("startup-error.txt"))
+        return Results.Text(System.IO.File.ReadAllText("startup-error.txt"));
+    return Results.Ok("No startup errors found!");
+});
+
 app.Run();
