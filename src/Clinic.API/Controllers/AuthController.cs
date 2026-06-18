@@ -781,6 +781,50 @@ public class AuthController : ControllerBase
         return Ok(new { message = "Profile updated successfully", data = dto });
     }
 
+    // ── Forgot / Reset Password ──
+    [HttpPost("forgot-password")]
+    public async Task<IActionResult> ForgotPassword([FromBody] ForgotPasswordRequest request)
+    {
+        if (string.IsNullOrWhiteSpace(request.Email))
+            return BadRequest(new { message = "Email is required" });
+
+        var user = await _userRepo.GetByEmailAsync(request.Email);
+        if (user == null)
+            return NotFound(new { message = "No account found with this email address" });
+
+        var code = _otpService.GenerateOtp(request.Email);
+        await _emailService.SendEmailAsync(request.Email, "Password Reset Code",
+            $"Your password reset code is: <strong>{code}</strong>. It is valid for 10 minutes.");
+
+        return Ok(new { message = "Password reset code sent to your email", otp = code });
+    }
+
+    [HttpPost("reset-password")]
+    public async Task<IActionResult> ResetPassword([FromBody] ResetPasswordRequest request)
+    {
+        if (string.IsNullOrWhiteSpace(request.Email) ||
+            string.IsNullOrWhiteSpace(request.Code) ||
+            string.IsNullOrWhiteSpace(request.NewPassword))
+            return BadRequest(new { message = "Email, code, and new password are required" });
+
+        if (request.NewPassword.Length < 6)
+            return BadRequest(new { message = "Password must be at least 6 characters long" });
+
+        if (!_otpService.VerifyOtp(request.Email, request.Code))
+            return BadRequest(new { message = "Invalid or expired reset code" });
+
+        _otpService.RemoveOtp(request.Email);
+
+        var user = await _userRepo.GetByEmailAsync(request.Email);
+        if (user == null)
+            return NotFound(new { message = "No account found with this email address" });
+
+        user.PasswordHash = BCrypt.Net.BCrypt.HashPassword(request.NewPassword);
+        await _userRepo.UpdateAsync(user);
+
+        return Ok(new { message = "Password reset successfully. You can now log in with your new password." });
+    }
+
     // ── Helpers ──
     private async Task<List<string>?> GetDoctorClinicIds(User user)
     {
