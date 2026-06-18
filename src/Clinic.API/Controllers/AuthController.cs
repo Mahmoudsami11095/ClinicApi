@@ -219,6 +219,7 @@ public class AuthController : ControllerBase
             }
 
             var isDoctor = string.Equals(request.Role, "doctor", StringComparison.OrdinalIgnoreCase);
+            var isAssistant = string.Equals(request.Role, "assistant", StringComparison.OrdinalIgnoreCase);
 
             if (isDoctor)
             {
@@ -286,6 +287,19 @@ public class AuthController : ControllerBase
                     Role = UserRole.Doctor,
                     Title = "Specialist",
                     DoctorId = doctorId,
+                    PasswordHash = BCrypt.Net.BCrypt.HashPassword("social-default-password-" + Guid.NewGuid().ToString())
+                };
+            }
+            else if (isAssistant)
+            {
+                user = new User
+                {
+                    Id = Guid.NewGuid().ToString(),
+                    Name = socialInfo.Name,
+                    Email = socialInfo.Email,
+                    Role = UserRole.Assistant,
+                    Title = "Clinical Assistant",
+                    ClinicId = string.IsNullOrEmpty(request.ClinicId) ? "clinic-1" : request.ClinicId,
                     PasswordHash = BCrypt.Net.BCrypt.HashPassword("social-default-password-" + Guid.NewGuid().ToString())
                 };
             }
