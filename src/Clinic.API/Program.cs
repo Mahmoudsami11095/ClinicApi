@@ -4,12 +4,18 @@ using Clinic.Infrastructure.Seed;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using Clinic.API.Middleware;
+using Clinic.API.Hubs;
+using Clinic.Application.Interfaces;
 
 var builder = WebApplication.CreateBuilder(args);
 
 // ── Application & Infrastructure (Clean Architecture) ──
 builder.Services.AddApplication();
 builder.Services.AddInfrastructure(builder.Configuration);
+
+// ── SignalR & Dispatchers ──
+builder.Services.AddSignalR();
+builder.Services.AddScoped<INotificationDispatcher, SignalRNotificationDispatcher>();
 
 // ── Controllers ──
 builder.Services.AddControllers()
@@ -56,6 +62,7 @@ app.UseCors("AngularApp");
 app.UseAuthentication();
 app.UseAuthorization();
 app.MapControllers();
+app.MapHub<NotificationHub>("/hubs/notifications");
 
 app.MapGet("/api/debug-error", () => 
 {
