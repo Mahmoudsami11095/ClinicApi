@@ -13,8 +13,13 @@ namespace Clinic.API.Controllers;
 public class DentalController : ControllerBase
 {
     private readonly IDentalLogRepository _repo;
+    private readonly IMaterialRepository _materialRepo;
 
-    public DentalController(IDentalLogRepository repo) => _repo = repo;
+    public DentalController(IDentalLogRepository repo, IMaterialRepository materialRepo)
+    {
+        _repo = repo;
+        _materialRepo = materialRepo;
+    }
 
     [HttpGet]
     public async Task<IActionResult> GetAll()
@@ -40,9 +45,27 @@ public class DentalController : ControllerBase
             PainDetails = dto.PainDetails,
             Treatment = dto.Treatment,
             Medication = dto.Medication,
-            IsPlanned = dto.IsPlanned
+            IsPlanned = dto.IsPlanned,
+            ConsumedMaterials = JsonSerializer.Serialize(dto.ConsumedMaterials),
+            ClinicId = dto.ClinicId
         };
         await _repo.AddAsync(entity);
+
+        // Deduct materials from inventory
+        if (dto.ConsumedMaterials != null && dto.ConsumedMaterials.Any())
+        {
+            foreach (var cm in dto.ConsumedMaterials)
+            {
+                var material = await _materialRepo.GetByIdAsync(cm.MaterialId);
+                if (material != null)
+                {
+                    material.Quantity -= cm.Quantity;
+                    if (material.Quantity < 0) material.Quantity = 0;
+                    await _materialRepo.UpdateAsync(material);
+                }
+            }
+        }
+
         return Ok(new { message = "Success", data = dto });
     }
 
@@ -52,13 +75,18 @@ public class DentalController : ControllerBase
         try { statusList = JsonSerializer.Deserialize<List<string>>(d.Status) ?? new(); }
         catch { statusList = new List<string> { d.Status }; }
 
+        List<ConsumedMaterialDto> materialsList;
+        try { materialsList = JsonSerializer.Deserialize<List<ConsumedMaterialDto>>(d.ConsumedMaterials) ?? new(); }
+        catch { materialsList = new(); }
+
         return new DentalLogDto
         {
             Id = d.Id, PatientId = d.PatientId, ToothNumber = d.ToothNumber,
             DoctorId = d.DoctorId, DoctorName = d.DoctorName, Date = d.Date,
             Status = statusList, PainLevel = d.PainLevel,
             PainDetails = d.PainDetails, Treatment = d.Treatment,
-            Medication = d.Medication, IsPlanned = d.IsPlanned
+            Medication = d.Medication, IsPlanned = d.IsPlanned,
+            ConsumedMaterials = materialsList, ClinicId = d.ClinicId
         };
     }
 }

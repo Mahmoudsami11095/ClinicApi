@@ -18,6 +18,7 @@ public class ClinicDbContext : DbContext
     public DbSet<DentalLog> DentalLogs => Set<DentalLog>();
     public DbSet<DoctorClinic> DoctorClinics => Set<DoctorClinic>();
     public DbSet<Notification> Notifications => Set<Notification>();
+    public DbSet<Material> Materials => Set<Material>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -231,6 +232,7 @@ public class ClinicDbContext : DbContext
             entity.Property(e => e.PainDetails).HasMaxLength(1000);
             entity.Property(e => e.Treatment).HasMaxLength(500);
             entity.Property(e => e.Medication).HasMaxLength(500);
+            entity.Property(e => e.ConsumedMaterials).HasMaxLength(2000); // JSON array
 
             entity.HasOne(e => e.Patient)
                   .WithMany(p => p.DentalLogs)
@@ -251,6 +253,21 @@ public class ClinicDbContext : DbContext
             entity.HasOne(e => e.User)
                   .WithMany()
                   .HasForeignKey(e => e.UserId)
+                  .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        // ── Material ──
+        modelBuilder.Entity<Material>(entity =>
+        {
+            entity.ToTable("Materials");
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.Name).HasMaxLength(200).IsRequired();
+            entity.Property(e => e.DoctorId).IsRequired();
+            entity.Property(e => e.Unit).HasMaxLength(50);
+
+            entity.HasOne(e => e.Doctor)
+                  .WithMany()
+                  .HasForeignKey(e => e.DoctorId)
                   .OnDelete(DeleteBehavior.Cascade);
         });
     }
