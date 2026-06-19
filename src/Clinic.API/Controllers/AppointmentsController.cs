@@ -14,12 +14,21 @@ public class AppointmentsController : ControllerBase
     private readonly IAppointmentRepository _repo;
     private readonly IClinicRepository _clinicRepo;
     private readonly IDoctorRepository _doctorRepo;
+    private readonly INotificationService _notificationService;
+    private readonly IUserRepository _userRepo;
 
-    public AppointmentsController(IAppointmentRepository repo, IClinicRepository clinicRepo, IDoctorRepository doctorRepo)
+    public AppointmentsController(
+        IAppointmentRepository repo, 
+        IClinicRepository clinicRepo, 
+        IDoctorRepository doctorRepo,
+        INotificationService notificationService,
+        IUserRepository userRepo)
     {
         _repo = repo;
         _clinicRepo = clinicRepo;
         _doctorRepo = doctorRepo;
+        _notificationService = notificationService;
+        _userRepo = userRepo;
     }
 
     private async Task<string?> ValidateDoctorAvailability(string doctorId, string clinicId, string appointmentDateStr)
@@ -144,6 +153,20 @@ public class AppointmentsController : ControllerBase
             Notes = dto.Notes, ClinicId = dto.ClinicId
         };
         await _repo.AddAsync(entity);
+
+        // Notify Doctor
+        var users = await _userRepo.GetAllAsync();
+        var doctorUser = users.FirstOrDefault(u => u.DoctorId == dto.DoctorId);
+        if (doctorUser != null)
+        {
+            await _notificationService.CreateNotificationAsync(
+                doctorUser.Id,
+                "New Appointment",
+                $"You have a new appointment scheduled for {dto.Date}.",
+                "Appointment"
+            );
+        }
+
         return Ok(new { message = "Success", data = dto });
     }
 
@@ -200,6 +223,20 @@ public class AppointmentsController : ControllerBase
         }
 
         await _repo.DeleteAsync(id);
+
+        // Notify Doctor
+        var users = await _userRepo.GetAllAsync();
+        var doctorUser = users.FirstOrDefault(u => u.DoctorId == entity.DoctorId);
+        if (doctorUser != null)
+        {
+            await _notificationService.CreateNotificationAsync(
+                doctorUser.Id,
+                "Appointment Cancelled",
+                $"Your appointment on {entity.Date} has been cancelled.",
+                "Appointment"
+            );
+        }
+
         return Ok(new { message = "Deleted" });
     }
 }

@@ -13,11 +13,22 @@ public class BillingController : ControllerBase
 {
     private readonly IBillingRepository _repo;
     private readonly IClinicRepository _clinicRepo;
+    private readonly INotificationService _notificationService;
+    private readonly IUserRepository _userRepo;
+    private readonly IAppointmentRepository _appointmentRepo;
 
-    public BillingController(IBillingRepository repo, IClinicRepository clinicRepo)
+    public BillingController(
+        IBillingRepository repo, 
+        IClinicRepository clinicRepo,
+        INotificationService notificationService,
+        IUserRepository userRepo,
+        IAppointmentRepository appointmentRepo)
     {
         _repo = repo;
         _clinicRepo = clinicRepo;
+        _notificationService = notificationService;
+        _userRepo = userRepo;
+        _appointmentRepo = appointmentRepo;
     }
 
     [HttpGet]
@@ -97,6 +108,27 @@ public class BillingController : ControllerBase
         }
 
         await _repo.UpdateAsync(entity);
+
+        // Notify Doctor if overdue
+        if (entity.Status == "Overdue" && !string.IsNullOrEmpty(entity.AppointmentId))
+        {
+            var appointment = await _appointmentRepo.GetByIdAsync(entity.AppointmentId);
+            if (appointment != null && !string.IsNullOrEmpty(appointment.DoctorId))
+            {
+                var users = await _userRepo.GetAllAsync();
+                var doctorUser = users.FirstOrDefault(u => u.DoctorId == appointment.DoctorId);
+                if (doctorUser != null)
+                {
+                    await _notificationService.CreateNotificationAsync(
+                        doctorUser.Id,
+                        "Bill Overdue",
+                        $"A bill of {entity.Amount:C} for appointment on {appointment.Date} is now overdue.",
+                        "Billing"
+                    );
+                }
+            }
+        }
+
         return Ok(new { message = "Success", data = MapToDto(entity) });
     }
 

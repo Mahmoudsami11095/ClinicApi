@@ -174,3 +174,8 @@ public class UserRepository : GenericRepository<User>, IUserRepository
         });
     }
 }
+
+public class NotificationRepository : GenericRepository<Notification>, INotificationRepository
+{
+    public NotificationRepository(ClinicDbContext context) : base(context) { }
+}

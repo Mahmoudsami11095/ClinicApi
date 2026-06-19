@@ -17,6 +17,7 @@ public class ClinicDbContext : DbContext
     public DbSet<Prescription> Prescriptions => Set<Prescription>();
     public DbSet<DentalLog> DentalLogs => Set<DentalLog>();
     public DbSet<DoctorClinic> DoctorClinics => Set<DoctorClinic>();
+    public DbSet<Notification> Notifications => Set<Notification>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -234,6 +235,22 @@ public class ClinicDbContext : DbContext
             entity.HasOne(e => e.Patient)
                   .WithMany(p => p.DentalLogs)
                   .HasForeignKey(e => e.PatientId)
+                  .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        // ── Notification ──
+        modelBuilder.Entity<Notification>(entity =>
+        {
+            entity.ToTable("Notifications");
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.UserId).HasMaxLength(450).IsRequired(); // Matches Identity User Id length
+            entity.Property(e => e.Title).HasMaxLength(200).IsRequired();
+            entity.Property(e => e.Message).HasMaxLength(1000).IsRequired();
+            entity.Property(e => e.Type).HasMaxLength(50);
+
+            entity.HasOne(e => e.User)
+                  .WithMany()
+                  .HasForeignKey(e => e.UserId)
                   .OnDelete(DeleteBehavior.Cascade);
         });
     }
