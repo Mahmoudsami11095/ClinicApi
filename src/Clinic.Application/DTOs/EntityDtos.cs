@@ -124,4 +124,6 @@ public class DentalLogDto
     public string? Treatment { get; set; }
     public string? Medication { get; set; }
     public bool IsPlanned { get; set; }
+    public List<ConsumedMaterialDto> ConsumedMaterials { get; set; } = new();
+    public string? ClinicId { get; set; }
 }

@@ -14,6 +14,8 @@ public class DentalLog
     public string? Treatment { get; set; }
     public string? Medication { get; set; }
     public bool IsPlanned { get; set; }
+    public string ConsumedMaterials { get; set; } = "[]"; // JSON array of ConsumedMaterialDto objects
+    public string? ClinicId { get; set; }
 
     // Navigation properties
     public Patient Patient { get; set; } = null!;
