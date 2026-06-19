@@ -56,11 +56,14 @@ public class AuthController : ControllerBase
         }
 
         if (user == null)
-            return Unauthorized(new { message = "Invalid credentials" });
+        {
+            bool isEmail = request.Email.Contains("@");
+            return NotFound(new { message = isEmail ? "No account found with this email address" : "No account found with this phone number" });
+        }
 
         if (!string.IsNullOrEmpty(request.Password) &&
             !BCrypt.Net.BCrypt.Verify(request.Password, user.PasswordHash))
-            return Unauthorized(new { message = "Invalid credentials" });
+            return Unauthorized(new { message = "Incorrect password" });
 
         var clinicIds = await GetDoctorClinicIds(user);
         var token = _jwtService.GenerateToken(user, clinicIds);
@@ -393,8 +396,6 @@ public class AuthController : ControllerBase
     [HttpPost("register")]
     public async Task<IActionResult> Register([FromBody] RegisterRequest request)
     {
-        try
-        {
         if (string.IsNullOrWhiteSpace(request.Email) ||
             string.IsNullOrWhiteSpace(request.Name) ||
             string.IsNullOrWhiteSpace(request.Role))
@@ -564,11 +565,6 @@ public class AuthController : ControllerBase
         var userDto = MapToUserDto(newUser, clinicIds);
 
         return Ok(new { message = "Registration successful", data = userDto });
-        }
-        catch (Exception ex)
-        {
-            return StatusCode(500, new { message = $"Registration failed: {ex.Message}" });
-        }
     }
 
     [HttpGet("users")]

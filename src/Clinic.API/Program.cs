@@ -2,6 +2,7 @@ using Clinic.Infrastructure;
 using Clinic.Infrastructure.Seed;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using Clinic.API.Middleware;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -37,6 +38,9 @@ var app = builder.Build();
 
 // ── Seed Database ──
 await DataSeeder.SeedAsync(app.Services);
+
+// ── Global Exception Middleware ──
+app.UseMiddleware<GlobalExceptionMiddleware>();
 
 // ── Middleware Pipeline ──
 if (app.Environment.IsDevelopment())
