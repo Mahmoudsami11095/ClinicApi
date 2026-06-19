@@ -1,3 +1,4 @@
+using Clinic.Application;
 using Clinic.Infrastructure;
 using Clinic.Infrastructure.Seed;
 using System.Text.Json;
@@ -6,7 +7,8 @@ using Clinic.API.Middleware;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// ── Infrastructure (DbContext, Repos, JWT, Auth) ──
+// ── Application & Infrastructure (Clean Architecture) ──
+builder.Services.AddApplication();
 builder.Services.AddInfrastructure(builder.Configuration);
 
 // ── Controllers ──
