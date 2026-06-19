@@ -299,7 +299,7 @@ public class AuthController : ControllerBase
                     Email = socialInfo.Email,
                     Role = UserRole.Assistant,
                     Title = "Clinical Assistant",
-                    ClinicId = string.IsNullOrEmpty(request.ClinicId) ? "clinic-1" : request.ClinicId,
+                    ClinicId = string.IsNullOrEmpty(request.ClinicId) ? null : request.ClinicId,
                     PasswordHash = BCrypt.Net.BCrypt.HashPassword("social-default-password-" + Guid.NewGuid().ToString())
                 };
             }
@@ -320,7 +320,7 @@ public class AuthController : ControllerBase
                     DateOfBirth = request.DateOfBirth ?? "1996-01-01",
                     BloodGroup = request.BloodGroup ?? "O+",
                     Address = request.Address ?? "",
-                    ClinicId = string.IsNullOrEmpty(request.ClinicId) ? "clinic-1" : request.ClinicId,
+                    ClinicId = string.IsNullOrEmpty(request.ClinicId) ? null : request.ClinicId,
                     RegistrationDate = DateTime.UtcNow.ToString("yyyy-MM-dd")
                 };
                 await _patientRepo.AddAsync(patient);
@@ -332,7 +332,7 @@ public class AuthController : ControllerBase
                     Email = socialInfo.Email,
                     Role = UserRole.Patient,
                     Title = "Registered Patient",
-                    ClinicId = string.IsNullOrEmpty(request.ClinicId) ? "clinic-1" : request.ClinicId,
+                    ClinicId = string.IsNullOrEmpty(request.ClinicId) ? null : request.ClinicId,
                     PatientId = patientId,
                     PasswordHash = BCrypt.Net.BCrypt.HashPassword("social-default-password-" + Guid.NewGuid().ToString())
                 };
@@ -393,6 +393,8 @@ public class AuthController : ControllerBase
     [HttpPost("register")]
     public async Task<IActionResult> Register([FromBody] RegisterRequest request)
     {
+        try
+        {
         if (string.IsNullOrWhiteSpace(request.Email) ||
             string.IsNullOrWhiteSpace(request.Name) ||
             string.IsNullOrWhiteSpace(request.Role))
@@ -427,7 +429,8 @@ public class AuthController : ControllerBase
         if (existing != null)
             return BadRequest(new { message = "Email already registered" });
 
-        var role = Enum.Parse<UserRole>(request.Role, ignoreCase: true);
+        if (!Enum.TryParse<UserRole>(request.Role, ignoreCase: true, out var role))
+            return BadRequest(new { message = $"Invalid role '{request.Role}'. Must be one of: doctor, patient, assistant." });
 
         // Generate patient ID for patient role
         string? patientId = request.PatientId;
@@ -479,7 +482,7 @@ public class AuthController : ControllerBase
                 }
                 else
                 {
-                    clinics.Add("clinic-1");
+                    // No default clinic - doctor must be assigned to a clinic later
                 }
             }
 
@@ -533,7 +536,7 @@ public class AuthController : ControllerBase
                 DateOfBirth = request.Dob ?? "1996-01-01",
                 BloodGroup = request.BloodGroup ?? "O+",
                 Address = request.Address ?? "",
-                ClinicId = string.IsNullOrWhiteSpace(request.ClinicId) ? "clinic-1" : request.ClinicId,
+                ClinicId = string.IsNullOrWhiteSpace(request.ClinicId) ? null : request.ClinicId,
                 RegistrationDate = DateTime.UtcNow.ToString("yyyy-MM-dd")
             };
             await _patientRepo.AddAsync(patient);
@@ -561,6 +564,11 @@ public class AuthController : ControllerBase
         var userDto = MapToUserDto(newUser, clinicIds);
 
         return Ok(new { message = "Registration successful", data = userDto });
+        }
+        catch (Exception ex)
+        {
+            return StatusCode(500, new { message = $"Registration failed: {ex.Message}" });
+        }
     }
 
     [HttpGet("users")]
