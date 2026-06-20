@@ -6,6 +6,7 @@ using System.Text.Json.Serialization;
 using Clinic.API.Middleware;
 using Clinic.API.Hubs;
 using Clinic.Application.Interfaces;
+using Clinic.API.Filters;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -18,7 +19,10 @@ builder.Services.AddSignalR();
 builder.Services.AddScoped<INotificationDispatcher, SignalRNotificationDispatcher>();
 
 // ── Controllers ──
-builder.Services.AddControllers()
+builder.Services.AddControllers(options => 
+    {
+        options.Filters.Add<AssistantClinicRequirementFilter>();
+    })
     .AddJsonOptions(options =>
     {
         options.JsonSerializerOptions.PropertyNamingPolicy = JsonNamingPolicy.CamelCase;

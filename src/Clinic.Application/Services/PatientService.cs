@@ -12,14 +12,16 @@ public class PatientService : IPatientService
 {
     private readonly IPatientRepository _repo;
     private readonly IClinicRepository _clinicRepo;
+    private readonly IUserRepository _userRepo;
 
-    public PatientService(IPatientRepository repo, IClinicRepository clinicRepo)
+    public PatientService(IPatientRepository repo, IClinicRepository clinicRepo, IUserRepository userRepo)
     {
         _repo = repo;
         _clinicRepo = clinicRepo;
+        _userRepo = userRepo;
     }
 
-    public async Task<IEnumerable<PatientDto>> GetAllAsync(string? doctorIdClaim)
+    public async Task<IEnumerable<PatientDto>> GetAllAsync(string? doctorIdClaim, string? clinicIdClaim = null)
     {
         var patients = await _repo.GetAllAsync();
         
@@ -33,19 +35,26 @@ public class PatientService : IPatientService
                 .ToList();
             patients = patients.Where(p => allowedClinicIds.Contains(p.ClinicId ?? "")).ToList();
         }
+        else if (!string.IsNullOrEmpty(clinicIdClaim))
+        {
+            patients = patients.Where(p => p.ClinicId == clinicIdClaim).ToList();
+        }
 
         return patients.Select(p => new PatientDto
         {
             Id = p.Id, FirstName = p.FirstName, LastName = p.LastName,
             Gender = p.Gender, DateOfBirth = p.DateOfBirth,
-            ContactNumber = p.ContactNumber, Email = p.Email,
+            ContactNumber = p.ContactNumber,
+            CountryCode = p.CountryCode,
+            PhoneNumber = p.PhoneNumber,
+            Email = p.Email,
             BloodGroup = p.BloodGroup, Address = p.Address,
             RegistrationDate = p.RegistrationDate, ClinicId = p.ClinicId,
             Allergies = p.Allergies, ChronicDiseases = p.ChronicDiseases, PastIllnesses = p.PastIllnesses
         }).ToList();
     }
 
-    public async Task CreateAsync(PatientDto dto, string? doctorIdClaim)
+    public async Task CreateAsync(PatientDto dto, string? doctorIdClaim, string? clinicIdClaim = null)
     {
         if (!string.IsNullOrEmpty(doctorIdClaim))
         {
@@ -56,13 +65,45 @@ public class PatientService : IPatientService
             if (!isAllowed)
                 throw new UnauthorizedAccessException("You can only manage patients for your clinics");
         }
+        else if (!string.IsNullOrEmpty(clinicIdClaim))
+        {
+            if (dto.ClinicId != clinicIdClaim)
+                throw new UnauthorizedAccessException("You can only manage patients for your assigned clinic");
+        }
+
+        var countryCode = dto.CountryCode;
+        var phoneNumber = dto.PhoneNumber;
+
+        if (string.IsNullOrEmpty(phoneNumber) && !string.IsNullOrEmpty(dto.ContactNumber))
+        {
+            var split = Clinic.Domain.Helpers.PhoneHelper.SplitContactNumber(dto.ContactNumber);
+            countryCode = split.CountryCode;
+            phoneNumber = split.PhoneNumber;
+        }
+
+        if (string.IsNullOrEmpty(countryCode))
+        {
+            countryCode = "+20";
+        }
+
+        var validation = Clinic.Domain.Helpers.PhoneHelper.ValidatePhoneNumber(countryCode, phoneNumber);
+        if (!validation.IsValid)
+            throw new ArgumentException(validation.ErrorMessage);
+
+        var normPhone = Clinic.Domain.Helpers.PhoneHelper.NormalizePhoneNumber(countryCode, phoneNumber!);
+
+        var isUnique = await _userRepo.IsPhoneNumberUniqueAsync(countryCode, normPhone);
+        if (!isUnique)
+            throw new InvalidOperationException("This phone number is already registered to another account.");
 
         var entity = new Patient
         {
             Id = string.IsNullOrEmpty(dto.Id) ? Guid.NewGuid().ToString() : dto.Id,
             FirstName = dto.FirstName, LastName = dto.LastName,
             Gender = dto.Gender, DateOfBirth = dto.DateOfBirth,
-            ContactNumber = dto.ContactNumber, Email = dto.Email,
+            CountryCode = countryCode,
+            PhoneNumber = normPhone,
+            Email = dto.Email,
             BloodGroup = dto.BloodGroup, Address = dto.Address,
             RegistrationDate = dto.RegistrationDate, ClinicId = dto.ClinicId,
             Allergies = dto.Allergies, ChronicDiseases = dto.ChronicDiseases, PastIllnesses = dto.PastIllnesses
@@ -70,7 +111,7 @@ public class PatientService : IPatientService
         await _repo.AddAsync(entity);
     }
 
-    public async Task UpdateAsync(string id, PatientDto dto, string? doctorIdClaim)
+    public async Task UpdateAsync(string id, PatientDto dto, string? doctorIdClaim, string? clinicIdClaim = null)
     {
         var existing = await _repo.GetByIdAsync(id);
         if (existing == null)
@@ -85,12 +126,46 @@ public class PatientService : IPatientService
             if (!isAllowed)
                 throw new UnauthorizedAccessException("You can only manage patients for your clinics");
         }
+        else if (!string.IsNullOrEmpty(clinicIdClaim))
+        {
+            if (dto.ClinicId != clinicIdClaim || existing.ClinicId != clinicIdClaim)
+                throw new UnauthorizedAccessException("You can only manage patients for your assigned clinic");
+        }
+
+        var countryCode = dto.CountryCode;
+        var phoneNumber = dto.PhoneNumber;
+
+        if (string.IsNullOrEmpty(phoneNumber) && !string.IsNullOrEmpty(dto.ContactNumber))
+        {
+            var split = Clinic.Domain.Helpers.PhoneHelper.SplitContactNumber(dto.ContactNumber);
+            countryCode = split.CountryCode;
+            phoneNumber = split.PhoneNumber;
+        }
+
+        if (string.IsNullOrEmpty(countryCode))
+        {
+            countryCode = "+20";
+        }
+
+        var validation = Clinic.Domain.Helpers.PhoneHelper.ValidatePhoneNumber(countryCode, phoneNumber);
+        if (!validation.IsValid)
+            throw new ArgumentException(validation.ErrorMessage);
+
+        var normPhone = Clinic.Domain.Helpers.PhoneHelper.NormalizePhoneNumber(countryCode, phoneNumber!);
+
+        var allUsers = await _userRepo.GetAllAsync();
+        var linkedUser = allUsers.FirstOrDefault(u => u.PatientId == id);
+
+        var isUnique = await _userRepo.IsPhoneNumberUniqueAsync(countryCode, normPhone, linkedUser?.Id);
+        if (!isUnique)
+            throw new InvalidOperationException("This phone number is already registered to another account.");
 
         existing.FirstName = dto.FirstName;
         existing.LastName = dto.LastName;
         existing.Gender = dto.Gender;
         existing.DateOfBirth = dto.DateOfBirth;
-        existing.ContactNumber = dto.ContactNumber;
+        existing.CountryCode = countryCode;
+        existing.PhoneNumber = normPhone;
         existing.Email = dto.Email;
         existing.BloodGroup = dto.BloodGroup;
         existing.Address = dto.Address;
@@ -102,7 +177,7 @@ public class PatientService : IPatientService
         await _repo.UpdateAsync(existing);
     }
 
-    public async Task DeleteAsync(string id, string? doctorIdClaim)
+    public async Task DeleteAsync(string id, string? doctorIdClaim, string? clinicIdClaim = null)
     {
         var existing = await _repo.GetByIdAsync(id);
         if (existing == null)
@@ -116,6 +191,11 @@ public class PatientService : IPatientService
                  c.DoctorClinics.Any(dc => dc.DoctorId == doctorIdClaim && dc.Status == "Accepted")));
             if (!isAllowed)
                 throw new UnauthorizedAccessException("You can only manage patients for your clinics");
+        }
+        else if (!string.IsNullOrEmpty(clinicIdClaim))
+        {
+            if (existing.ClinicId != clinicIdClaim)
+                throw new UnauthorizedAccessException("You can only manage patients for your assigned clinic");
         }
 
         await _repo.DeleteAsync(id);

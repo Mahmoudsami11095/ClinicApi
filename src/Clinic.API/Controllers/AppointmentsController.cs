@@ -105,6 +105,7 @@ public class AppointmentsController : ControllerBase
     {
         var appointments = await _repo.GetAllAsync();
         var doctorIdClaim = User.FindFirst("doctorId")?.Value;
+        var clinicIdClaim = User.FindFirst("clinicId")?.Value;
         if (!string.IsNullOrEmpty(doctorIdClaim))
         {
             var clinics = await _clinicRepo.GetAllAsync();
@@ -114,6 +115,10 @@ public class AppointmentsController : ControllerBase
                 .Select(c => c.Id)
                 .ToList();
             appointments = appointments.Where(a => allowedClinicIds.Contains(a.ClinicId ?? "")).ToList();
+        }
+        else if (!string.IsNullOrEmpty(clinicIdClaim))
+        {
+            appointments = appointments.Where(a => a.ClinicId == clinicIdClaim).ToList();
         }
 
         var dtos = appointments.Select(a => new AppointmentDto
@@ -129,6 +134,7 @@ public class AppointmentsController : ControllerBase
     public async Task<IActionResult> Create([FromBody] AppointmentDto dto)
     {
         var doctorIdClaim = User.FindFirst("doctorId")?.Value;
+        var clinicIdClaim = User.FindFirst("clinicId")?.Value;
         if (!string.IsNullOrEmpty(doctorIdClaim))
         {
             var clinics = await _clinicRepo.GetAllAsync();
@@ -137,6 +143,11 @@ public class AppointmentsController : ControllerBase
                  c.DoctorClinics.Any(dc => dc.DoctorId == doctorIdClaim && dc.Status == "Accepted")));
             if (!isAllowed)
                 return StatusCode(403, new { message = "You can only manage appointments for your clinics" });
+        }
+        else if (!string.IsNullOrEmpty(clinicIdClaim))
+        {
+            if (dto.ClinicId != clinicIdClaim)
+                return StatusCode(403, new { message = "You can only manage appointments for your assigned clinic" });
         }
 
         var validationError = await ValidateDoctorAvailability(dto.DoctorId, dto.ClinicId ?? "", dto.Date);
@@ -177,6 +188,7 @@ public class AppointmentsController : ControllerBase
         if (entity == null) return NotFound(new { message = "Not found" });
 
         var doctorIdClaim = User.FindFirst("doctorId")?.Value;
+        var clinicIdClaim = User.FindFirst("clinicId")?.Value;
         if (!string.IsNullOrEmpty(doctorIdClaim))
         {
             var clinics = await _clinicRepo.GetAllAsync();
@@ -185,6 +197,11 @@ public class AppointmentsController : ControllerBase
                  c.DoctorClinics.Any(dc => dc.DoctorId == doctorIdClaim && dc.Status == "Accepted")));
             if (!isAllowed)
                 return StatusCode(403, new { message = "You can only manage appointments for your clinics" });
+        }
+        else if (!string.IsNullOrEmpty(clinicIdClaim))
+        {
+            if (dto.ClinicId != clinicIdClaim || entity.ClinicId != clinicIdClaim)
+                return StatusCode(403, new { message = "You can only manage appointments for your assigned clinic" });
         }
 
         var validationError = await ValidateDoctorAvailability(dto.DoctorId, dto.ClinicId ?? "", dto.Date);
@@ -212,6 +229,7 @@ public class AppointmentsController : ControllerBase
         if (entity == null) return NotFound(new { message = "Not found" });
 
         var doctorIdClaim = User.FindFirst("doctorId")?.Value;
+        var clinicIdClaim = User.FindFirst("clinicId")?.Value;
         if (!string.IsNullOrEmpty(doctorIdClaim))
         {
             var clinics = await _clinicRepo.GetAllAsync();
@@ -220,6 +238,11 @@ public class AppointmentsController : ControllerBase
                  c.DoctorClinics.Any(dc => dc.DoctorId == doctorIdClaim && dc.Status == "Accepted")));
             if (!isAllowed)
                 return StatusCode(403, new { message = "You can only manage appointments for your clinics" });
+        }
+        else if (!string.IsNullOrEmpty(clinicIdClaim))
+        {
+            if (entity.ClinicId != clinicIdClaim)
+                return StatusCode(403, new { message = "You can only manage appointments for your assigned clinic" });
         }
 
         await _repo.DeleteAsync(id);

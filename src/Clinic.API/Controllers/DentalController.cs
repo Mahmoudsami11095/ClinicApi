@@ -14,17 +14,39 @@ public class DentalController : ControllerBase
 {
     private readonly IDentalLogRepository _repo;
     private readonly IMaterialRepository _materialRepo;
+    private readonly IClinicRepository _clinicRepo;
 
-    public DentalController(IDentalLogRepository repo, IMaterialRepository materialRepo)
+    public DentalController(IDentalLogRepository repo, IMaterialRepository materialRepo, IClinicRepository clinicRepo)
     {
         _repo = repo;
         _materialRepo = materialRepo;
+        _clinicRepo = clinicRepo;
     }
 
     [HttpGet]
     public async Task<IActionResult> GetAll()
     {
         var logs = await _repo.GetAllAsync();
+        var doctorIdClaim = User.FindFirst("doctorId")?.Value;
+        var clinicIdClaim = User.FindFirst("clinicId")?.Value;
+
+        if (!string.IsNullOrEmpty(doctorIdClaim) || !string.IsNullOrEmpty(clinicIdClaim))
+        {
+            if (!string.IsNullOrEmpty(doctorIdClaim))
+            {
+                var clinics = await _clinicRepo.GetAllAsync();
+                var allowedClinicIds = clinics
+                    .Where(c => c.CreatorDoctorId == doctorIdClaim || 
+                                c.DoctorClinics.Any(dc => dc.DoctorId == doctorIdClaim && dc.Status == "Accepted"))
+                    .Select(c => c.Id)
+                    .ToList();
+                logs = logs.Where(l => allowedClinicIds.Contains(l.ClinicId ?? "")).ToList();
+            }
+            else if (!string.IsNullOrEmpty(clinicIdClaim))
+            {
+                logs = logs.Where(l => l.ClinicId == clinicIdClaim).ToList();
+            }
+        }
         var dtos = logs.Select(MapToDto).ToList();
         return Ok(new { data = dtos });
     }
@@ -32,6 +54,25 @@ public class DentalController : ControllerBase
     [HttpPost]
     public async Task<IActionResult> Create([FromBody] DentalLogDto dto)
     {
+        var doctorIdClaim = User.FindFirst("doctorId")?.Value;
+        var clinicIdClaim = User.FindFirst("clinicId")?.Value;
+
+        if (!string.IsNullOrEmpty(doctorIdClaim) || !string.IsNullOrEmpty(clinicIdClaim))
+        {
+            if (!string.IsNullOrEmpty(doctorIdClaim))
+            {
+                var clinics = await _clinicRepo.GetAllAsync();
+                var isAllowed = clinics.Any(c => c.Id == dto.ClinicId && 
+                    (c.CreatorDoctorId == doctorIdClaim || 
+                     c.DoctorClinics.Any(dc => dc.DoctorId == doctorIdClaim && dc.Status == "Accepted")));
+                if (!isAllowed) return StatusCode(403, new { message = "You can only manage dental logs for your clinics" });
+            }
+            else if (!string.IsNullOrEmpty(clinicIdClaim))
+            {
+                if (dto.ClinicId != clinicIdClaim)
+                    return StatusCode(403, new { message = "You can only manage dental logs for your assigned clinic" });
+            }
+        }
         var entity = new DentalLog
         {
             Id = string.IsNullOrEmpty(dto.Id) ? Guid.NewGuid().ToString() : dto.Id,

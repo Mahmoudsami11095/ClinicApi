@@ -36,6 +36,7 @@ public class BillingController : ControllerBase
     {
         var records = await _repo.GetAllAsync();
         var doctorIdClaim = User.FindFirst("doctorId")?.Value;
+        var clinicIdClaim = User.FindFirst("clinicId")?.Value;
         if (!string.IsNullOrEmpty(doctorIdClaim))
         {
             var clinics = await _clinicRepo.GetAllAsync();
@@ -46,6 +47,10 @@ public class BillingController : ControllerBase
                 .ToList();
             records = records.Where(r => allowedClinicIds.Contains(r.ClinicId ?? "")).ToList();
         }
+        else if (!string.IsNullOrEmpty(clinicIdClaim))
+        {
+            records = records.Where(r => r.ClinicId == clinicIdClaim).ToList();
+        }
 
         var dtos = records.Select(MapToDto).ToList();
         return Ok(new { data = dtos });
@@ -55,6 +60,7 @@ public class BillingController : ControllerBase
     public async Task<IActionResult> Create([FromBody] BillingRecordDto dto)
     {
         var doctorIdClaim = User.FindFirst("doctorId")?.Value;
+        var clinicIdClaim = User.FindFirst("clinicId")?.Value;
         if (!string.IsNullOrEmpty(doctorIdClaim))
         {
             var clinics = await _clinicRepo.GetAllAsync();
@@ -63,6 +69,11 @@ public class BillingController : ControllerBase
                  c.DoctorClinics.Any(dc => dc.DoctorId == doctorIdClaim && dc.Status == "Accepted")));
             if (!isAllowed)
                 return StatusCode(403, new { message = "You can only manage billing for your clinics" });
+        }
+        else if (!string.IsNullOrEmpty(clinicIdClaim))
+        {
+            if (dto.ClinicId != clinicIdClaim)
+                return StatusCode(403, new { message = "You can only manage billing for your assigned clinic" });
         }
 
         var entity = MapToEntity(dto);
@@ -78,6 +89,7 @@ public class BillingController : ControllerBase
         if (entity == null) return NotFound(new { message = "Not found" });
 
         var doctorIdClaim = User.FindFirst("doctorId")?.Value;
+        var clinicIdClaim = User.FindFirst("clinicId")?.Value;
         if (!string.IsNullOrEmpty(doctorIdClaim))
         {
             var clinics = await _clinicRepo.GetAllAsync();
@@ -86,6 +98,11 @@ public class BillingController : ControllerBase
                  c.DoctorClinics.Any(dc => dc.DoctorId == doctorIdClaim && dc.Status == "Accepted")));
             if (!isAllowed)
                 return StatusCode(403, new { message = "You can only manage billing for your clinics" });
+        }
+        else if (!string.IsNullOrEmpty(clinicIdClaim))
+        {
+            if (dto.ClinicId != clinicIdClaim || entity.ClinicId != clinicIdClaim)
+                return StatusCode(403, new { message = "You can only manage billing for your assigned clinic" });
         }
 
         entity.PatientId = dto.PatientId;

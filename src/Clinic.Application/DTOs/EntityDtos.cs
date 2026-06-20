@@ -20,6 +20,8 @@ public class PatientDto
     public string Gender { get; set; } = string.Empty;
     public string DateOfBirth { get; set; } = string.Empty;
     public string ContactNumber { get; set; } = string.Empty;
+    public string CountryCode { get; set; } = "+20";
+    public string PhoneNumber { get; set; } = string.Empty;
     public string Email { get; set; } = string.Empty;
     public string BloodGroup { get; set; } = string.Empty;
     public string Address { get; set; } = string.Empty;
@@ -51,6 +53,8 @@ public class DoctorDto
     public string Specialization { get; set; } = string.Empty;
     public string Email { get; set; } = string.Empty;
     public string ContactNumber { get; set; } = string.Empty;
+    public string CountryCode { get; set; } = "+20";
+    public string PhoneNumber { get; set; } = string.Empty;
     public string? Avatar { get; set; }
     public DoctorAvailabilityDto Availability { get; set; } = new();
     public List<string>? ClinicIds { get; set; }

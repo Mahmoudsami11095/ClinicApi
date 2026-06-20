@@ -74,7 +74,9 @@ public class ClinicDbContext : DbContext
             entity.Property(e => e.LastName).HasMaxLength(100).IsRequired();
             entity.Property(e => e.Specialization).HasMaxLength(100);
             entity.Property(e => e.Email).HasMaxLength(200);
-            entity.Property(e => e.ContactNumber).HasMaxLength(50);
+            entity.Property(e => e.CountryCode).HasMaxLength(10).HasDefaultValue("+20");
+            entity.Property(e => e.PhoneNumber).HasMaxLength(50);
+            entity.Ignore(e => e.ContactNumber);
             entity.Property(e => e.Avatar).HasMaxLength(500);
             entity.Property(e => e.AvailabilityDays).HasMaxLength(500);
             entity.Property(e => e.AvailabilityHours).HasMaxLength(50);
@@ -111,7 +113,9 @@ public class ClinicDbContext : DbContext
             entity.Property(e => e.LastName).HasMaxLength(100).IsRequired();
             entity.Property(e => e.Gender).HasMaxLength(20);
             entity.Property(e => e.DateOfBirth).HasMaxLength(50);
-            entity.Property(e => e.ContactNumber).HasMaxLength(50);
+            entity.Property(e => e.CountryCode).HasMaxLength(10).HasDefaultValue("+20");
+            entity.Property(e => e.PhoneNumber).HasMaxLength(50);
+            entity.Ignore(e => e.ContactNumber);
             entity.Property(e => e.Email).HasMaxLength(200);
             entity.Property(e => e.BloodGroup).HasMaxLength(10);
             entity.Property(e => e.Address).HasMaxLength(500);
