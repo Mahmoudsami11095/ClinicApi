@@ -106,6 +106,8 @@ public class AppointmentsController : ControllerBase
         var appointments = await _repo.GetAllAsync();
         var doctorIdClaim = User.FindFirst("doctorId")?.Value;
         var clinicIdClaim = User.FindFirst("clinicId")?.Value;
+        var roleClaim = User.FindFirst(System.Security.Claims.ClaimTypes.Role)?.Value;
+
         if (!string.IsNullOrEmpty(doctorIdClaim))
         {
             var clinics = await _clinicRepo.GetAllAsync();
@@ -115,6 +117,18 @@ public class AppointmentsController : ControllerBase
                 .Select(c => c.Id)
                 .ToList();
             appointments = appointments.Where(a => allowedClinicIds.Contains(a.ClinicId ?? "")).ToList();
+        }
+        else if (roleClaim == "assistant")
+        {
+            var cIds = User.FindAll("clinicIds").Select(c => c.Value).ToList();
+            if (cIds.Any())
+            {
+                appointments = appointments.Where(a => cIds.Contains(a.ClinicId ?? "")).ToList();
+            }
+            else if (!string.IsNullOrEmpty(clinicIdClaim))
+            {
+                appointments = appointments.Where(a => a.ClinicId == clinicIdClaim).ToList();
+            }
         }
         else if (!string.IsNullOrEmpty(clinicIdClaim))
         {
