@@ -12,10 +12,12 @@ namespace Clinic.Application.Services;
 public class DoctorService : IDoctorService
 {
     private readonly IDoctorRepository _repo;
+    private readonly IUserRepository _userRepo;
 
-    public DoctorService(IDoctorRepository repo)
+    public DoctorService(IDoctorRepository repo, IUserRepository userRepo)
     {
         _repo = repo;
+        _userRepo = userRepo;
     }
 
     public async Task<IEnumerable<DoctorDto>> GetAllAsync()
@@ -26,13 +28,40 @@ public class DoctorService : IDoctorService
 
     public async Task CreateAsync(DoctorDto dto)
     {
+        var countryCode = dto.CountryCode;
+        var phoneNumber = dto.PhoneNumber;
+
+        if (string.IsNullOrEmpty(phoneNumber) && !string.IsNullOrEmpty(dto.ContactNumber))
+        {
+            var split = Clinic.Domain.Helpers.PhoneHelper.SplitContactNumber(dto.ContactNumber);
+            countryCode = split.CountryCode;
+            phoneNumber = split.PhoneNumber;
+        }
+
+        if (string.IsNullOrEmpty(countryCode))
+        {
+            countryCode = "+20";
+        }
+
+        var validation = Clinic.Domain.Helpers.PhoneHelper.ValidatePhoneNumber(countryCode, phoneNumber);
+        if (!validation.IsValid)
+            throw new ArgumentException(validation.ErrorMessage);
+
+        var normPhone = Clinic.Domain.Helpers.PhoneHelper.NormalizePhoneNumber(countryCode, phoneNumber!);
+
+        var isUnique = await _userRepo.IsPhoneNumberUniqueAsync(countryCode, normPhone);
+        if (!isUnique)
+            throw new InvalidOperationException("This phone number is already registered to another account.");
+
         var clinicIds = dto.ClinicIds ?? new List<string>();
         var entity = new Doctor
         {
             Id = string.IsNullOrEmpty(dto.Id) ? Guid.NewGuid().ToString() : dto.Id,
             FirstName = dto.FirstName, LastName = dto.LastName,
             Specialization = dto.Specialization, Email = dto.Email,
-            ContactNumber = dto.ContactNumber, Avatar = dto.Avatar,
+            CountryCode = countryCode,
+            PhoneNumber = normPhone,
+            Avatar = dto.Avatar,
             AvailabilityDays = JsonSerializer.Serialize(dto.Availability?.Days ?? new List<string>()),
             AvailabilityHours = dto.Availability?.Hours ?? ""
         };
@@ -62,7 +91,10 @@ public class DoctorService : IDoctorService
         {
             Id = d.Id, FirstName = d.FirstName, LastName = d.LastName,
             Specialization = d.Specialization, Email = d.Email,
-            ContactNumber = d.ContactNumber, Avatar = d.Avatar,
+            ContactNumber = d.ContactNumber,
+            CountryCode = d.CountryCode,
+            PhoneNumber = d.PhoneNumber,
+            Avatar = d.Avatar,
             Availability = new DoctorAvailabilityDto { Days = days, Hours = d.AvailabilityHours },
             ClinicIds = d.DoctorClinics?.Select(dc => dc.ClinicId).ToList(),
             ClinicAvailabilities = clinicAvails

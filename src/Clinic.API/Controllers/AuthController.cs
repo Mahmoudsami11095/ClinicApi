@@ -65,7 +65,7 @@ public class AuthController : ControllerBase
             !BCrypt.Net.BCrypt.Verify(request.Password, user.PasswordHash))
             return Unauthorized(new { message = "Incorrect password" });
 
-        var clinicIds = await GetDoctorClinicIds(user);
+        var clinicIds = await GetUserClinicIds(user);
         var token = _jwtService.GenerateToken(user, clinicIds);
         var userDto = MapToUserDto(user, clinicIds);
 
@@ -152,7 +152,7 @@ public class AuthController : ControllerBase
                 return Ok(new { message = "Phone number verified successfully" });
             }
 
-            var clinicIds = await GetDoctorClinicIds(user);
+            var clinicIds = await GetUserClinicIds(user);
             var token = _jwtService.GenerateToken(user, clinicIds);
             var userDto = MapToUserDto(user, clinicIds);
 
@@ -177,7 +177,7 @@ public class AuthController : ControllerBase
             if (user == null)
                 return Ok(new { message = "Phone number verified successfully" });
 
-            var clinicIds = await GetDoctorClinicIds(user);
+            var clinicIds = await GetUserClinicIds(user);
             var token = _jwtService.GenerateToken(user, clinicIds);
             var userDto = MapToUserDto(user, clinicIds);
 
@@ -195,7 +195,7 @@ public class AuthController : ControllerBase
         if (emailUser == null)
             return Ok(new { message = "Email verified successfully" });
 
-        var emailClinicIds = await GetDoctorClinicIds(emailUser);
+        var emailClinicIds = await GetUserClinicIds(emailUser);
         var emailToken = _jwtService.GenerateToken(emailUser, emailClinicIds);
         var emailUserDto = MapToUserDto(emailUser, emailClinicIds);
 
@@ -305,6 +305,13 @@ public class AuthController : ControllerBase
                     ClinicId = string.IsNullOrEmpty(request.ClinicId) ? null : request.ClinicId,
                     PasswordHash = BCrypt.Net.BCrypt.HashPassword("social-default-password-" + Guid.NewGuid().ToString())
                 };
+
+                var clinics = request.ClinicIds ?? new List<string>();
+                if (!string.IsNullOrWhiteSpace(request.ClinicId) && !clinics.Contains(request.ClinicId))
+                {
+                    clinics.Add(request.ClinicId);
+                }
+                user.UserClinics = clinics.Select(cid => new UserClinic { ClinicId = cid, UserId = user.Id }).ToList();
             }
             else
             {
@@ -344,7 +351,7 @@ public class AuthController : ControllerBase
             await _userRepo.AddAsync(user);
         }
 
-        var clinicIds = await GetDoctorClinicIds(user);
+        var clinicIds = await GetUserClinicIds(user);
         var appToken = _jwtService.GenerateToken(user, clinicIds);
         var userDto = MapToUserDto(user, clinicIds);
 
@@ -363,9 +370,19 @@ public class AuthController : ControllerBase
 
         if (!string.IsNullOrWhiteSpace(request.Phone))
         {
+            var split = Clinic.Domain.Helpers.PhoneHelper.SplitContactNumber(request.Phone);
+            var validation = Clinic.Domain.Helpers.PhoneHelper.ValidatePhoneNumber(split.CountryCode, split.PhoneNumber);
+            if (!validation.IsValid)
+                return BadRequest(new { message = validation.ErrorMessage });
+
+            var normPhone = Clinic.Domain.Helpers.PhoneHelper.NormalizePhoneNumber(split.CountryCode, split.PhoneNumber);
+            var isUnique = await _userRepo.IsPhoneNumberUniqueAsync(split.CountryCode, normPhone);
+            if (!isUnique)
+                return BadRequest(new { message = "Phone number already registered to another account." });
+
             var existingPhone = await _userRepo.GetByPhoneNumberAsync(request.Phone);
             if (existingPhone != null)
-                return BadRequest(new { message = "Phone number already registered" });
+                return BadRequest(new { message = "Phone number already registered to another account." });
 
             // Generate and send Email OTP
             var emailCode = _otpService.GenerateOtp(request.Email);
@@ -433,6 +450,34 @@ public class AuthController : ControllerBase
         if (!Enum.TryParse<UserRole>(request.Role, ignoreCase: true, out var role))
             return BadRequest(new { message = $"Invalid role '{request.Role}'. Must be one of: doctor, patient, assistant." });
 
+        var countryCode = request.CountryCode;
+        var phoneNumber = request.PhoneNumber;
+
+        if (string.IsNullOrEmpty(phoneNumber) && !string.IsNullOrEmpty(request.Phone))
+        {
+            var split = Clinic.Domain.Helpers.PhoneHelper.SplitContactNumber(request.Phone);
+            countryCode = split.CountryCode;
+            phoneNumber = split.PhoneNumber;
+        }
+
+        if (!string.IsNullOrEmpty(phoneNumber))
+        {
+            if (string.IsNullOrEmpty(countryCode))
+            {
+                countryCode = "+20";
+            }
+
+            var validation = Clinic.Domain.Helpers.PhoneHelper.ValidatePhoneNumber(countryCode, phoneNumber);
+            if (!validation.IsValid)
+                return BadRequest(new { message = validation.ErrorMessage });
+
+            phoneNumber = Clinic.Domain.Helpers.PhoneHelper.NormalizePhoneNumber(countryCode, phoneNumber);
+
+            var isUnique = await _userRepo.IsPhoneNumberUniqueAsync(countryCode, phoneNumber);
+            if (!isUnique)
+                return BadRequest(new { message = "Phone number is already registered to another account." });
+        }
+
         // Generate patient ID for patient role
         string? patientId = request.PatientId;
         if (role == UserRole.Patient && string.IsNullOrEmpty(patientId))
@@ -454,7 +499,8 @@ public class AuthController : ControllerBase
                 FirstName = nameParts[0],
                 LastName = nameParts.Length > 1 ? nameParts[1] : "",
                 Email = request.Email,
-                ContactNumber = request.Phone ?? "+1234567890",
+                CountryCode = countryCode ?? "+20",
+                PhoneNumber = phoneNumber ?? "",
                 Specialization = request.Specialization ?? "General Medicine",
                 AvailabilityDays = "[\"Monday\",\"Tuesday\",\"Wednesday\",\"Thursday\",\"Friday\"]",
                 AvailabilityHours = "09:00-17:00"
@@ -532,7 +578,8 @@ public class AuthController : ControllerBase
                 FirstName = nameParts[0],
                 LastName = nameParts.Length > 1 ? nameParts[1] : "",
                 Email = request.Email,
-                ContactNumber = request.Phone ?? "+1234567890",
+                CountryCode = countryCode ?? "+20",
+                PhoneNumber = phoneNumber ?? "",
                 Gender = request.Gender ?? "Male",
                 DateOfBirth = request.Dob ?? "1996-01-01",
                 BloodGroup = request.BloodGroup ?? "O+",
@@ -558,10 +605,21 @@ public class AuthController : ControllerBase
             PasswordHash = BCrypt.Net.BCrypt.HashPassword(request.Password ?? "password123")
         };
 
+        if (role == UserRole.Assistant)
+        {
+            var clinics = request.ClinicIds ?? new List<string>();
+            if (!string.IsNullOrWhiteSpace(request.ClinicId) && !clinics.Contains(request.ClinicId))
+            {
+                clinics.Add(request.ClinicId);
+            }
+            newUser.UserClinics = clinics.Select(cid => new UserClinic { ClinicId = cid, UserId = newUser.Id }).ToList();
+            registeredClinicIds = clinics;
+        }
+
         await _userRepo.AddAsync(newUser);
 
         var clinicIds = registeredClinicIds ??
-            (string.IsNullOrEmpty(request.ClinicId) ? new List<string>() : new List<string> { request.ClinicId });
+            (string.IsNullOrWhiteSpace(request.ClinicId) ? new List<string>() : new List<string> { request.ClinicId });
         var userDto = MapToUserDto(newUser, clinicIds);
 
         return Ok(new { message = "Registration successful", data = userDto });
@@ -574,7 +632,7 @@ public class AuthController : ControllerBase
         var dtos = new List<UserDto>();
         foreach (var u in users)
         {
-            var clinicIds = await GetDoctorClinicIds(u);
+            var clinicIds = await GetUserClinicIds(u);
             dtos.Add(MapToUserDto(u, clinicIds));
         }
         return Ok(new { data = dtos });
@@ -610,6 +668,8 @@ public class AuthController : ControllerBase
             {
                 profile.Specialization = doctor.Specialization;
                 profile.ContactNumber = doctor.ContactNumber;
+                profile.CountryCode = doctor.CountryCode;
+                profile.PhoneNumber = doctor.PhoneNumber;
                 profile.Avatar = doctor.Avatar;
                 profile.AvailabilityDays = doctor.AvailabilityDays;
                 profile.AvailabilityHours = doctor.AvailabilityHours;
@@ -625,6 +685,8 @@ public class AuthController : ControllerBase
                 profile.BloodGroup = patient.BloodGroup;
                 profile.Address = patient.Address;
                 profile.ContactNumber = patient.ContactNumber;
+                profile.CountryCode = patient.CountryCode;
+                profile.PhoneNumber = patient.PhoneNumber;
                 profile.Allergies = patient.Allergies;
                 profile.ChronicDiseases = patient.ChronicDiseases;
                 profile.PastIllnesses = patient.PastIllnesses;
@@ -656,13 +718,35 @@ public class AuthController : ControllerBase
             return Ok(new { message = "OTP sent to your email successfully", emailOtp = emailCode });
         }
 
-        if (!string.IsNullOrWhiteSpace(request.ContactNumber))
+        var contactNumber = request.ContactNumber;
+        var countryCode = request.CountryCode;
+        var phoneNumber = request.PhoneNumber;
+
+        if (string.IsNullOrEmpty(phoneNumber) && !string.IsNullOrEmpty(contactNumber))
         {
-            var existingUser = await _userRepo.GetByPhoneNumberAsync(request.ContactNumber);
-            if (existingUser != null && existingUser.Id != userId)
+            var split = Clinic.Domain.Helpers.PhoneHelper.SplitContactNumber(contactNumber);
+            countryCode = split.CountryCode;
+            phoneNumber = split.PhoneNumber;
+        }
+
+        if (!string.IsNullOrEmpty(phoneNumber))
+        {
+            if (string.IsNullOrEmpty(countryCode))
+            {
+                countryCode = "+20";
+            }
+
+            var validation = Clinic.Domain.Helpers.PhoneHelper.ValidatePhoneNumber(countryCode, phoneNumber);
+            if (!validation.IsValid)
+                return BadRequest(new { message = validation.ErrorMessage });
+
+            var normPhone = Clinic.Domain.Helpers.PhoneHelper.NormalizePhoneNumber(countryCode, phoneNumber);
+            var isUnique = await _userRepo.IsPhoneNumberUniqueAsync(countryCode, normPhone, userId);
+            if (!isUnique)
                 return BadRequest(new { message = "Phone number is already in use by another account" });
 
-            var (success, message, whatsappCode) = await _whatsappOtpService.RequestOtpAsync(request.ContactNumber);
+            var fullContactNumber = $"{countryCode}{normPhone}";
+            var (success, message, whatsappCode) = await _whatsappOtpService.RequestOtpAsync(fullContactNumber);
             if (!success)
             {
                 if (message.Contains("Too many OTP requests", StringComparison.OrdinalIgnoreCase))
@@ -719,39 +803,55 @@ public class AuthController : ControllerBase
         }
 
         // 2. Phone OTP Check
-        if (doctor != null && !string.Equals(doctor.ContactNumber, dto.ContactNumber, StringComparison.OrdinalIgnoreCase))
+        var countryCode = dto.CountryCode;
+        var phoneNumber = dto.PhoneNumber;
+
+        if (string.IsNullOrEmpty(phoneNumber) && !string.IsNullOrEmpty(dto.ContactNumber))
         {
-            if (string.IsNullOrWhiteSpace(dto.ContactNumber))
-                return BadRequest(new { message = "Contact number cannot be empty" });
-
-            var existingUser = await _userRepo.GetByPhoneNumberAsync(dto.ContactNumber);
-            if (existingUser != null && existingUser.Id != userId)
-                return BadRequest(new { message = "Phone number is already in use by another account" });
-
-            if (string.IsNullOrWhiteSpace(dto.PhoneOtpCode))
-                return BadRequest(new { message = "WhatsApp verification code is required to update phone number" });
-
-            if (!_whatsappOtpService.VerifyOtp(dto.ContactNumber, dto.PhoneOtpCode))
-                return BadRequest(new { message = "Invalid or expired WhatsApp verification code" });
-
-            _whatsappOtpService.RemoveOtp(dto.ContactNumber);
+            var split = Clinic.Domain.Helpers.PhoneHelper.SplitContactNumber(dto.ContactNumber);
+            countryCode = split.CountryCode;
+            phoneNumber = split.PhoneNumber;
         }
-        else if (patient != null && !string.Equals(patient.ContactNumber, dto.ContactNumber, StringComparison.OrdinalIgnoreCase))
-        {
-            if (string.IsNullOrWhiteSpace(dto.ContactNumber))
-                return BadRequest(new { message = "Contact number cannot be empty" });
 
-            var existingUser = await _userRepo.GetByPhoneNumberAsync(dto.ContactNumber);
-            if (existingUser != null && existingUser.Id != userId)
+        if (string.IsNullOrEmpty(countryCode))
+        {
+            countryCode = "+20";
+        }
+
+        var hasNewPhone = false;
+        var normPhone = "";
+        if (!string.IsNullOrEmpty(phoneNumber))
+        {
+            var validation = Clinic.Domain.Helpers.PhoneHelper.ValidatePhoneNumber(countryCode, phoneNumber);
+            if (!validation.IsValid)
+                return BadRequest(new { message = validation.ErrorMessage });
+
+            normPhone = Clinic.Domain.Helpers.PhoneHelper.NormalizePhoneNumber(countryCode, phoneNumber);
+
+            if (doctor != null && (!string.Equals(doctor.CountryCode, countryCode, StringComparison.OrdinalIgnoreCase) || !string.Equals(doctor.PhoneNumber, normPhone, StringComparison.OrdinalIgnoreCase)))
+            {
+                hasNewPhone = true;
+            }
+            else if (patient != null && (!string.Equals(patient.CountryCode, countryCode, StringComparison.OrdinalIgnoreCase) || !string.Equals(patient.PhoneNumber, normPhone, StringComparison.OrdinalIgnoreCase)))
+            {
+                hasNewPhone = true;
+            }
+        }
+
+        if (hasNewPhone)
+        {
+            var isUnique = await _userRepo.IsPhoneNumberUniqueAsync(countryCode, normPhone, userId);
+            if (!isUnique)
                 return BadRequest(new { message = "Phone number is already in use by another account" });
 
             if (string.IsNullOrWhiteSpace(dto.PhoneOtpCode))
                 return BadRequest(new { message = "WhatsApp verification code is required to update phone number" });
 
-            if (!_whatsappOtpService.VerifyOtp(dto.ContactNumber, dto.PhoneOtpCode))
+            var fullContactNumber = $"{countryCode}{normPhone}";
+            if (!_whatsappOtpService.VerifyOtp(fullContactNumber, dto.PhoneOtpCode))
                 return BadRequest(new { message = "Invalid or expired WhatsApp verification code" });
 
-            _whatsappOtpService.RemoveOtp(dto.ContactNumber);
+            _whatsappOtpService.RemoveOtp(fullContactNumber);
         }
 
         // Update core User
@@ -773,7 +873,11 @@ public class AuthController : ControllerBase
             doctor.LastName = nameParts.Length > 1 ? nameParts[1] : "";
             doctor.Email = dto.Email;
             doctor.Specialization = dto.Specialization ?? doctor.Specialization;
-            doctor.ContactNumber = dto.ContactNumber ?? doctor.ContactNumber;
+            if (!string.IsNullOrEmpty(phoneNumber))
+            {
+                doctor.CountryCode = countryCode;
+                doctor.PhoneNumber = normPhone;
+            }
             doctor.Avatar = dto.Avatar ?? doctor.Avatar;
             doctor.AvailabilityDays = dto.AvailabilityDays ?? doctor.AvailabilityDays;
             doctor.AvailabilityHours = dto.AvailabilityHours ?? doctor.AvailabilityHours;
@@ -789,7 +893,11 @@ public class AuthController : ControllerBase
             patient.DateOfBirth = dto.DateOfBirth ?? patient.DateOfBirth;
             patient.BloodGroup = dto.BloodGroup ?? patient.BloodGroup;
             patient.Address = dto.Address ?? patient.Address;
-            patient.ContactNumber = dto.ContactNumber ?? patient.ContactNumber;
+            if (!string.IsNullOrEmpty(phoneNumber))
+            {
+                patient.CountryCode = countryCode;
+                patient.PhoneNumber = normPhone;
+            }
             patient.Allergies = dto.Allergies ?? patient.Allergies;
             patient.ChronicDiseases = dto.ChronicDiseases ?? patient.ChronicDiseases;
             patient.PastIllnesses = dto.PastIllnesses ?? patient.PastIllnesses;
@@ -844,18 +952,24 @@ public class AuthController : ControllerBase
     }
 
     // ── Helpers ──
-    private async Task<List<string>?> GetDoctorClinicIds(User user)
+    private async Task<List<string>?> GetUserClinicIds(User user)
     {
-        if (user.Role != UserRole.Doctor || string.IsNullOrEmpty(user.DoctorId))
-            return null;
+        if (user.Role == UserRole.Doctor && !string.IsNullOrEmpty(user.DoctorId))
+        {
+            var doctor = await _doctorRepo.GetByIdAsync(user.DoctorId);
+            if (doctor == null) return null;
 
-        var doctor = await _doctorRepo.GetByIdAsync(user.DoctorId);
-        if (doctor == null) return null;
-
-        // Load doctor with clinics
-        var doctors = await _doctorRepo.GetAllAsync(); // includes DoctorClinics
-        var d = doctors.FirstOrDefault(x => x.Id == user.DoctorId);
-        return d?.DoctorClinics.Select(dc => dc.ClinicId).ToList();
+            // Load doctor with clinics
+            var doctors = await _doctorRepo.GetAllAsync(); // includes DoctorClinics
+            var d = doctors.FirstOrDefault(x => x.Id == user.DoctorId);
+            return d?.DoctorClinics.Select(dc => dc.ClinicId).ToList();
+        }
+        else if (user.Role == UserRole.Assistant)
+        {
+            var fullUser = await _userRepo.GetByIdAsync(user.Id);
+            return fullUser?.UserClinics?.Select(uc => uc.ClinicId).ToList() ?? new List<string>();
+        }
+        return null;
     }
 
     private static UserDto MapToUserDto(User user, List<string>? clinicIds)

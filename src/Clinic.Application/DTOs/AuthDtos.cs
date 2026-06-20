@@ -35,6 +35,7 @@ public class VerifyOtpRequest
 {
     public string? Email { get; set; }
     public string? PhoneNumber { get; set; }
+    public string? CountryCode { get; set; }
     public string Code { get; set; } = string.Empty;
     public bool? RemoveAfterVerification { get; set; }
 }
@@ -55,6 +56,8 @@ public class RegisterRequest
     public string? ClinicAvailabilityHours { get; set; }
     public string? ClinicAvailabilityDays { get; set; }
     public string? Phone { get; set; }
+    public string? CountryCode { get; set; }
+    public string? PhoneNumber { get; set; }
     public string? Gender { get; set; }
     public int? Age { get; set; }
     public string? OtpCode { get; set; }
@@ -86,6 +89,8 @@ public class SocialLoginRequest
 
     // Missing data fields:
     public string? ContactNumber { get; set; }
+    public string? CountryCode { get; set; }
+    public string? PhoneNumber { get; set; }
     public string? Specialization { get; set; }
     public string? ClinicName { get; set; }
     public string? ClinicAddress { get; set; }
@@ -129,6 +134,8 @@ public class UserProfileDto
     public string? DoctorId { get; set; }
     public string? Specialization { get; set; }
     public string? ContactNumber { get; set; }
+    public string? CountryCode { get; set; }
+    public string? PhoneNumber { get; set; }
     public string? Avatar { get; set; }
     public string? AvailabilityDays { get; set; }
     public string? AvailabilityHours { get; set; }
@@ -152,6 +159,8 @@ public class ProfileOtpRequest
 {
     public string? Email { get; set; }
     public string? ContactNumber { get; set; }
+    public string? CountryCode { get; set; }
+    public string? PhoneNumber { get; set; }
 }
 
 // ── Forgot / Reset Password ──

@@ -4,6 +4,7 @@ using Clinic.Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -11,9 +12,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace Clinic.Infrastructure.Migrations
 {
     [DbContext(typeof(ClinicDbContext))]
-    partial class ClinicDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260620123957_SplitPhoneNumber")]
+    partial class SplitPhoneNumber
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -619,21 +622,6 @@ namespace Clinic.Infrastructure.Migrations
                     b.ToTable("Users", (string)null);
                 });
 
-            modelBuilder.Entity("Clinic.Domain.Entities.UserClinic", b =>
-                {
-                    b.Property<string>("UserId")
-                        .HasColumnType("nvarchar(450)");
-
-                    b.Property<string>("ClinicId")
-                        .HasColumnType("nvarchar(450)");
-
-                    b.HasKey("UserId", "ClinicId");
-
-                    b.HasIndex("ClinicId");
-
-                    b.ToTable("UserClinics", (string)null);
-                });
-
             modelBuilder.Entity("Clinic.Domain.Entities.Appointment", b =>
                 {
                     b.HasOne("Clinic.Domain.Entities.ClinicEntity", "Clinic")
@@ -914,25 +902,6 @@ namespace Clinic.Infrastructure.Migrations
                     b.Navigation("Patient");
                 });
 
-            modelBuilder.Entity("Clinic.Domain.Entities.UserClinic", b =>
-                {
-                    b.HasOne("Clinic.Domain.Entities.ClinicEntity", "Clinic")
-                        .WithMany("UserClinics")
-                        .HasForeignKey("ClinicId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.HasOne("Clinic.Domain.Entities.User", "User")
-                        .WithMany("UserClinics")
-                        .HasForeignKey("UserId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("Clinic");
-
-                    b.Navigation("User");
-                });
-
             modelBuilder.Entity("Clinic.Domain.Entities.Appointment", b =>
                 {
                     b.Navigation("BillingRecord");
@@ -949,8 +918,6 @@ namespace Clinic.Infrastructure.Migrations
                     b.Navigation("DoctorClinics");
 
                     b.Navigation("Patients");
-
-                    b.Navigation("UserClinics");
 
                     b.Navigation("Users");
                 });
@@ -984,11 +951,6 @@ namespace Clinic.Infrastructure.Migrations
             modelBuilder.Entity("Clinic.Domain.Entities.RadiologyCenter", b =>
                 {
                     b.Navigation("RadiologyRecords");
-                });
-
-            modelBuilder.Entity("Clinic.Domain.Entities.User", b =>
-                {
-                    b.Navigation("UserClinics");
                 });
 #pragma warning restore 612, 618
         }

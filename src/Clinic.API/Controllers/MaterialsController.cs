@@ -21,6 +21,16 @@ public class MaterialsController : ControllerBase
     [HttpGet("doctor/{doctorId}")]
     public async Task<IActionResult> GetByDoctor(string doctorId, [FromQuery] string? clinicId)
     {
+        var clinicIdClaim = User.FindFirst("clinicId")?.Value;
+        if (!string.IsNullOrEmpty(clinicIdClaim))
+        {
+            if (!string.IsNullOrEmpty(clinicId) && clinicId != "all" && clinicId != clinicIdClaim)
+            {
+                return StatusCode(403, new { message = "You can only view materials for your assigned clinic" });
+            }
+            clinicId = clinicIdClaim;
+        }
+
         IEnumerable<Material> materials;
         if (!string.IsNullOrEmpty(clinicId) && clinicId != "all")
         {
@@ -46,6 +56,13 @@ public class MaterialsController : ControllerBase
     [HttpPost]
     public async Task<IActionResult> Create([FromBody] MaterialDto dto)
     {
+        var clinicIdClaim = User.FindFirst("clinicId")?.Value;
+        if (!string.IsNullOrEmpty(clinicIdClaim))
+        {
+            if (dto.ClinicId != clinicIdClaim)
+                return StatusCode(403, new { message = "You can only manage materials for your assigned clinic" });
+        }
+
         var material = new Material
         {
             Id = string.IsNullOrEmpty(dto.Id) ? Guid.NewGuid().ToString() : dto.Id,
@@ -66,6 +83,13 @@ public class MaterialsController : ControllerBase
         var material = await _repo.GetByIdAsync(id);
         if (material == null) return NotFound(new { message = "Material not found" });
 
+        var clinicIdClaim = User.FindFirst("clinicId")?.Value;
+        if (!string.IsNullOrEmpty(clinicIdClaim))
+        {
+            if (dto.ClinicId != clinicIdClaim || material.ClinicId != clinicIdClaim)
+                return StatusCode(403, new { message = "You can only manage materials for your assigned clinic" });
+        }
+
         material.Name = dto.Name;
         material.Quantity = dto.Quantity;
         material.Unit = dto.Unit;
@@ -80,6 +104,13 @@ public class MaterialsController : ControllerBase
     {
         var material = await _repo.GetByIdAsync(id);
         if (material == null) return NotFound(new { message = "Material not found" });
+
+        var clinicIdClaim = User.FindFirst("clinicId")?.Value;
+        if (!string.IsNullOrEmpty(clinicIdClaim))
+        {
+            if (material.ClinicId != clinicIdClaim)
+                return StatusCode(403, new { message = "You can only manage materials for your assigned clinic" });
+        }
 
         await _repo.DeleteAsync(id);
         return Ok(new { message = "Material deleted successfully" });

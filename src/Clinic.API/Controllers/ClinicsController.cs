@@ -30,12 +30,18 @@ public class ClinicsController : ControllerBase
     {
         var clinics = await _repo.GetAllAsync();
         var doctorIdClaim = User.FindFirst("doctorId")?.Value;
+        var roleClaim = User.FindFirst(System.Security.Claims.ClaimTypes.Role)?.Value;
+        var userId = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
 
-        if (!string.IsNullOrEmpty(doctorIdClaim))
+        if (roleClaim == UserRole.Doctor.ToString().ToLower() && !string.IsNullOrEmpty(doctorIdClaim))
         {
             // Filter clinics to show only those created by the doctor or assigned to them (either Pending or Accepted)
             clinics = clinics.Where(c => c.CreatorDoctorId == doctorIdClaim || 
                                          c.DoctorClinics.Any(dc => dc.DoctorId == doctorIdClaim)).ToList();
+        }
+        else if (roleClaim == UserRole.Assistant.ToString().ToLower() && !string.IsNullOrEmpty(userId))
+        {
+            clinics = clinics.Where(c => c.UserClinics != null && c.UserClinics.Any(uc => uc.UserId == userId)).ToList();
         }
 
         var dtos = clinics.Select(c => {
@@ -54,7 +60,8 @@ public class ClinicsController : ControllerBase
                 CreatorDoctorId = c.CreatorDoctorId,
                 Status = status,
                 AvailabilityHours = c.AvailabilityHours,
-                AvailabilityDays = c.AvailabilityDays
+                AvailabilityDays = c.AvailabilityDays,
+                AssistantCount = c.UserClinics?.Count(uc => uc.User?.Role == UserRole.Assistant) ?? 0
             };
         }).ToList();
 
@@ -204,7 +211,9 @@ public class ClinicsController : ControllerBase
             return BadRequest(new { message = "Assistant email is required" });
 
         var cleanEmail = request.Email.Trim().ToLower();
-        var assistantUser = await _context.Users.FirstOrDefaultAsync(u => u.Email.ToLower() == cleanEmail);
+        var assistantUser = await _context.Users
+            .Include(u => u.UserClinics)
+            .FirstOrDefaultAsync(u => u.Email.ToLower() == cleanEmail);
         
         if (assistantUser == null)
             return NotFound(new { message = $"No user found with email {request.Email}" });
@@ -212,11 +221,26 @@ public class ClinicsController : ControllerBase
         if (assistantUser.Role != UserRole.Assistant)
             return BadRequest(new { message = $"User with email {request.Email} is not an Assistant" });
 
-        // Update assistant's clinic and supervising doctor
-        assistantUser.ClinicId = id;
+        // Set legacy ClinicId if not set, else leave it as primary
+        if (string.IsNullOrEmpty(assistantUser.ClinicId))
+        {
+            assistantUser.ClinicId = id;
+        }
+
         if (!string.IsNullOrEmpty(doctorIdClaim))
         {
             assistantUser.DoctorId = doctorIdClaim;
+        }
+
+        // Add to many-to-many relationship
+        if (assistantUser.UserClinics == null)
+        {
+            assistantUser.UserClinics = new List<UserClinic>();
+        }
+
+        if (!assistantUser.UserClinics.Any(uc => uc.ClinicId == id))
+        {
+            assistantUser.UserClinics.Add(new UserClinic { ClinicId = id, UserId = assistantUser.Id });
         }
 
         _context.Users.Update(assistantUser);

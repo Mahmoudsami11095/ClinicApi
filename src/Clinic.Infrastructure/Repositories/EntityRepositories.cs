@@ -10,7 +10,12 @@ public class ClinicRepository : GenericRepository<ClinicEntity>, IClinicReposito
     public ClinicRepository(ClinicDbContext context) : base(context) { }
 
     public override async Task<List<ClinicEntity>> GetAllAsync()
-        => await _dbSet.Include(c => c.DoctorClinics).AsNoTracking().ToListAsync();
+        => await _dbSet
+            .Include(c => c.DoctorClinics)
+            .Include(c => c.UserClinics)
+                .ThenInclude(uc => uc.User)
+            .AsNoTracking()
+            .ToListAsync();
 }
 
 public class PatientRepository : GenericRepository<Patient>, IPatientRepository
@@ -142,36 +147,46 @@ public class UserRepository : GenericRepository<User>, IUserRepository
 {
     public UserRepository(ClinicDbContext context) : base(context) { }
 
+    public override async Task<List<User>> GetAllAsync()
+        => await _dbSet.Include(u => u.UserClinics).AsNoTracking().ToListAsync();
+
+    public override async Task<User?> GetByIdAsync(string id)
+        => await _dbSet.Include(u => u.UserClinics).FirstOrDefaultAsync(u => u.Id == id);
+
     public async Task<User?> GetByEmailAsync(string email)
-        => await _dbSet.FirstOrDefaultAsync(u => u.Email.ToLower() == email.ToLower());
+        => await _dbSet.Include(u => u.UserClinics).FirstOrDefaultAsync(u => u.Email.ToLower() == email.ToLower());
 
     public async Task<User?> GetByPhoneNumberAsync(string phoneNumber)
     {
-        var normalizedPhone = phoneNumber.Replace(" ", "").Replace("-", "").Replace("+", "").Trim();
-        if (normalizedPhone.Length > 9)
-        {
-            normalizedPhone = normalizedPhone.Substring(normalizedPhone.Length - 9);
-        }
+        var split = Clinic.Domain.Helpers.PhoneHelper.SplitContactNumber(phoneNumber);
+        var normPhone = Clinic.Domain.Helpers.PhoneHelper.NormalizePhoneNumber(split.CountryCode, split.PhoneNumber);
 
-        var users = await _dbSet
+        return await _dbSet
             .Include(u => u.Patient)
             .Include(u => u.Doctor)
-            .ToListAsync();
+            .FirstOrDefaultAsync(u =>
+                (u.Patient != null && u.Patient.CountryCode == split.CountryCode && u.Patient.PhoneNumber == normPhone) ||
+                (u.Doctor != null && u.Doctor.CountryCode == split.CountryCode && u.Doctor.PhoneNumber == normPhone)
+            );
+    }
 
-        return users.FirstOrDefault(u => 
-        {
-            if (u.Patient != null)
-            {
-                var patientPhone = u.Patient.ContactNumber.Replace(" ", "").Replace("-", "").Replace("+", "").Trim();
-                if (patientPhone.EndsWith(normalizedPhone)) return true;
-            }
-            if (u.Doctor != null)
-            {
-                var doctorPhone = u.Doctor.ContactNumber.Replace(" ", "").Replace("-", "").Replace("+", "").Trim();
-                if (doctorPhone.EndsWith(normalizedPhone)) return true;
-            }
-            return false;
-        });
+    public async Task<bool> IsPhoneNumberUniqueAsync(string countryCode, string phoneNumber, string? excludeUserId = null)
+    {
+        var normPhone = Clinic.Domain.Helpers.PhoneHelper.NormalizePhoneNumber(countryCode, phoneNumber);
+
+        var patientExists = await _context.Patients
+            .AnyAsync(p => p.CountryCode == countryCode && p.PhoneNumber == normPhone && 
+                (excludeUserId == null || !_dbSet.Any(u => u.Id == excludeUserId && u.PatientId == p.Id)));
+
+        if (patientExists) return false;
+
+        var doctorExists = await _context.Doctors
+            .AnyAsync(d => d.CountryCode == countryCode && d.PhoneNumber == normPhone && 
+                (excludeUserId == null || !_dbSet.Any(u => u.Id == excludeUserId && u.DoctorId == d.Id)));
+
+        if (doctorExists) return false;
+
+        return true;
     }
 }
 

@@ -17,6 +17,7 @@ public class ClinicDbContext : DbContext
     public DbSet<Prescription> Prescriptions => Set<Prescription>();
     public DbSet<DentalLog> DentalLogs => Set<DentalLog>();
     public DbSet<DoctorClinic> DoctorClinics => Set<DoctorClinic>();
+    public DbSet<UserClinic> UserClinics => Set<UserClinic>();
     public DbSet<Notification> Notifications => Set<Notification>();
     public DbSet<Material> Materials => Set<Material>();
     public DbSet<RadiologyCenter> RadiologyCenters => Set<RadiologyCenter>();
@@ -74,7 +75,9 @@ public class ClinicDbContext : DbContext
             entity.Property(e => e.LastName).HasMaxLength(100).IsRequired();
             entity.Property(e => e.Specialization).HasMaxLength(100);
             entity.Property(e => e.Email).HasMaxLength(200);
-            entity.Property(e => e.ContactNumber).HasMaxLength(50);
+            entity.Property(e => e.CountryCode).HasMaxLength(10).HasDefaultValue("+20");
+            entity.Property(e => e.PhoneNumber).HasMaxLength(50);
+            entity.Ignore(e => e.ContactNumber);
             entity.Property(e => e.Avatar).HasMaxLength(500);
             entity.Property(e => e.AvailabilityDays).HasMaxLength(500);
             entity.Property(e => e.AvailabilityHours).HasMaxLength(50);
@@ -102,6 +105,23 @@ public class ClinicDbContext : DbContext
                   .HasForeignKey(dc => dc.ClinicId);
         });
 
+        // ── UserClinic (Many-to-Many join) ──
+        modelBuilder.Entity<UserClinic>(entity =>
+        {
+            entity.ToTable("UserClinics");
+            entity.HasKey(uc => new { uc.UserId, uc.ClinicId });
+
+            entity.HasOne(uc => uc.User)
+                  .WithMany(u => u.UserClinics)
+                  .HasForeignKey(uc => uc.UserId)
+                  .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne(uc => uc.Clinic)
+                  .WithMany(c => c.UserClinics)
+                  .HasForeignKey(uc => uc.ClinicId)
+                  .OnDelete(DeleteBehavior.Cascade);
+        });
+
         // ── Patient ──
         modelBuilder.Entity<Patient>(entity =>
         {
@@ -111,7 +131,9 @@ public class ClinicDbContext : DbContext
             entity.Property(e => e.LastName).HasMaxLength(100).IsRequired();
             entity.Property(e => e.Gender).HasMaxLength(20);
             entity.Property(e => e.DateOfBirth).HasMaxLength(50);
-            entity.Property(e => e.ContactNumber).HasMaxLength(50);
+            entity.Property(e => e.CountryCode).HasMaxLength(10).HasDefaultValue("+20");
+            entity.Property(e => e.PhoneNumber).HasMaxLength(50);
+            entity.Ignore(e => e.ContactNumber);
             entity.Property(e => e.Email).HasMaxLength(200);
             entity.Property(e => e.BloodGroup).HasMaxLength(10);
             entity.Property(e => e.Address).HasMaxLength(500);

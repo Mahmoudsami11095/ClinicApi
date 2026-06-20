@@ -14,6 +14,7 @@ public class User
     // Optional FK – set for clinic-bound admins, assistants, patients
     public string? ClinicId { get; set; }
     public ClinicEntity? Clinic { get; set; }
+    public ICollection<UserClinic> UserClinics { get; set; } = new List<UserClinic>();
 
     // Optional FK – links a user account to a Doctor record
     public string? DoctorId { get; set; }

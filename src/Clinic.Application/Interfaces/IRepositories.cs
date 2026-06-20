@@ -35,6 +35,7 @@ public interface IUserRepository : IGenericRepository<User>
 {
     Task<User?> GetByEmailAsync(string email);
     Task<User?> GetByPhoneNumberAsync(string phoneNumber);
+    Task<bool> IsPhoneNumberUniqueAsync(string countryCode, string phoneNumber, string? excludeUserId = null);
 }
 
 public interface INotificationRepository : IGenericRepository<Notification> { }

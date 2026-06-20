@@ -7,7 +7,20 @@ public class Patient
     public string LastName { get; set; } = string.Empty;
     public string Gender { get; set; } = string.Empty;
     public string DateOfBirth { get; set; } = string.Empty;
-    public string ContactNumber { get; set; } = string.Empty;
+    public string CountryCode { get; set; } = "+20";
+    public string PhoneNumber { get; set; } = string.Empty;
+
+    [System.ComponentModel.DataAnnotations.Schema.NotMapped]
+    public string ContactNumber
+    {
+        get => $"{CountryCode} {PhoneNumber}".Trim();
+        set
+        {
+            var split = Helpers.PhoneHelper.SplitContactNumber(value);
+            CountryCode = split.CountryCode;
+            PhoneNumber = split.PhoneNumber;
+        }
+    }
     public string Email { get; set; } = string.Empty;
     public string BloodGroup { get; set; } = string.Empty;
     public string Address { get; set; } = string.Empty;

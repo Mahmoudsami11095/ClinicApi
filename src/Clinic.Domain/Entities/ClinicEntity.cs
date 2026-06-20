@@ -16,4 +16,5 @@ public class ClinicEntity
     public ICollection<Appointment> Appointments { get; set; } = new List<Appointment>();
     public ICollection<BillingRecord> BillingRecords { get; set; } = new List<BillingRecord>();
     public ICollection<User> Users { get; set; } = new List<User>();
+    public ICollection<UserClinic> UserClinics { get; set; } = new List<UserClinic>();
 }
