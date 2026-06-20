@@ -19,4 +19,5 @@ public class Doctor
     public ICollection<Appointment> Appointments { get; set; } = new List<Appointment>();
     public ICollection<Prescription> Prescriptions { get; set; } = new List<Prescription>();
     public ICollection<DentalLog> DentalLogs { get; set; } = new List<DentalLog>();
+    public ICollection<RadiologyRecord> RadiologyRecords { get; set; } = new List<RadiologyRecord>();
 }

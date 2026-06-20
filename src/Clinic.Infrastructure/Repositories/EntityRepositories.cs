@@ -179,3 +179,13 @@ public class NotificationRepository : GenericRepository<Notification>, INotifica
 {
     public NotificationRepository(ClinicDbContext context) : base(context) { }
 }
+
+public class RadiologyCenterRepository : GenericRepository<RadiologyCenter>, IRadiologyCenterRepository
+{
+    public RadiologyCenterRepository(ClinicDbContext context) : base(context) { }
+}
+
+public class RadiologyRecordRepository : GenericRepository<RadiologyRecord>, IRadiologyRecordRepository
+{
+    public RadiologyRecordRepository(ClinicDbContext context) : base(context) { }
+}

@@ -19,7 +19,8 @@ public class ClinicDbContext : DbContext
     public DbSet<DoctorClinic> DoctorClinics => Set<DoctorClinic>();
     public DbSet<Notification> Notifications => Set<Notification>();
     public DbSet<Material> Materials => Set<Material>();
-
+    public DbSet<RadiologyCenter> RadiologyCenters => Set<RadiologyCenter>();
+    public DbSet<RadiologyRecord> RadiologyRecords => Set<RadiologyRecord>();
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
@@ -264,10 +265,45 @@ public class ClinicDbContext : DbContext
             entity.Property(e => e.Name).HasMaxLength(200).IsRequired();
             entity.Property(e => e.DoctorId).IsRequired();
             entity.Property(e => e.Unit).HasMaxLength(50);
-
             entity.HasOne(e => e.Doctor)
                   .WithMany()
                   .HasForeignKey(e => e.DoctorId)
+                  .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        // ── RadiologyCenter ──
+        modelBuilder.Entity<RadiologyCenter>(entity =>
+        {
+            entity.ToTable("RadiologyCenters");
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.Name).HasMaxLength(200).IsRequired();
+            entity.Property(e => e.ContactNumber).HasMaxLength(50);
+            entity.Property(e => e.Address).HasMaxLength(500);
+        });
+
+        // ── RadiologyRecord ──
+        modelBuilder.Entity<RadiologyRecord>(entity =>
+        {
+            entity.ToTable("RadiologyRecords");
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.ProcedureName).HasMaxLength(200).IsRequired();
+            entity.Property(e => e.AmountPaid).HasColumnType("decimal(18,2)");
+            entity.Property(e => e.Date).HasMaxLength(50);
+            entity.Property(e => e.Notes).HasMaxLength(1000);
+
+            entity.HasOne(e => e.RadiologyCenter)
+                  .WithMany(c => c.RadiologyRecords)
+                  .HasForeignKey(e => e.RadiologyCenterId)
+                  .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne(e => e.Doctor)
+                  .WithMany(d => d.RadiologyRecords)
+                  .HasForeignKey(e => e.DoctorId)
+                  .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne(e => e.Patient)
+                  .WithMany(p => p.RadiologyRecords)
+                  .HasForeignKey(e => e.PatientId)
                   .OnDelete(DeleteBehavior.Cascade);
         });
     }

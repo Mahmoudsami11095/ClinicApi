@@ -39,3 +39,6 @@ public interface IUserRepository : IGenericRepository<User>
 
 public interface INotificationRepository : IGenericRepository<Notification> { }
 
+public interface IRadiologyCenterRepository : IGenericRepository<RadiologyCenter> { }
+
+public interface IRadiologyRecordRepository : IGenericRepository<RadiologyRecord> { }
