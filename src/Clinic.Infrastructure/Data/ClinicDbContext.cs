@@ -17,6 +17,7 @@ public class ClinicDbContext : DbContext
     public DbSet<Prescription> Prescriptions => Set<Prescription>();
     public DbSet<DentalLog> DentalLogs => Set<DentalLog>();
     public DbSet<DoctorClinic> DoctorClinics => Set<DoctorClinic>();
+    public DbSet<UserClinic> UserClinics => Set<UserClinic>();
     public DbSet<Notification> Notifications => Set<Notification>();
     public DbSet<Material> Materials => Set<Material>();
     public DbSet<RadiologyCenter> RadiologyCenters => Set<RadiologyCenter>();
@@ -102,6 +103,23 @@ public class ClinicDbContext : DbContext
             entity.HasOne(dc => dc.Clinic)
                   .WithMany(c => c.DoctorClinics)
                   .HasForeignKey(dc => dc.ClinicId);
+        });
+
+        // ── UserClinic (Many-to-Many join) ──
+        modelBuilder.Entity<UserClinic>(entity =>
+        {
+            entity.ToTable("UserClinics");
+            entity.HasKey(uc => new { uc.UserId, uc.ClinicId });
+
+            entity.HasOne(uc => uc.User)
+                  .WithMany(u => u.UserClinics)
+                  .HasForeignKey(uc => uc.UserId)
+                  .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne(uc => uc.Clinic)
+                  .WithMany(c => c.UserClinics)
+                  .HasForeignKey(uc => uc.ClinicId)
+                  .OnDelete(DeleteBehavior.Cascade);
         });
 
         // ── Patient ──

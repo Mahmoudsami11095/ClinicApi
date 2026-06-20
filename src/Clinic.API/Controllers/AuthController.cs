@@ -65,7 +65,7 @@ public class AuthController : ControllerBase
             !BCrypt.Net.BCrypt.Verify(request.Password, user.PasswordHash))
             return Unauthorized(new { message = "Incorrect password" });
 
-        var clinicIds = await GetDoctorClinicIds(user);
+        var clinicIds = await GetUserClinicIds(user);
         var token = _jwtService.GenerateToken(user, clinicIds);
         var userDto = MapToUserDto(user, clinicIds);
 
@@ -152,7 +152,7 @@ public class AuthController : ControllerBase
                 return Ok(new { message = "Phone number verified successfully" });
             }
 
-            var clinicIds = await GetDoctorClinicIds(user);
+            var clinicIds = await GetUserClinicIds(user);
             var token = _jwtService.GenerateToken(user, clinicIds);
             var userDto = MapToUserDto(user, clinicIds);
 
@@ -177,7 +177,7 @@ public class AuthController : ControllerBase
             if (user == null)
                 return Ok(new { message = "Phone number verified successfully" });
 
-            var clinicIds = await GetDoctorClinicIds(user);
+            var clinicIds = await GetUserClinicIds(user);
             var token = _jwtService.GenerateToken(user, clinicIds);
             var userDto = MapToUserDto(user, clinicIds);
 
@@ -195,7 +195,7 @@ public class AuthController : ControllerBase
         if (emailUser == null)
             return Ok(new { message = "Email verified successfully" });
 
-        var emailClinicIds = await GetDoctorClinicIds(emailUser);
+        var emailClinicIds = await GetUserClinicIds(emailUser);
         var emailToken = _jwtService.GenerateToken(emailUser, emailClinicIds);
         var emailUserDto = MapToUserDto(emailUser, emailClinicIds);
 
@@ -305,6 +305,13 @@ public class AuthController : ControllerBase
                     ClinicId = string.IsNullOrEmpty(request.ClinicId) ? null : request.ClinicId,
                     PasswordHash = BCrypt.Net.BCrypt.HashPassword("social-default-password-" + Guid.NewGuid().ToString())
                 };
+
+                var clinics = request.ClinicIds ?? new List<string>();
+                if (!string.IsNullOrWhiteSpace(request.ClinicId) && !clinics.Contains(request.ClinicId))
+                {
+                    clinics.Add(request.ClinicId);
+                }
+                user.UserClinics = clinics.Select(cid => new UserClinic { ClinicId = cid, UserId = user.Id }).ToList();
             }
             else
             {
@@ -344,7 +351,7 @@ public class AuthController : ControllerBase
             await _userRepo.AddAsync(user);
         }
 
-        var clinicIds = await GetDoctorClinicIds(user);
+        var clinicIds = await GetUserClinicIds(user);
         var appToken = _jwtService.GenerateToken(user, clinicIds);
         var userDto = MapToUserDto(user, clinicIds);
 
@@ -598,10 +605,21 @@ public class AuthController : ControllerBase
             PasswordHash = BCrypt.Net.BCrypt.HashPassword(request.Password ?? "password123")
         };
 
+        if (role == UserRole.Assistant)
+        {
+            var clinics = request.ClinicIds ?? new List<string>();
+            if (!string.IsNullOrWhiteSpace(request.ClinicId) && !clinics.Contains(request.ClinicId))
+            {
+                clinics.Add(request.ClinicId);
+            }
+            newUser.UserClinics = clinics.Select(cid => new UserClinic { ClinicId = cid, UserId = newUser.Id }).ToList();
+            registeredClinicIds = clinics;
+        }
+
         await _userRepo.AddAsync(newUser);
 
         var clinicIds = registeredClinicIds ??
-            (string.IsNullOrEmpty(request.ClinicId) ? new List<string>() : new List<string> { request.ClinicId });
+            (string.IsNullOrWhiteSpace(request.ClinicId) ? new List<string>() : new List<string> { request.ClinicId });
         var userDto = MapToUserDto(newUser, clinicIds);
 
         return Ok(new { message = "Registration successful", data = userDto });
@@ -614,7 +632,7 @@ public class AuthController : ControllerBase
         var dtos = new List<UserDto>();
         foreach (var u in users)
         {
-            var clinicIds = await GetDoctorClinicIds(u);
+            var clinicIds = await GetUserClinicIds(u);
             dtos.Add(MapToUserDto(u, clinicIds));
         }
         return Ok(new { data = dtos });
@@ -934,18 +952,24 @@ public class AuthController : ControllerBase
     }
 
     // ── Helpers ──
-    private async Task<List<string>?> GetDoctorClinicIds(User user)
+    private async Task<List<string>?> GetUserClinicIds(User user)
     {
-        if (user.Role != UserRole.Doctor || string.IsNullOrEmpty(user.DoctorId))
-            return null;
+        if (user.Role == UserRole.Doctor && !string.IsNullOrEmpty(user.DoctorId))
+        {
+            var doctor = await _doctorRepo.GetByIdAsync(user.DoctorId);
+            if (doctor == null) return null;
 
-        var doctor = await _doctorRepo.GetByIdAsync(user.DoctorId);
-        if (doctor == null) return null;
-
-        // Load doctor with clinics
-        var doctors = await _doctorRepo.GetAllAsync(); // includes DoctorClinics
-        var d = doctors.FirstOrDefault(x => x.Id == user.DoctorId);
-        return d?.DoctorClinics.Select(dc => dc.ClinicId).ToList();
+            // Load doctor with clinics
+            var doctors = await _doctorRepo.GetAllAsync(); // includes DoctorClinics
+            var d = doctors.FirstOrDefault(x => x.Id == user.DoctorId);
+            return d?.DoctorClinics.Select(dc => dc.ClinicId).ToList();
+        }
+        else if (user.Role == UserRole.Assistant)
+        {
+            var fullUser = await _userRepo.GetByIdAsync(user.Id);
+            return fullUser?.UserClinics?.Select(uc => uc.ClinicId).ToList() ?? new List<string>();
+        }
+        return null;
     }
 
     private static UserDto MapToUserDto(User user, List<string>? clinicIds)

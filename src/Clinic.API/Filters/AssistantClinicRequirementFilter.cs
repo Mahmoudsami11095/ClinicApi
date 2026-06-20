@@ -21,14 +21,33 @@ public class AssistantClinicRequirementFilter : IAsyncActionFilter
             var role = user.FindFirst(ClaimTypes.Role)?.Value;
             if (role == "assistant")
             {
-                var clinicId = user.FindFirst("clinicId")?.Value;
-                if (string.IsNullOrEmpty(clinicId))
+                var clinicIds = user.FindAll("clinicIds").Select(c => c.Value).ToList();
+                var singleClinicId = user.FindFirst("clinicId")?.Value;
+                if (!string.IsNullOrEmpty(singleClinicId) && !clinicIds.Contains(singleClinicId))
                 {
-                    context.Result = new ObjectResult(new { message = "You must be assigned to a clinic to access this data." })
+                    clinicIds.Add(singleClinicId);
+                }
+
+                if (!clinicIds.Any())
+                {
+                    context.Result = new ObjectResult(new { message = "You must be assigned to at least one clinic to access this data." })
                     {
                         StatusCode = 403
                     };
                     return;
+                }
+
+                var requestedClinicId = context.HttpContext.Request.Query["clinicId"].ToString();
+                if (!string.IsNullOrEmpty(requestedClinicId))
+                {
+                    if (!clinicIds.Contains(requestedClinicId))
+                    {
+                        context.Result = new ObjectResult(new { message = "You are not authorized to access data for the requested clinic." })
+                        {
+                            StatusCode = 403
+                        };
+                        return;
+                    }
                 }
             }
         }

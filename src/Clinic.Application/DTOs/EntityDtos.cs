@@ -10,6 +10,7 @@ public class ClinicDto
     public string? Status { get; set; }
     public string? AvailabilityHours { get; set; }
     public string? AvailabilityDays { get; set; }
+    public int AssistantCount { get; set; }
 }
 
 public class PatientDto

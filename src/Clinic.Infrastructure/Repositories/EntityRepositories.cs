@@ -10,7 +10,12 @@ public class ClinicRepository : GenericRepository<ClinicEntity>, IClinicReposito
     public ClinicRepository(ClinicDbContext context) : base(context) { }
 
     public override async Task<List<ClinicEntity>> GetAllAsync()
-        => await _dbSet.Include(c => c.DoctorClinics).AsNoTracking().ToListAsync();
+        => await _dbSet
+            .Include(c => c.DoctorClinics)
+            .Include(c => c.UserClinics)
+                .ThenInclude(uc => uc.User)
+            .AsNoTracking()
+            .ToListAsync();
 }
 
 public class PatientRepository : GenericRepository<Patient>, IPatientRepository
@@ -142,8 +147,14 @@ public class UserRepository : GenericRepository<User>, IUserRepository
 {
     public UserRepository(ClinicDbContext context) : base(context) { }
 
+    public override async Task<List<User>> GetAllAsync()
+        => await _dbSet.Include(u => u.UserClinics).AsNoTracking().ToListAsync();
+
+    public override async Task<User?> GetByIdAsync(string id)
+        => await _dbSet.Include(u => u.UserClinics).FirstOrDefaultAsync(u => u.Id == id);
+
     public async Task<User?> GetByEmailAsync(string email)
-        => await _dbSet.FirstOrDefaultAsync(u => u.Email.ToLower() == email.ToLower());
+        => await _dbSet.Include(u => u.UserClinics).FirstOrDefaultAsync(u => u.Email.ToLower() == email.ToLower());
 
     public async Task<User?> GetByPhoneNumberAsync(string phoneNumber)
     {
