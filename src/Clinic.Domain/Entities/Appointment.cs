@@ -15,6 +15,6 @@ public class Appointment
     public Patient Patient { get; set; } = null!;
     public Doctor Doctor { get; set; } = null!;
     public ClinicEntity? Clinic { get; set; }
-    public BillingRecord? BillingRecord { get; set; }
+    public ICollection<BillingRecord> BillingRecords { get; set; } = new List<BillingRecord>();
     public Prescription? Prescription { get; set; }
 }

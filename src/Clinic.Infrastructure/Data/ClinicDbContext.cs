@@ -189,8 +189,8 @@ public class ClinicDbContext : DbContext
                   .OnDelete(DeleteBehavior.NoAction);
 
             entity.HasOne(e => e.Appointment)
-                  .WithOne(a => a.BillingRecord)
-                  .HasForeignKey<BillingRecord>(e => e.AppointmentId)
+                  .WithMany(a => a.BillingRecords)
+                  .HasForeignKey(e => e.AppointmentId)
                   .OnDelete(DeleteBehavior.SetNull);
 
             entity.HasOne(e => e.Clinic)
