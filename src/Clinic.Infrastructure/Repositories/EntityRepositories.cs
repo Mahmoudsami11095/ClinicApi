@@ -193,6 +193,28 @@ public class UserRepository : GenericRepository<User>, IUserRepository
 public class NotificationRepository : GenericRepository<Notification>, INotificationRepository
 {
     public NotificationRepository(ClinicDbContext context) : base(context) { }
+
+    public override async Task<Notification?> GetByIdAsync(string id)
+    {
+        if (Guid.TryParse(id, out var guidId))
+        {
+            return await _dbSet.FindAsync(guidId);
+        }
+        return null;
+    }
+
+    public override async Task DeleteAsync(string id)
+    {
+        if (Guid.TryParse(id, out var guidId))
+        {
+            var entity = await _dbSet.FindAsync(guidId);
+            if (entity != null)
+            {
+                _dbSet.Remove(entity);
+                await _context.SaveChangesAsync();
+            }
+        }
+    }
 }
 
 public class RadiologyCenterRepository : GenericRepository<RadiologyCenter>, IRadiologyCenterRepository
