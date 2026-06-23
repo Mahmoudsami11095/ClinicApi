@@ -6,6 +6,7 @@ using Clinic.Infrastructure.Data;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using System.Security.Claims;
 
 namespace Clinic.API.Controllers;
 
@@ -195,10 +196,17 @@ public class ClinicsController : ControllerBase
         var clinic = await _repo.GetByIdAsync(id);
         if (clinic == null) return NotFound(new { message = "Clinic not found" });
 
+        var roleClaim = User.FindFirst(ClaimTypes.Role)?.Value;
         var doctorIdClaim = User.FindFirst("doctorId")?.Value;
+        
         // Verify user has permission: only the clinic creator, assigned doctor or admin can manage it
-        if (!string.IsNullOrEmpty(doctorIdClaim))
+        if (roleClaim != "admin")
         {
+            if (string.IsNullOrEmpty(doctorIdClaim))
+            {
+                return StatusCode(403, new { message = "You do not have permission to manage this clinic" });
+            }
+
             var isCreator = clinic.CreatorDoctorId == doctorIdClaim;
             var isAssigned = await _context.DoctorClinics.AnyAsync(dc => dc.DoctorId == doctorIdClaim && dc.ClinicId == id && dc.Status == "Accepted");
             if (!isCreator && !isAssigned)

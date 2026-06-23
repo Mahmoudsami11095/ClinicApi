@@ -9,7 +9,8 @@ public class AssistantClinicRequirementFilter : IAsyncActionFilter
     public async Task OnActionExecutionAsync(ActionExecutingContext context, ActionExecutionDelegate next)
     {
         var controllerName = context.RouteData.Values["controller"]?.ToString();
-        if (controllerName == "Auth" || controllerName == "Notifications")
+        var actionName = context.RouteData.Values["action"]?.ToString();
+        if (controllerName == "Auth" || controllerName == "Notifications" || actionName == "AssignAssistant" || actionName == "RespondAssignment")
         {
             await next();
             return;
