@@ -45,7 +45,10 @@ public static class DependencyInjection
         services.AddScoped<IJwtService, JwtService>();
         services.AddSingleton<IOtpService, OtpService>();
         services.AddHttpClient<IWhatsAppOtpService, WhatsAppOtpService>();
+        services.AddScoped<ISmsService, TwilioSmsService>();
         services.AddTransient<IEmailService, EmailService>();
+
+        // services.AddScoped<IPhotoStorageService, FileSystemPhotoStorageService>();
         services.AddTransient<ISocialAuthService, SocialAuthService>();
 
         // ── JWT Authentication ──

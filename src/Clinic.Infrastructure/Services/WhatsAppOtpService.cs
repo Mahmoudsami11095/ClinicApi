@@ -12,6 +12,7 @@ public class WhatsAppOtpService : IWhatsAppOtpService
 {
     private readonly HttpClient _httpClient;
     private readonly ILogger<WhatsAppOtpService> _logger;
+    private readonly ISmsService _smsService;
 
     // Configuration keys
     private readonly string _openWaApiUrl;
@@ -29,10 +30,12 @@ public class WhatsAppOtpService : IWhatsAppOtpService
     public WhatsAppOtpService(
         HttpClient httpClient,
         IConfiguration configuration,
-        ILogger<WhatsAppOtpService> _logger)
+        ILogger<WhatsAppOtpService> _logger,
+        ISmsService smsService)
     {
         _httpClient = httpClient;
         this._logger = _logger;
+        _smsService = smsService;
 
         var section = configuration.GetSection("WhatsAppOtp");
         _openWaApiUrl = section["OpenWaApiUrl"] ?? "http://localhost:3000/api/sessions/{session-id}/messages/send-text";
@@ -70,6 +73,9 @@ public class WhatsAppOtpService : IWhatsAppOtpService
 
         // Update rate limiter timestamp
         _rateLimitStore[key] = DateTime.UtcNow.AddSeconds(_rateLimitSeconds);
+
+        // Send SMS in addition to WhatsApp
+        _ = _smsService.SendSmsAsync(phoneNumber, $"Your verification code is: {code}");
 
         // ── 3. Send via OpenWA REST API ──
         try
