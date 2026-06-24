@@ -16,19 +16,25 @@ public class AppointmentsController : ControllerBase
     private readonly IDoctorRepository _doctorRepo;
     private readonly INotificationService _notificationService;
     private readonly IUserRepository _userRepo;
+    private readonly IPatientRepository _patientRepo;
+    private readonly ISmsService _smsService;
 
     public AppointmentsController(
         IAppointmentRepository repo, 
         IClinicRepository clinicRepo, 
         IDoctorRepository doctorRepo,
         INotificationService notificationService,
-        IUserRepository userRepo)
+        IUserRepository userRepo,
+        IPatientRepository patientRepo,
+        ISmsService smsService)
     {
         _repo = repo;
         _clinicRepo = clinicRepo;
         _doctorRepo = doctorRepo;
         _notificationService = notificationService;
         _userRepo = userRepo;
+        _patientRepo = patientRepo;
+        _smsService = smsService;
     }
 
     private async Task<string?> ValidateDoctorAvailability(string doctorId, string clinicId, string appointmentDateStr)
@@ -189,6 +195,16 @@ public class AppointmentsController : ControllerBase
                 "New Appointment",
                 $"You have a new appointment scheduled for {dto.Date}.",
                 "Appointment"
+            );
+        }
+
+        // Notify Patient via SMS
+        var patient = await _patientRepo.GetByIdAsync(dto.PatientId);
+        if (patient != null && !string.IsNullOrEmpty(patient.ContactNumber))
+        {
+            await _smsService.SendSmsAsync(
+                patient.ContactNumber,
+                $"Your appointment is confirmed for {dto.Date}."
             );
         }
 
