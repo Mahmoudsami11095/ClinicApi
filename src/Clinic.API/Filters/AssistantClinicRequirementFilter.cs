@@ -39,7 +39,7 @@ public class AssistantClinicRequirementFilter : IAsyncActionFilter
                 }
 
                 var requestedClinicId = context.HttpContext.Request.Query["clinicId"].ToString();
-                if (!string.IsNullOrEmpty(requestedClinicId))
+                if (!string.IsNullOrEmpty(requestedClinicId) && requestedClinicId != "all")
                 {
                     if (!clinicIds.Contains(requestedClinicId))
                     {
