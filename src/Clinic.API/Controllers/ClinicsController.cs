@@ -18,12 +18,14 @@ public class ClinicsController : ControllerBase
     private readonly IClinicRepository _repo;
     private readonly IDoctorRepository _doctorRepo;
     private readonly ClinicDbContext _context;
+    private readonly IEmailService _emailService;
 
-    public ClinicsController(IClinicRepository repo, IDoctorRepository doctorRepo, ClinicDbContext context)
+    public ClinicsController(IClinicRepository repo, IDoctorRepository doctorRepo, ClinicDbContext context, IEmailService emailService)
     {
         _repo = repo;
         _doctorRepo = doctorRepo;
         _context = context;
+        _emailService = emailService;
     }
 
     [HttpGet]
@@ -224,7 +226,14 @@ public class ClinicsController : ControllerBase
             .FirstOrDefaultAsync(u => u.Email.ToLower() == cleanEmail);
         
         if (assistantUser == null)
-            return NotFound(new { message = $"No user found with email {request.Email}" });
+        {
+            await _emailService.SendEmailAsync(
+                cleanEmail,
+                $"Invitation to join {clinic.Name}",
+                $"Hello,\n\nYou have been invited to join the clinic {clinic.Name} as an Assistant.\nSince you do not have an account yet, please create an account as an Assistant using this email address to be assigned to this clinic."
+            );
+            return Ok(new { message = $"Invitation email sent to {request.Email}. User must create an account." });
+        }
 
         if (assistantUser.Role != UserRole.Assistant)
             return BadRequest(new { message = $"User with email {request.Email} is not an Assistant" });
@@ -253,6 +262,12 @@ public class ClinicsController : ControllerBase
 
         _context.Users.Update(assistantUser);
         await _context.SaveChangesAsync();
+
+        await _emailService.SendEmailAsync(
+            cleanEmail,
+            $"Assigned to {clinic.Name}",
+            $"Hello {assistantUser.Name},\n\nYou have been successfully assigned to the clinic {clinic.Name} as an Assistant."
+        );
 
         return Ok(new { message = "Assistant assigned successfully", assistant = assistantUser.Name });
     }
