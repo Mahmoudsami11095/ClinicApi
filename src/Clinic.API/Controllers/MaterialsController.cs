@@ -39,6 +39,21 @@ public class MaterialsController : ControllerBase
         else
         {
             materials = await _repo.GetByDoctorIdAsync(doctorId);
+            var role = User.FindFirst(System.Security.Claims.ClaimTypes.Role)?.Value;
+            if (role == "assistant")
+            {
+                var assistantClinicIds = User.FindAll("clinicIds").Select(c => c.Value).ToList();
+                var singleClinicId = User.FindFirst("clinicId")?.Value;
+                if (!string.IsNullOrEmpty(singleClinicId) && !assistantClinicIds.Contains(singleClinicId))
+                {
+                    assistantClinicIds.Add(singleClinicId);
+                }
+
+                if (assistantClinicIds.Any())
+                {
+                    materials = materials.Where(m => assistantClinicIds.Contains(m.ClinicId ?? ""));
+                }
+            }
         }
 
         var dtos = materials.Select(m => new MaterialDto
