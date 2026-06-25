@@ -251,8 +251,13 @@ public class AuthController : ControllerBase
                         Address = request.ClinicAddress ?? "Primary Address",
                         Phone = request.ClinicPhone ?? request.ContactNumber ?? "+1234567890",
                         CreatorDoctorId = doctorId,
-                        AvailabilityHours = request.AvailabilityHours ?? "09:00-17:00",
-                        AvailabilityDays = request.AvailabilityDays ?? "[\"Monday\",\"Tuesday\",\"Wednesday\",\"Thursday\",\"Friday\"]"
+                        AvailabilityHours = request.ClinicAvailabilityHours ?? request.AvailabilityHours ?? "09:00-17:00",
+                        AvailabilityDays = request.ClinicAvailabilityDays ?? request.AvailabilityDays ?? "[\"Monday\",\"Tuesday\",\"Wednesday\",\"Thursday\",\"Friday\"]",
+                        Latitude = request.Latitude,
+                        Longitude = request.Longitude,
+                        City = request.City,
+                        State = request.State,
+                        Country = request.Country
                     };
                     await _clinicRepo.AddAsync(newClinic);
 
