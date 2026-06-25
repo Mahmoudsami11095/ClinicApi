@@ -109,6 +109,8 @@ public class SocialLoginRequest
     public List<string>? ClinicIds { get; set; }
     public string? AvailabilityDays { get; set; }
     public string? AvailabilityHours { get; set; }
+    public string? ClinicAvailabilityHours { get; set; }
+    public string? ClinicAvailabilityDays { get; set; }
     public string? Gender { get; set; }
     public string? DateOfBirth { get; set; }
     public string? BloodGroup { get; set; }
