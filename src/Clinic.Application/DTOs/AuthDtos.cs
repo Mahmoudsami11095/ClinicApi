@@ -20,6 +20,12 @@ public class OtpRequest
     public string? Phone { get; set; }
 }
 
+public class CheckAvailabilityRequest
+{
+    public string? Email { get; set; }
+    public string? Phone { get; set; }
+}
+
 public class OtpResponse
 {
     public string Message { get; set; } = string.Empty;
