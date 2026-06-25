@@ -363,6 +363,45 @@ public class AuthController : ControllerBase
         return Ok(new { message = $"Logged in via {request.Provider}", data = userDto, token = appToken });
     }
 
+    [HttpPost("check-availability")]
+    public async Task<IActionResult> CheckAvailability([FromBody] CheckAvailabilityRequest request)
+    {
+        var errors = new List<string>();
+
+        if (!string.IsNullOrWhiteSpace(request.Email))
+        {
+            var existingEmail = await _userRepo.GetByEmailAsync(request.Email);
+            if (existingEmail != null)
+                errors.Add("Email is already registered.");
+        }
+
+        if (!string.IsNullOrWhiteSpace(request.Phone))
+        {
+            var split = Clinic.Domain.Helpers.PhoneHelper.SplitContactNumber(request.Phone);
+            var validation = Clinic.Domain.Helpers.PhoneHelper.ValidatePhoneNumber(split.CountryCode, split.PhoneNumber);
+            if (!validation.IsValid)
+            {
+                errors.Add(validation.ErrorMessage);
+            }
+            else
+            {
+                var normPhone = Clinic.Domain.Helpers.PhoneHelper.NormalizePhoneNumber(split.CountryCode, split.PhoneNumber);
+                var isUnique = await _userRepo.IsPhoneNumberUniqueAsync(split.CountryCode, normPhone);
+                if (!isUnique)
+                    errors.Add("Phone number is already registered.");
+
+                var existingPhone = await _userRepo.GetByPhoneNumberAsync(request.Phone);
+                if (existingPhone != null && !errors.Contains("Phone number is already registered."))
+                    errors.Add("Phone number is already registered.");
+            }
+        }
+
+        if (errors.Count > 0)
+            return BadRequest(new { message = string.Join(" ", errors), errors });
+
+        return Ok(new { message = "Available" });
+    }
+
     [HttpPost("register-send-otp")]
     public async Task<IActionResult> RegisterSendOtp([FromBody] OtpRequest request)
     {
@@ -404,14 +443,14 @@ public class AuthController : ControllerBase
                 return BadRequest(new { message });
             }
 
-            return Ok(new { message = "OTPs sent to email and WhatsApp successfully", emailOtp = emailCode, whatsappOtp = whatsappCode, otp = emailCode });
+            return Ok(new { message = "OTPs sent to email and WhatsApp successfully" });
         }
         else
         {
             // Only Email OTP
             var emailCode = _otpService.GenerateOtp(request.Email);
             await _emailService.SendEmailAsync(request.Email, "Clinic Registration Verification", $"Your registration verification code is: <strong>{emailCode}</strong>. It is valid for 10 minutes.");
-            return Ok(new { message = "OTP sent to email", emailOtp = emailCode, otp = emailCode });
+            return Ok(new { message = "OTP sent to email" });
         }
     }
 
@@ -423,29 +462,22 @@ public class AuthController : ControllerBase
             string.IsNullOrWhiteSpace(request.Role))
             return BadRequest(new { message = "Missing required registration details" });
 
-        if (!string.IsNullOrWhiteSpace(request.Phone))
+        // Email OTP is always required
+        if (string.IsNullOrWhiteSpace(request.OtpCode))
+            return BadRequest(new { message = "Email verification code is required" });
+
+        if (!_otpService.VerifyOtp(request.Email, request.OtpCode))
+            return BadRequest(new { message = "Invalid or expired Email verification code" });
+
+        _otpService.RemoveOtp(request.Email);
+
+        // WhatsApp OTP is optional – only verify if the user provided it
+        if (!string.IsNullOrWhiteSpace(request.Phone) && !string.IsNullOrWhiteSpace(request.PhoneOtpCode))
         {
-            if (string.IsNullOrWhiteSpace(request.OtpCode) || string.IsNullOrWhiteSpace(request.PhoneOtpCode))
-                return BadRequest(new { message = "Both Email verification code and WhatsApp verification code are required" });
-
-            if (!_otpService.VerifyOtp(request.Email, request.OtpCode))
-                return BadRequest(new { message = "Invalid or expired Email verification code" });
-
             if (!_whatsappOtpService.VerifyOtp(request.Phone, request.PhoneOtpCode))
                 return BadRequest(new { message = "Invalid or expired WhatsApp verification code" });
 
-            _otpService.RemoveOtp(request.Email);
             _whatsappOtpService.RemoveOtp(request.Phone);
-        }
-        else
-        {
-            if (string.IsNullOrWhiteSpace(request.OtpCode))
-                return BadRequest(new { message = "Email verification code is required" });
-
-            if (!_otpService.VerifyOtp(request.Email, request.OtpCode))
-                return BadRequest(new { message = "Invalid or expired Email verification code" });
-
-            _otpService.RemoveOtp(request.Email);
         }
 
         var existing = await _userRepo.GetByEmailAsync(request.Email);
@@ -523,7 +555,12 @@ public class AuthController : ControllerBase
                         Phone = request.ClinicPhone ?? request.Phone ?? "+1234567890",
                         CreatorDoctorId = doctorId,
                         AvailabilityHours = request.ClinicAvailabilityHours ?? request.AvailabilityHours ?? "09:00-17:00",
-                        AvailabilityDays = request.ClinicAvailabilityDays ?? request.AvailabilityDays ?? "[\"Monday\",\"Tuesday\",\"Wednesday\",\"Thursday\",\"Friday\"]"
+                        AvailabilityDays = request.ClinicAvailabilityDays ?? request.AvailabilityDays ?? "[\"Monday\",\"Tuesday\",\"Wednesday\",\"Thursday\",\"Friday\"]",
+                        Latitude = request.Latitude,
+                        Longitude = request.Longitude,
+                        City = request.City,
+                        State = request.State,
+                        Country = request.Country
                     };
                     await _clinicRepo.AddAsync(newClinic);
                     clinics.Add(newClinic.Id);

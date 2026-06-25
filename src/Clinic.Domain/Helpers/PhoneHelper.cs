@@ -90,16 +90,24 @@ public static class PhoneHelper
                 cleanPhone = cleanPhone.Substring(1);
             }
 
-            // Egyptian mobile starts with 10, 11, 12, 15 and is exactly 10 digits
-            var isMobile = (cleanPhone.StartsWith("10") || cleanPhone.StartsWith("11") || cleanPhone.StartsWith("12") || cleanPhone.StartsWith("15"))
-                            && cleanPhone.Length == 10;
+            // Check if it starts with a mobile prefix
+            var hasMobilePrefix = cleanPhone.StartsWith("10") || cleanPhone.StartsWith("11") || cleanPhone.StartsWith("12") || cleanPhone.StartsWith("15");
 
-            // Landlines are 7-9 digits
-            var isLandline = cleanPhone.Length >= 7 && cleanPhone.Length <= 9;
-
-            if (!isMobile && !isLandline)
+            if (hasMobilePrefix)
             {
-                return (false, "Invalid Egyptian phone number. Mobile numbers must be 10 digits starting with 10, 11, 12, or 15.");
+                // Egyptian mobile must be exactly 10 digits (e.g. 1012345678)
+                if (cleanPhone.Length != 10)
+                {
+                    return (false, "Invalid Egyptian mobile number. Must be 11 digits starting with 010, 011, 012, or 015.");
+                }
+            }
+            else
+            {
+                // Landlines are 7-9 digits
+                if (cleanPhone.Length < 7 || cleanPhone.Length > 9)
+                {
+                    return (false, "Invalid Egyptian landline number. Must be 7-9 digits.");
+                }
             }
         }
         else
