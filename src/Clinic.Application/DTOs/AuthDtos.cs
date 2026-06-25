@@ -70,6 +70,11 @@ public class RegisterRequest
     public string? Dob { get; set; }
     public string? BloodGroup { get; set; }
     public string? Address { get; set; }
+    public double? Latitude { get; set; }
+    public double? Longitude { get; set; }
+    public string? City { get; set; }
+    public string? State { get; set; }
+    public string? Country { get; set; }
     public List<DoctorClinicAvailabilityRequest>? ClinicAvailabilities { get; set; }
 }
 
@@ -102,6 +107,11 @@ public class SocialLoginRequest
     public string? DateOfBirth { get; set; }
     public string? BloodGroup { get; set; }
     public string? Address { get; set; }
+    public double? Latitude { get; set; }
+    public double? Longitude { get; set; }
+    public string? City { get; set; }
+    public string? State { get; set; }
+    public string? Country { get; set; }
     public string? ClinicId { get; set; }
     public List<DoctorClinicAvailabilityRequest>? ClinicAvailabilities { get; set; }
 }
@@ -146,6 +156,11 @@ public class UserProfileDto
     public string? DateOfBirth { get; set; }
     public string? BloodGroup { get; set; }
     public string? Address { get; set; }
+    public double? Latitude { get; set; }
+    public double? Longitude { get; set; }
+    public string? City { get; set; }
+    public string? State { get; set; }
+    public string? Country { get; set; }
     public string? Allergies { get; set; }
     public string? ChronicDiseases { get; set; }
     public string? PastIllnesses { get; set; }

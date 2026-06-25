@@ -49,6 +49,8 @@ public class PatientService : IPatientService
             PhoneNumber = p.PhoneNumber,
             Email = p.Email,
             BloodGroup = p.BloodGroup, Address = p.Address,
+            Latitude = p.Latitude, Longitude = p.Longitude,
+            City = p.City, State = p.State, Country = p.Country,
             RegistrationDate = p.RegistrationDate, ClinicId = p.ClinicId,
             Allergies = p.Allergies, ChronicDiseases = p.ChronicDiseases, PastIllnesses = p.PastIllnesses
         }).ToList();
@@ -105,7 +107,9 @@ public class PatientService : IPatientService
             PhoneNumber = normPhone,
             Email = dto.Email,
             BloodGroup = dto.BloodGroup, Address = dto.Address,
-            RegistrationDate = dto.RegistrationDate, ClinicId = dto.ClinicId,
+            Latitude = dto.Latitude, Longitude = dto.Longitude,
+            City = dto.City, State = dto.State, Country = dto.Country,
+            RegistrationDate = DateTime.UtcNow.ToString("yyyy-MM-dd"), ClinicId = dto.ClinicId,
             Allergies = dto.Allergies, ChronicDiseases = dto.ChronicDiseases, PastIllnesses = dto.PastIllnesses
         };
         await _repo.AddAsync(entity);
@@ -169,6 +173,11 @@ public class PatientService : IPatientService
         existing.Email = dto.Email;
         existing.BloodGroup = dto.BloodGroup;
         existing.Address = dto.Address;
+        existing.Latitude = dto.Latitude;
+        existing.Longitude = dto.Longitude;
+        existing.City = dto.City;
+        existing.State = dto.State;
+        existing.Country = dto.Country;
         existing.ClinicId = dto.ClinicId;
         existing.Allergies = dto.Allergies;
         existing.ChronicDiseases = dto.ChronicDiseases;

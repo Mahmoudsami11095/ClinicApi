@@ -64,7 +64,12 @@ public class ClinicsController : ControllerBase
                 Status = status,
                 AvailabilityHours = c.AvailabilityHours,
                 AvailabilityDays = c.AvailabilityDays,
-                AssistantCount = c.UserClinics?.Count(uc => uc.User?.Role == UserRole.Assistant) ?? 0
+                AssistantCount = c.UserClinics?.Count(uc => uc.User?.Role == UserRole.Assistant) ?? 0,
+                Latitude = c.Latitude,
+                Longitude = c.Longitude,
+                City = c.City,
+                State = c.State,
+                Country = c.Country
             };
         }).ToList();
 
@@ -92,7 +97,12 @@ public class ClinicsController : ControllerBase
             Phone = dto.Phone,
             CreatorDoctorId = doctorIdClaim,
             AvailabilityHours = dto.AvailabilityHours,
-            AvailabilityDays = dto.AvailabilityDays
+            AvailabilityDays = dto.AvailabilityDays,
+            Latitude = dto.Latitude,
+            Longitude = dto.Longitude,
+            City = dto.City,
+            State = dto.State,
+            Country = dto.Country
         };
         await _repo.AddAsync(entity);
 
@@ -111,7 +121,12 @@ public class ClinicsController : ControllerBase
             CreatorDoctorId = entity.CreatorDoctorId,
             Status = "Accepted",
             AvailabilityHours = entity.AvailabilityHours,
-            AvailabilityDays = entity.AvailabilityDays
+            AvailabilityDays = entity.AvailabilityDays,
+            Latitude = entity.Latitude,
+            Longitude = entity.Longitude,
+            City = entity.City,
+            State = entity.State,
+            Country = entity.Country
         };
         return Ok(new { message = "Success", data = result });
     }
@@ -304,9 +319,14 @@ public class ClinicsController : ControllerBase
         entity.Phone = dto.Phone;
         entity.AvailabilityHours = dto.AvailabilityHours;
         entity.AvailabilityDays = dto.AvailabilityDays;
+        entity.Latitude = dto.Latitude;
+        entity.Longitude = dto.Longitude;
+        entity.City = dto.City;
+        entity.State = dto.State;
+        entity.Country = dto.Country;
         await _repo.UpdateAsync(entity);
 
-        var result = new ClinicDto { Id = entity.Id, Name = entity.Name, Address = entity.Address, Phone = entity.Phone, CreatorDoctorId = entity.CreatorDoctorId, AvailabilityHours = entity.AvailabilityHours, AvailabilityDays = entity.AvailabilityDays };
+        var result = new ClinicDto { Id = entity.Id, Name = entity.Name, Address = entity.Address, Phone = entity.Phone, CreatorDoctorId = entity.CreatorDoctorId, AvailabilityHours = entity.AvailabilityHours, AvailabilityDays = entity.AvailabilityDays, Latitude = entity.Latitude, Longitude = entity.Longitude, City = entity.City, State = entity.State, Country = entity.Country };
         return Ok(new { message = "Success", data = result });
     }
 

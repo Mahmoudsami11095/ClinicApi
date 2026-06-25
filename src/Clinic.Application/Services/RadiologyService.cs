@@ -28,7 +28,12 @@ public class RadiologyService : IRadiologyService
             Id = c.Id,
             Name = c.Name,
             ContactNumber = c.ContactNumber,
-            Address = c.Address
+            Address = c.Address,
+            Latitude = c.Latitude,
+            Longitude = c.Longitude,
+            City = c.City,
+            State = c.State,
+            Country = c.Country
         }).ToList();
     }
 
@@ -39,7 +44,12 @@ public class RadiologyService : IRadiologyService
             Id = Guid.NewGuid().ToString(),
             Name = dto.Name,
             ContactNumber = dto.ContactNumber,
-            Address = dto.Address
+            Address = dto.Address,
+            Latitude = dto.Latitude,
+            Longitude = dto.Longitude,
+            City = dto.City,
+            State = dto.State,
+            Country = dto.Country
         };
 
         await _centerRepo.AddAsync(center);
@@ -48,7 +58,12 @@ public class RadiologyService : IRadiologyService
             Id = center.Id,
             Name = center.Name,
             ContactNumber = center.ContactNumber,
-            Address = center.Address
+            Address = center.Address,
+            Latitude = center.Latitude,
+            Longitude = center.Longitude,
+            City = center.City,
+            State = center.State,
+            Country = center.Country
         };
     }
 
@@ -60,6 +75,11 @@ public class RadiologyService : IRadiologyService
         center.Name = dto.Name;
         center.ContactNumber = dto.ContactNumber;
         center.Address = dto.Address;
+        center.Latitude = dto.Latitude;
+        center.Longitude = dto.Longitude;
+        center.City = dto.City;
+        center.State = dto.State;
+        center.Country = dto.Country;
 
         await _centerRepo.UpdateAsync(center);
         return new RadiologyCenterDto
@@ -67,7 +87,12 @@ public class RadiologyService : IRadiologyService
             Id = center.Id,
             Name = center.Name,
             ContactNumber = center.ContactNumber,
-            Address = center.Address
+            Address = center.Address,
+            Latitude = center.Latitude,
+            Longitude = center.Longitude,
+            City = center.City,
+            State = center.State,
+            Country = center.Country
         };
     }
 

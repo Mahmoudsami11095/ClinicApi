@@ -24,6 +24,11 @@ public class Patient
     public string Email { get; set; } = string.Empty;
     public string BloodGroup { get; set; } = string.Empty;
     public string Address { get; set; } = string.Empty;
+    public double? Latitude { get; set; }
+    public double? Longitude { get; set; }
+    public string? City { get; set; }
+    public string? State { get; set; }
+    public string? Country { get; set; }
     public string RegistrationDate { get; set; } = string.Empty;
     public string? Allergies { get; set; }
     public string? ChronicDiseases { get; set; }

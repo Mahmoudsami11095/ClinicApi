@@ -326,10 +326,15 @@ public class AuthController : ControllerBase
                     LastName = nameParts.Length > 1 ? nameParts[1] : "",
                     Email = socialInfo.Email,
                     ContactNumber = request.ContactNumber ?? "+1234567890",
-                    Gender = request.Gender ?? "Male",
+                    Address = request.Address ?? "",
+                    Latitude = request.Latitude,
+                    Longitude = request.Longitude,
+                    City = request.City,
+                    State = request.State,
+                    Country = request.Country,
+                    Gender = request.Gender ?? "Not Specified",
                     DateOfBirth = request.DateOfBirth ?? "1996-01-01",
                     BloodGroup = request.BloodGroup ?? "O+",
-                    Address = request.Address ?? "",
                     ClinicId = string.IsNullOrEmpty(request.ClinicId) ? null : request.ClinicId,
                     RegistrationDate = DateTime.UtcNow.ToString("yyyy-MM-dd")
                 };
@@ -584,6 +589,11 @@ public class AuthController : ControllerBase
                 DateOfBirth = request.Dob ?? "1996-01-01",
                 BloodGroup = request.BloodGroup ?? "O+",
                 Address = request.Address ?? "",
+                Latitude = request.Latitude,
+                Longitude = request.Longitude,
+                City = request.City,
+                State = request.State,
+                Country = request.Country,
                 ClinicId = string.IsNullOrWhiteSpace(request.ClinicId) ? null : request.ClinicId,
                 RegistrationDate = DateTime.UtcNow.ToString("yyyy-MM-dd")
             };
@@ -690,6 +700,11 @@ public class AuthController : ControllerBase
                 profile.Allergies = patient.Allergies;
                 profile.ChronicDiseases = patient.ChronicDiseases;
                 profile.PastIllnesses = patient.PastIllnesses;
+                profile.Latitude = patient.Latitude;
+                profile.Longitude = patient.Longitude;
+                profile.City = patient.City;
+                profile.State = patient.State;
+                profile.Country = patient.Country;
             }
         }
 
@@ -893,6 +908,11 @@ public class AuthController : ControllerBase
             patient.DateOfBirth = dto.DateOfBirth ?? patient.DateOfBirth;
             patient.BloodGroup = dto.BloodGroup ?? patient.BloodGroup;
             patient.Address = dto.Address ?? patient.Address;
+            patient.Latitude = dto.Latitude ?? patient.Latitude;
+            patient.Longitude = dto.Longitude ?? patient.Longitude;
+            patient.City = dto.City ?? patient.City;
+            patient.State = dto.State ?? patient.State;
+            patient.Country = dto.Country ?? patient.Country;
             if (!string.IsNullOrEmpty(phoneNumber))
             {
                 patient.CountryCode = countryCode;
