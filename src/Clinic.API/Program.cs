@@ -34,7 +34,7 @@ builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
 // ── CORS ──
-var allowedOrigins = builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>() ?? new[] { "http://localhost:4200" };
+var allowedOrigins = builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>() ?? new[] { "http://localhost:4200", "http://127.0.0.1:4200", "https://127.0.0.1:4200","http://localhost:4300","https://clinic-app-ten-topaz.vercel.app" };
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("AngularApp", policy =>
