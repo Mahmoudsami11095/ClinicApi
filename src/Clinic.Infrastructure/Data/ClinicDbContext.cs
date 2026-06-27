@@ -22,6 +22,7 @@ public class ClinicDbContext : DbContext
     public DbSet<Material> Materials => Set<Material>();
     public DbSet<RadiologyCenter> RadiologyCenters => Set<RadiologyCenter>();
     public DbSet<RadiologyRecord> RadiologyRecords => Set<RadiologyRecord>();
+    public DbSet<Specialization> Specializations => Set<Specialization>();
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
@@ -81,6 +82,45 @@ public class ClinicDbContext : DbContext
             entity.Property(e => e.Avatar).HasMaxLength(500);
             entity.Property(e => e.AvailabilityDays).HasMaxLength(500);
             entity.Property(e => e.AvailabilityHours).HasMaxLength(50);
+
+            entity.HasOne(e => e.SpecializationReference)
+                  .WithMany(s => s.Doctors)
+                  .HasForeignKey(e => e.SpecializationId)
+                  .OnDelete(DeleteBehavior.SetNull);
+        });
+
+        // ── Specialization ──
+        modelBuilder.Entity<Specialization>(entity =>
+        {
+            entity.ToTable("Specializations");
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.Name).HasMaxLength(100).IsRequired();
+            entity.Property(e => e.TranslationKey).HasMaxLength(100);
+            entity.Property(e => e.Category).HasMaxLength(100);
+
+            entity.HasData(
+                new Specialization { Id = "s1", Name = "General Dentistry", TranslationKey = "auth.spec_general_dentistry", Category = "Dentistry" },
+                new Specialization { Id = "s2", Name = "Orthodontics", TranslationKey = "auth.spec_orthodontics", Category = "Dentistry" },
+                new Specialization { Id = "s3", Name = "Oral Surgery", TranslationKey = "auth.spec_oral_surgery", Category = "Dentistry" },
+                new Specialization { Id = "s4", Name = "Endodontics", TranslationKey = "auth.spec_endodontics", Category = "Dentistry" },
+                new Specialization { Id = "s5", Name = "Periodontics", TranslationKey = "auth.spec_periodontics", Category = "Dentistry" },
+                new Specialization { Id = "s6", Name = "Pediatric Dentistry", TranslationKey = "auth.spec_pediatric_dentistry", Category = "Dentistry" },
+                new Specialization { Id = "s7", Name = "Prosthodontics", TranslationKey = "auth.spec_prosthodontics", Category = "Dentistry" },
+                new Specialization { Id = "s8", Name = "Cardiology", TranslationKey = "auth.spec_cardiology", Category = "Medicine" },
+                new Specialization { Id = "s9", Name = "Dermatology", TranslationKey = "auth.spec_dermatology", Category = "Medicine" },
+                new Specialization { Id = "s10", Name = "Endocrinology", TranslationKey = "auth.spec_endocrinology", Category = "Medicine" },
+                new Specialization { Id = "s11", Name = "Gastroenterology", TranslationKey = "auth.spec_gastroenterology", Category = "Medicine" },
+                new Specialization { Id = "s12", Name = "Neurology", TranslationKey = "auth.spec_neurology", Category = "Medicine" },
+                new Specialization { Id = "s13", Name = "Obstetrics and Gynecology", TranslationKey = "auth.spec_obgyn", Category = "Medicine" },
+                new Specialization { Id = "s14", Name = "Oncology", TranslationKey = "auth.spec_oncology", Category = "Medicine" },
+                new Specialization { Id = "s15", Name = "Ophthalmology", TranslationKey = "auth.spec_ophthalmology", Category = "Medicine" },
+                new Specialization { Id = "s16", Name = "Orthopedics", TranslationKey = "auth.spec_orthopedics", Category = "Medicine" },
+                new Specialization { Id = "s17", Name = "Pediatrics", TranslationKey = "auth.spec_pediatrics", Category = "Medicine" },
+                new Specialization { Id = "s18", Name = "Psychiatry", TranslationKey = "auth.spec_psychiatry", Category = "Medicine" },
+                new Specialization { Id = "s19", Name = "Radiology", TranslationKey = "auth.spec_radiology", Category = "Medicine" },
+                new Specialization { Id = "s20", Name = "Urology", TranslationKey = "auth.spec_urology", Category = "Medicine" },
+                new Specialization { Id = "s21", Name = "General Practice", TranslationKey = "auth.spec_general_practice", Category = "Medicine" }
+            );
         });
 
         // ── DoctorClinic (Many-to-Many join) ──
