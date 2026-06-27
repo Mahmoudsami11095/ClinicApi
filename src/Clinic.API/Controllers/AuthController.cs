@@ -229,6 +229,16 @@ public class AuthController : ControllerBase
 
         if (user == null)
         {
+            var superAdminEmail = Environment.GetEnvironmentVariable("SUPER_ADMIN_EMAIL") ?? "mahmoudsami11095@gmail.com";
+            if (string.Equals(socialInfo.Email, superAdminEmail, StringComparison.OrdinalIgnoreCase))
+            {
+                request.Role = "Admin";
+            }
+            else if (string.Equals(request.Role, "Admin", StringComparison.OrdinalIgnoreCase))
+            {
+                request.Role = "Patient";
+            }
+
             if (string.IsNullOrWhiteSpace(request.Role))
             {
                 return Ok(new { requiresRoleSelection = true, email = socialInfo.Email, name = socialInfo.Name });
@@ -236,6 +246,7 @@ public class AuthController : ControllerBase
 
             var isDoctor = string.Equals(request.Role, "doctor", StringComparison.OrdinalIgnoreCase);
             var isAssistant = string.Equals(request.Role, "assistant", StringComparison.OrdinalIgnoreCase);
+            var isAdmin = string.Equals(request.Role, "admin", StringComparison.OrdinalIgnoreCase);
 
             if (isDoctor)
             {
@@ -338,6 +349,18 @@ public class AuthController : ControllerBase
                     clinics.Add(request.ClinicId);
                 }
                 user.UserClinics = clinics.Select(cid => new UserClinic { ClinicId = cid, UserId = user.Id }).ToList();
+            }
+            else if (isAdmin)
+            {
+                user = new User
+                {
+                    Id = Guid.NewGuid().ToString(),
+                    Name = socialInfo.Name,
+                    Email = socialInfo.Email,
+                    Role = UserRole.Admin,
+                    Title = "Super Admin",
+                    PasswordHash = BCrypt.Net.BCrypt.HashPassword(!string.IsNullOrWhiteSpace(request.Password) ? request.Password : ("social-default-password-" + Guid.NewGuid().ToString()))
+                };
             }
             else
             {
@@ -517,6 +540,16 @@ public class AuthController : ControllerBase
         if (existing != null)
             return BadRequest(new { message = "Email already registered" });
 
+        var superAdminEmail = Environment.GetEnvironmentVariable("SUPER_ADMIN_EMAIL") ?? "mahmoudsami11095@gmail.com";
+        if (string.Equals(request.Email, superAdminEmail, StringComparison.OrdinalIgnoreCase))
+        {
+            request.Role = "Admin";
+        }
+        else if (string.Equals(request.Role, "Admin", StringComparison.OrdinalIgnoreCase))
+        {
+            request.Role = "Patient";
+        }
+
         if (!Enum.TryParse<UserRole>(request.Role, ignoreCase: true, out var role))
             return BadRequest(new { message = $"Invalid role '{request.Role}'. Must be one of: doctor, patient, assistant." });
 
@@ -679,7 +712,8 @@ public class AuthController : ControllerBase
             Role = role,
             Title = role == UserRole.Patient ? "Registered Patient" :
                     role == UserRole.Doctor ? (request.Title ?? "Specialist") :
-                    role == UserRole.Assistant ? "Clinical Assistant" : "Clinic Staff",
+                    role == UserRole.Assistant ? "Clinical Assistant" :
+                    role == UserRole.Admin ? "Super Admin" : "Clinic Staff",
             ClinicId = string.IsNullOrWhiteSpace(request.ClinicId) ? null : request.ClinicId,
             DoctorId = role == UserRole.Doctor ? doctorId : request.DoctorId,
             PatientId = role == UserRole.Patient ? patientId : null,
