@@ -35,6 +35,7 @@ public class OtpResponse
 public class WhatsAppOtpRequest
 {
     public string PhoneNumber { get; set; } = string.Empty;
+    public bool? CheckRegistration { get; set; }
 }
 
 public class VerifyOtpRequest
@@ -73,6 +74,7 @@ public class RegisterRequest
     public string? DoctorId { get; set; }
     public string? PatientId { get; set; }
     public string? Specialization { get; set; }
+    public string? SpecializationId { get; set; }
     public string? Dob { get; set; }
     public string? BloodGroup { get; set; }
     public string? Address { get; set; }
@@ -97,12 +99,15 @@ public class SocialLoginRequest
     public string Provider { get; set; } = string.Empty;
     public string Token { get; set; } = string.Empty;
     public string? Role { get; set; }
+    public string? Title { get; set; }
+    public string? Password { get; set; }
 
     // Missing data fields:
     public string? ContactNumber { get; set; }
     public string? CountryCode { get; set; }
     public string? PhoneNumber { get; set; }
     public string? Specialization { get; set; }
+    public string? SpecializationId { get; set; }
     public string? ClinicName { get; set; }
     public string? ClinicAddress { get; set; }
     public string? ClinicPhone { get; set; }
@@ -151,6 +156,7 @@ public class UserProfileDto
     // Doctor Specific fields
     public string? DoctorId { get; set; }
     public string? Specialization { get; set; }
+    public string? SpecializationId { get; set; }
     public string? ContactNumber { get; set; }
     public string? CountryCode { get; set; }
     public string? PhoneNumber { get; set; }

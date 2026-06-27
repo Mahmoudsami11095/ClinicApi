@@ -116,6 +116,19 @@ public class AuthController : ControllerBase
         if (string.IsNullOrWhiteSpace(request.PhoneNumber))
             return BadRequest(new { message = "Phone number is required." });
 
+        if (request.CheckRegistration ?? false)
+        {
+            var split = Clinic.Domain.Helpers.PhoneHelper.SplitContactNumber(request.PhoneNumber);
+            var validation = Clinic.Domain.Helpers.PhoneHelper.ValidatePhoneNumber(split.CountryCode, split.PhoneNumber);
+            if (!validation.IsValid)
+                return BadRequest(new { message = validation.ErrorMessage });
+
+            var normPhone = Clinic.Domain.Helpers.PhoneHelper.NormalizePhoneNumber(split.CountryCode, split.PhoneNumber);
+            var isUnique = await _userRepo.IsPhoneNumberUniqueAsync(split.CountryCode, normPhone);
+            if (!isUnique)
+                return BadRequest(new { message = "Phone number already registered to another account." });
+        }
+
         var (success, message, code) = await _whatsappOtpService.RequestOtpAsync(request.PhoneNumber);
         if (!success)
         {
@@ -228,6 +241,13 @@ public class AuthController : ControllerBase
             {
                 var doctorId = Guid.NewGuid().ToString();
 
+                var contactNumber = request.ContactNumber ?? "+1234567890";
+                var split = Clinic.Domain.Helpers.PhoneHelper.SplitContactNumber(contactNumber);
+                var normPhone = Clinic.Domain.Helpers.PhoneHelper.NormalizePhoneNumber(split.CountryCode, split.PhoneNumber);
+                var isUnique = await _userRepo.IsPhoneNumberUniqueAsync(split.CountryCode, normPhone);
+                if (!isUnique)
+                    return BadRequest(new { message = "Phone number already registered to another account." });
+
                 var nameParts = socialInfo.Name.Split(' ', 2);
                 var doctor = new Doctor
                 {
@@ -235,7 +255,8 @@ public class AuthController : ControllerBase
                     FirstName = nameParts[0],
                     LastName = nameParts.Length > 1 ? nameParts[1] : "",
                     Email = socialInfo.Email,
-                    ContactNumber = request.ContactNumber ?? "+1234567890",
+                    ContactNumber = contactNumber,
+                    SpecializationId = request.SpecializationId,
                     Specialization = request.Specialization ?? "General Medicine",
                     AvailabilityDays = request.AvailabilityDays ?? "[\"Monday\",\"Tuesday\",\"Wednesday\",\"Thursday\",\"Friday\"]",
                     AvailabilityHours = request.AvailabilityHours ?? "09:00-17:00"
@@ -293,9 +314,9 @@ public class AuthController : ControllerBase
                     Name = socialInfo.Name,
                     Email = socialInfo.Email,
                     Role = UserRole.Doctor,
-                    Title = "Specialist",
+                    Title = request.Title ?? "Specialist",
                     DoctorId = doctorId,
-                    PasswordHash = BCrypt.Net.BCrypt.HashPassword("social-default-password-" + Guid.NewGuid().ToString())
+                    PasswordHash = BCrypt.Net.BCrypt.HashPassword(!string.IsNullOrWhiteSpace(request.Password) ? request.Password : ("social-default-password-" + Guid.NewGuid().ToString()))
                 };
             }
             else if (isAssistant)
@@ -308,7 +329,7 @@ public class AuthController : ControllerBase
                     Role = UserRole.Assistant,
                     Title = "Clinical Assistant",
                     ClinicId = string.IsNullOrEmpty(request.ClinicId) ? null : request.ClinicId,
-                    PasswordHash = BCrypt.Net.BCrypt.HashPassword("social-default-password-" + Guid.NewGuid().ToString())
+                    PasswordHash = BCrypt.Net.BCrypt.HashPassword(!string.IsNullOrWhiteSpace(request.Password) ? request.Password : ("social-default-password-" + Guid.NewGuid().ToString()))
                 };
 
                 var clinics = request.ClinicIds ?? new List<string>();
@@ -323,6 +344,13 @@ public class AuthController : ControllerBase
                 // Auto-register user as Patient
                 var patientId = Guid.NewGuid().ToString();
 
+                var contactNumber = request.ContactNumber ?? "+1234567890";
+                var split = Clinic.Domain.Helpers.PhoneHelper.SplitContactNumber(contactNumber);
+                var normPhone = Clinic.Domain.Helpers.PhoneHelper.NormalizePhoneNumber(split.CountryCode, split.PhoneNumber);
+                var isUnique = await _userRepo.IsPhoneNumberUniqueAsync(split.CountryCode, normPhone);
+                if (!isUnique)
+                    return BadRequest(new { message = "Phone number already registered to another account." });
+
                 var nameParts = socialInfo.Name.Split(' ', 2);
                 var patient = new Patient
                 {
@@ -330,7 +358,7 @@ public class AuthController : ControllerBase
                     FirstName = nameParts[0],
                     LastName = nameParts.Length > 1 ? nameParts[1] : "",
                     Email = socialInfo.Email,
-                    ContactNumber = request.ContactNumber ?? "+1234567890",
+                    ContactNumber = contactNumber,
                     Address = request.Address ?? "",
                     Latitude = request.Latitude,
                     Longitude = request.Longitude,
@@ -354,7 +382,7 @@ public class AuthController : ControllerBase
                     Title = "Registered Patient",
                     ClinicId = string.IsNullOrEmpty(request.ClinicId) ? null : request.ClinicId,
                     PatientId = patientId,
-                    PasswordHash = BCrypt.Net.BCrypt.HashPassword("social-default-password-" + Guid.NewGuid().ToString())
+                    PasswordHash = BCrypt.Net.BCrypt.HashPassword(!string.IsNullOrWhiteSpace(request.Password) ? request.Password : ("social-default-password-" + Guid.NewGuid().ToString()))
                 };
             }
 
@@ -543,6 +571,7 @@ public class AuthController : ControllerBase
                 Email = request.Email,
                 CountryCode = countryCode ?? "+20",
                 PhoneNumber = phoneNumber ?? "",
+                SpecializationId = request.SpecializationId,
                 Specialization = request.Specialization ?? "General Medicine",
                 AvailabilityDays = "[\"Monday\",\"Tuesday\",\"Wednesday\",\"Thursday\",\"Friday\"]",
                 AvailabilityHours = "09:00-17:00"
@@ -718,6 +747,7 @@ public class AuthController : ControllerBase
             var doctor = await _doctorRepo.GetByIdAsync(user.DoctorId);
             if (doctor != null)
             {
+                profile.SpecializationId = doctor.SpecializationId;
                 profile.Specialization = doctor.Specialization;
                 profile.ContactNumber = doctor.ContactNumber;
                 profile.CountryCode = doctor.CountryCode;
@@ -929,6 +959,7 @@ public class AuthController : ControllerBase
             doctor.FirstName = nameParts[0];
             doctor.LastName = nameParts.Length > 1 ? nameParts[1] : "";
             doctor.Email = dto.Email;
+            doctor.SpecializationId = dto.SpecializationId ?? doctor.SpecializationId;
             doctor.Specialization = dto.Specialization ?? doctor.Specialization;
             if (!string.IsNullOrEmpty(phoneNumber))
             {

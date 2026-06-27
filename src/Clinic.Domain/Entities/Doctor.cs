@@ -6,6 +6,8 @@ public class Doctor
     public string FirstName { get; set; } = string.Empty;
     public string LastName { get; set; } = string.Empty;
     public string Specialization { get; set; } = string.Empty;
+    public string? SpecializationId { get; set; }
+    public Specialization? SpecializationReference { get; set; }
     public string Email { get; set; } = string.Empty;
     public string CountryCode { get; set; } = "+20";
     public string PhoneNumber { get; set; } = string.Empty;
