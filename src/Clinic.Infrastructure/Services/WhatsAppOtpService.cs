@@ -96,9 +96,8 @@ public class WhatsAppOtpService : IWhatsAppOtpService
                             type = "body",
                             parameters = new[]
                             {
-                                new { type = "text", text = code },
-                                new { type = "text", text = "Clinic App" },
-                                new { type = "text", text = "1" }
+                                new { type = "text", text = "Clinic User" }, // {{1}} Name
+                                new { type = "text", text = code }         // {{2}} OTP
                             }
                         }
                     }
