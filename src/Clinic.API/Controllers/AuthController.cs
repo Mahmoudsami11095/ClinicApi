@@ -236,6 +236,7 @@ public class AuthController : ControllerBase
                     LastName = nameParts.Length > 1 ? nameParts[1] : "",
                     Email = socialInfo.Email,
                     ContactNumber = request.ContactNumber ?? "+1234567890",
+                    SpecializationId = request.SpecializationId,
                     Specialization = request.Specialization ?? "General Medicine",
                     AvailabilityDays = request.AvailabilityDays ?? "[\"Monday\",\"Tuesday\",\"Wednesday\",\"Thursday\",\"Friday\"]",
                     AvailabilityHours = request.AvailabilityHours ?? "09:00-17:00"
@@ -293,9 +294,9 @@ public class AuthController : ControllerBase
                     Name = socialInfo.Name,
                     Email = socialInfo.Email,
                     Role = UserRole.Doctor,
-                    Title = "Specialist",
+                    Title = request.Title ?? "Specialist",
                     DoctorId = doctorId,
-                    PasswordHash = BCrypt.Net.BCrypt.HashPassword("social-default-password-" + Guid.NewGuid().ToString())
+                    PasswordHash = BCrypt.Net.BCrypt.HashPassword(!string.IsNullOrWhiteSpace(request.Password) ? request.Password : ("social-default-password-" + Guid.NewGuid().ToString()))
                 };
             }
             else if (isAssistant)
@@ -308,7 +309,7 @@ public class AuthController : ControllerBase
                     Role = UserRole.Assistant,
                     Title = "Clinical Assistant",
                     ClinicId = string.IsNullOrEmpty(request.ClinicId) ? null : request.ClinicId,
-                    PasswordHash = BCrypt.Net.BCrypt.HashPassword("social-default-password-" + Guid.NewGuid().ToString())
+                    PasswordHash = BCrypt.Net.BCrypt.HashPassword(!string.IsNullOrWhiteSpace(request.Password) ? request.Password : ("social-default-password-" + Guid.NewGuid().ToString()))
                 };
 
                 var clinics = request.ClinicIds ?? new List<string>();
@@ -354,7 +355,7 @@ public class AuthController : ControllerBase
                     Title = "Registered Patient",
                     ClinicId = string.IsNullOrEmpty(request.ClinicId) ? null : request.ClinicId,
                     PatientId = patientId,
-                    PasswordHash = BCrypt.Net.BCrypt.HashPassword("social-default-password-" + Guid.NewGuid().ToString())
+                    PasswordHash = BCrypt.Net.BCrypt.HashPassword(!string.IsNullOrWhiteSpace(request.Password) ? request.Password : ("social-default-password-" + Guid.NewGuid().ToString()))
                 };
             }
 
@@ -543,6 +544,7 @@ public class AuthController : ControllerBase
                 Email = request.Email,
                 CountryCode = countryCode ?? "+20",
                 PhoneNumber = phoneNumber ?? "",
+                SpecializationId = request.SpecializationId,
                 Specialization = request.Specialization ?? "General Medicine",
                 AvailabilityDays = "[\"Monday\",\"Tuesday\",\"Wednesday\",\"Thursday\",\"Friday\"]",
                 AvailabilityHours = "09:00-17:00"
@@ -718,6 +720,7 @@ public class AuthController : ControllerBase
             var doctor = await _doctorRepo.GetByIdAsync(user.DoctorId);
             if (doctor != null)
             {
+                profile.SpecializationId = doctor.SpecializationId;
                 profile.Specialization = doctor.Specialization;
                 profile.ContactNumber = doctor.ContactNumber;
                 profile.CountryCode = doctor.CountryCode;
@@ -929,6 +932,7 @@ public class AuthController : ControllerBase
             doctor.FirstName = nameParts[0];
             doctor.LastName = nameParts.Length > 1 ? nameParts[1] : "";
             doctor.Email = dto.Email;
+            doctor.SpecializationId = dto.SpecializationId ?? doctor.SpecializationId;
             doctor.Specialization = dto.Specialization ?? doctor.Specialization;
             if (!string.IsNullOrEmpty(phoneNumber))
             {

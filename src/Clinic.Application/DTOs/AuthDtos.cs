@@ -98,6 +98,8 @@ public class SocialLoginRequest
     public string Provider { get; set; } = string.Empty;
     public string Token { get; set; } = string.Empty;
     public string? Role { get; set; }
+    public string? Title { get; set; }
+    public string? Password { get; set; }
 
     // Missing data fields:
     public string? ContactNumber { get; set; }
