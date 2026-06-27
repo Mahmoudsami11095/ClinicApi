@@ -35,6 +35,7 @@ public class OtpResponse
 public class WhatsAppOtpRequest
 {
     public string PhoneNumber { get; set; } = string.Empty;
+    public bool? CheckRegistration { get; set; }
 }
 
 public class VerifyOtpRequest

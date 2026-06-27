@@ -116,6 +116,19 @@ public class AuthController : ControllerBase
         if (string.IsNullOrWhiteSpace(request.PhoneNumber))
             return BadRequest(new { message = "Phone number is required." });
 
+        if (request.CheckRegistration ?? false)
+        {
+            var split = Clinic.Domain.Helpers.PhoneHelper.SplitContactNumber(request.PhoneNumber);
+            var validation = Clinic.Domain.Helpers.PhoneHelper.ValidatePhoneNumber(split.CountryCode, split.PhoneNumber);
+            if (!validation.IsValid)
+                return BadRequest(new { message = validation.ErrorMessage });
+
+            var normPhone = Clinic.Domain.Helpers.PhoneHelper.NormalizePhoneNumber(split.CountryCode, split.PhoneNumber);
+            var isUnique = await _userRepo.IsPhoneNumberUniqueAsync(split.CountryCode, normPhone);
+            if (!isUnique)
+                return BadRequest(new { message = "Phone number already registered to another account." });
+        }
+
         var (success, message, code) = await _whatsappOtpService.RequestOtpAsync(request.PhoneNumber);
         if (!success)
         {
@@ -228,6 +241,13 @@ public class AuthController : ControllerBase
             {
                 var doctorId = Guid.NewGuid().ToString();
 
+                var contactNumber = request.ContactNumber ?? "+1234567890";
+                var split = Clinic.Domain.Helpers.PhoneHelper.SplitContactNumber(contactNumber);
+                var normPhone = Clinic.Domain.Helpers.PhoneHelper.NormalizePhoneNumber(split.CountryCode, split.PhoneNumber);
+                var isUnique = await _userRepo.IsPhoneNumberUniqueAsync(split.CountryCode, normPhone);
+                if (!isUnique)
+                    return BadRequest(new { message = "Phone number already registered to another account." });
+
                 var nameParts = socialInfo.Name.Split(' ', 2);
                 var doctor = new Doctor
                 {
@@ -235,7 +255,7 @@ public class AuthController : ControllerBase
                     FirstName = nameParts[0],
                     LastName = nameParts.Length > 1 ? nameParts[1] : "",
                     Email = socialInfo.Email,
-                    ContactNumber = request.ContactNumber ?? "+1234567890",
+                    ContactNumber = contactNumber,
                     SpecializationId = request.SpecializationId,
                     Specialization = request.Specialization ?? "General Medicine",
                     AvailabilityDays = request.AvailabilityDays ?? "[\"Monday\",\"Tuesday\",\"Wednesday\",\"Thursday\",\"Friday\"]",
@@ -324,6 +344,13 @@ public class AuthController : ControllerBase
                 // Auto-register user as Patient
                 var patientId = Guid.NewGuid().ToString();
 
+                var contactNumber = request.ContactNumber ?? "+1234567890";
+                var split = Clinic.Domain.Helpers.PhoneHelper.SplitContactNumber(contactNumber);
+                var normPhone = Clinic.Domain.Helpers.PhoneHelper.NormalizePhoneNumber(split.CountryCode, split.PhoneNumber);
+                var isUnique = await _userRepo.IsPhoneNumberUniqueAsync(split.CountryCode, normPhone);
+                if (!isUnique)
+                    return BadRequest(new { message = "Phone number already registered to another account." });
+
                 var nameParts = socialInfo.Name.Split(' ', 2);
                 var patient = new Patient
                 {
@@ -331,7 +358,7 @@ public class AuthController : ControllerBase
                     FirstName = nameParts[0],
                     LastName = nameParts.Length > 1 ? nameParts[1] : "",
                     Email = socialInfo.Email,
-                    ContactNumber = request.ContactNumber ?? "+1234567890",
+                    ContactNumber = contactNumber,
                     Address = request.Address ?? "",
                     Latitude = request.Latitude,
                     Longitude = request.Longitude,
