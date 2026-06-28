@@ -68,6 +68,8 @@ app.UseAuthorization();
 app.MapControllers();
 app.MapHub<NotificationHub>("/hubs/notifications");
 
+app.MapGet("/api/health", () => Results.Ok(new { status = "awake", timestamp = DateTime.UtcNow }));
+
 app.MapGet("/api/debug-error", () => 
 {
     if (System.IO.File.Exists("startup-error.txt"))
