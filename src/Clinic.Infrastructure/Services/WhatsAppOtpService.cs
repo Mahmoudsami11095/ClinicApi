@@ -124,22 +124,19 @@ public class WhatsAppOtpService : IWhatsAppOtpService
             else
             {
                 var responseError = await response.Content.ReadAsStringAsync();
-                _logger.LogWarning("Failed to send WhatsApp OTP. Gateway status code: {StatusCode}, Error: {Error}. Falling back to console logging.", response.StatusCode, responseError);
-                Console.WriteLine($"[WhatsApp OTP Dev Fallback] Generated Code for {phoneNumber}: {code}");
-                return (true, $"[DEV ONLY] Gateway returned error {response.StatusCode}. Code printed to console: {code}", code);
+                _logger.LogWarning("Failed to send WhatsApp OTP. Gateway status code: {StatusCode}, Error: {Error}.", response.StatusCode, responseError);
+                return (false, "Failed to send WhatsApp verification code. Please try again later.", null);
             }
         }
         catch (HttpRequestException ex)
         {
-            _logger.LogWarning(ex, "WhatsApp API Gateway is unreachable. Falling back to console logging.");
-            Console.WriteLine($"[WhatsApp OTP Dev Fallback] Generated Code for {phoneNumber}: {code}");
-            return (true, $"[DEV ONLY] Gateway unreachable. Code printed to console: {code}", code);
+            _logger.LogWarning(ex, "WhatsApp API Gateway is unreachable.");
+            return (false, "WhatsApp service is currently unreachable. Please try again later.", null);
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Unexpected error occurred while sending WhatsApp OTP to {PhoneNumber}. Falling back to console logging.", phoneNumber);
-            Console.WriteLine($"[WhatsApp OTP Dev Fallback] Generated Code for {phoneNumber}: {code}");
-            return (true, $"[DEV ONLY] Code printed to console: {code}", code);
+            _logger.LogError(ex, "Unexpected error occurred while sending WhatsApp OTP to {PhoneNumber}.", phoneNumber);
+            return (false, "An unexpected error occurred while sending the verification code.", null);
         }
     }
 

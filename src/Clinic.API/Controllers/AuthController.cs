@@ -527,14 +527,18 @@ public class AuthController : ControllerBase
 
         _otpService.RemoveOtp(request.Email);
 
-        // WhatsApp OTP is optional – only verify if the user provided it
-        if (!string.IsNullOrWhiteSpace(request.Phone) && !string.IsNullOrWhiteSpace(request.PhoneOtpCode))
-        {
-            if (!_whatsappOtpService.VerifyOtp(request.Phone, request.PhoneOtpCode))
-                return BadRequest(new { message = "Invalid or expired WhatsApp verification code" });
+        // WhatsApp OTP is mandatory
+        var phoneToCheck = !string.IsNullOrWhiteSpace(request.Phone) ? request.Phone : $"{request.CountryCode}{request.PhoneNumber}";
+        if (string.IsNullOrWhiteSpace(phoneToCheck))
+            return BadRequest(new { message = "Phone number is required for WhatsApp verification" });
 
-            _whatsappOtpService.RemoveOtp(request.Phone);
-        }
+        if (string.IsNullOrWhiteSpace(request.PhoneOtpCode))
+            return BadRequest(new { message = "WhatsApp verification code is required" });
+
+        if (!_whatsappOtpService.VerifyOtp(phoneToCheck, request.PhoneOtpCode))
+            return BadRequest(new { message = "Invalid or expired WhatsApp verification code" });
+
+        _whatsappOtpService.RemoveOtp(phoneToCheck);
 
         var existing = await _userRepo.GetByEmailAsync(request.Email);
         if (existing != null)

@@ -16,19 +16,25 @@ public class AppointmentsController : ControllerBase
     private readonly IDoctorRepository _doctorRepo;
     private readonly INotificationService _notificationService;
     private readonly IUserRepository _userRepo;
+    private readonly IPatientRepository _patientRepo;
+    private readonly IWhatsAppNotificationService _whatsAppNotificationService;
 
     public AppointmentsController(
         IAppointmentRepository repo, 
         IClinicRepository clinicRepo, 
         IDoctorRepository doctorRepo,
         INotificationService notificationService,
-        IUserRepository userRepo)
+        IUserRepository userRepo,
+        IPatientRepository patientRepo,
+        IWhatsAppNotificationService whatsAppNotificationService)
     {
         _repo = repo;
         _clinicRepo = clinicRepo;
         _doctorRepo = doctorRepo;
         _notificationService = notificationService;
         _userRepo = userRepo;
+        _patientRepo = patientRepo;
+        _whatsAppNotificationService = whatsAppNotificationService;
     }
 
     private async Task<string?> ValidateDoctorAvailability(string doctorId, string clinicId, string appointmentDateStr)
@@ -192,6 +198,29 @@ public class AppointmentsController : ControllerBase
             );
         }
 
+        // Notify Patient via WhatsApp
+        var patient = await _patientRepo.GetByIdAsync(dto.PatientId);
+        var clinic = await _clinicRepo.GetByIdAsync(dto.ClinicId ?? "");
+        if (patient != null && clinic != null && !string.IsNullOrWhiteSpace(patient.ContactNumber))
+        {
+            var dateOnly = dto.Date;
+            var timeOnly = "";
+            if (DateTime.TryParse(dto.Date, out var dt))
+            {
+                dateOnly = dt.ToString("MMMM dd, yyyy");
+                timeOnly = dt.ToString("h:mm tt");
+            }
+
+            await _whatsAppNotificationService.SendAppointmentConfirmationAsync(
+                patient.ContactNumber,
+                patient.FirstName,
+                clinic.Name ?? "Clinic",
+                dto.Type ?? "Appointment",
+                dateOnly,
+                timeOnly
+            );
+        }
+
         return Ok(new { message = "Success", data = dto });
     }
 
@@ -271,6 +300,28 @@ public class AppointmentsController : ControllerBase
                 "Appointment Cancelled",
                 $"Your appointment on {entity.Date} has been cancelled.",
                 "Appointment"
+            );
+        }
+
+        // Notify Patient via WhatsApp
+        var patient = await _patientRepo.GetByIdAsync(entity.PatientId);
+        var clinic = await _clinicRepo.GetByIdAsync(entity.ClinicId ?? "");
+        if (patient != null && clinic != null && !string.IsNullOrWhiteSpace(patient.ContactNumber))
+        {
+            var dateOnly = entity.Date;
+            var timeOnly = "";
+            if (DateTime.TryParse(entity.Date, out var dt))
+            {
+                dateOnly = dt.ToString("MMMM dd, yyyy");
+                timeOnly = dt.ToString("h:mm tt");
+            }
+
+            await _whatsAppNotificationService.SendAppointmentCancellationAsync(
+                patient.ContactNumber,
+                patient.FirstName,
+                clinic.Name ?? "Clinic",
+                dateOnly,
+                timeOnly
             );
         }
 
