@@ -125,7 +125,7 @@ public class WhatsAppOtpService : IWhatsAppOtpService
             {
                 var responseError = await response.Content.ReadAsStringAsync();
                 _logger.LogWarning("Failed to send WhatsApp OTP. Gateway status code: {StatusCode}, Error: {Error}.", response.StatusCode, responseError);
-                return (false, "Failed to send WhatsApp verification code. Please try again later.", null);
+                return (false, $"Failed to send WhatsApp verification code. Meta Error: {responseError}", null);
             }
         }
         catch (HttpRequestException ex)

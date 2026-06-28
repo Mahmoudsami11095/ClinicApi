@@ -59,8 +59,7 @@ public class GlobalExceptionMiddleware
 
         context.Response.StatusCode = statusCode;
 
-        // TEMPORARY FOR DEBUGGING: Always show full error details
-        var detail = exception.ToString();
+        var detail = _env.IsDevelopment() ? exception.ToString() : null;
 
         var response = new
         {
