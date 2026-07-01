@@ -34,7 +34,7 @@ public class SubscriptionsController : ControllerBase
         {
             // Fallback: check if role is doctor, retrieve details
             var roleStr = User.FindFirst(ClaimTypes.Role)?.Value;
-            if (roleStr != "Doctor")
+            if (!string.Equals(roleStr, "doctor", StringComparison.OrdinalIgnoreCase))
                 return BadRequest(new { message = "Only doctor accounts have subscription details." });
         }
 
