@@ -22,6 +22,7 @@ builder.Services.AddScoped<INotificationDispatcher, SignalRNotificationDispatche
 builder.Services.AddControllers(options => 
     {
         options.Filters.Add<AssistantClinicRequirementFilter>();
+        options.Filters.Add<SubscriptionActiveFilter>();
     })
     .AddJsonOptions(options =>
     {

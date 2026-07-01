@@ -23,6 +23,8 @@ public class ClinicDbContext : DbContext
     public DbSet<RadiologyCenter> RadiologyCenters => Set<RadiologyCenter>();
     public DbSet<RadiologyRecord> RadiologyRecords => Set<RadiologyRecord>();
     public DbSet<Specialization> Specializations => Set<Specialization>();
+    public DbSet<PromoCode> PromoCodes => Set<PromoCode>();
+    public DbSet<SubscriptionSetting> SubscriptionSettings => Set<SubscriptionSetting>();
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
@@ -367,6 +369,35 @@ public class ClinicDbContext : DbContext
                   .WithMany(p => p.RadiologyRecords)
                   .HasForeignKey(e => e.PatientId)
                   .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        // ── PromoCode ──
+        modelBuilder.Entity<PromoCode>(entity =>
+        {
+            entity.ToTable("PromoCodes");
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.Code).HasMaxLength(50).IsRequired();
+            entity.HasIndex(e => e.Code).IsUnique();
+            entity.Property(e => e.DiscountType).HasMaxLength(50);
+
+            entity.HasData(
+                new PromoCode { Id = "p1", Code = "FREE3MONTHS", DiscountType = "FreeMonths", Value = 3, ExpiryDate = new DateTime(2028, 1, 1, 0, 0, 0, DateTimeKind.Utc), MaxUses = 100, CurrentUses = 0, IsActive = true },
+                new PromoCode { Id = "p2", Code = "SAVE50", DiscountType = "Flat", Value = 50, ExpiryDate = new DateTime(2028, 1, 1, 0, 0, 0, DateTimeKind.Utc), MaxUses = 100, CurrentUses = 0, IsActive = true },
+                new PromoCode { Id = "p3", Code = "HALFPRICE", DiscountType = "Percent", Value = 50, ExpiryDate = new DateTime(2028, 1, 1, 0, 0, 0, DateTimeKind.Utc), MaxUses = 100, CurrentUses = 0, IsActive = true }
+            );
+        });
+
+        // ── SubscriptionSetting ──
+        modelBuilder.Entity<SubscriptionSetting>(entity =>
+        {
+            entity.ToTable("SubscriptionSettings");
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.InitialSetupFee).HasColumnType("decimal(18,2)");
+            entity.Property(e => e.AnnualSubscriptionFee).HasColumnType("decimal(18,2)");
+
+            entity.HasData(
+                new SubscriptionSetting { Id = "s_default", InitialSetupFee = 100.00m, AnnualSubscriptionFee = 300.00m, TrialDurationMonths = 6 }
+            );
         });
     }
 }

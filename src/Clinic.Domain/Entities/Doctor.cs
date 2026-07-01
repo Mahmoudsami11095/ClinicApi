@@ -25,6 +25,14 @@ public class Doctor
     }
     public string? Avatar { get; set; }
 
+    // Subscription tracking properties
+    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+    public string SubscriptionStatus { get; set; } = "Trial"; // "Trial", "Active", "Expired", "Suspended"
+    public DateTime TrialEndDate { get; set; } = DateTime.UtcNow.AddMonths(6);
+    public DateTime? SubscriptionEndDate { get; set; }
+    public bool IsInitialFeePaid { get; set; } = false;
+    public string? AppliedPromoCode { get; set; }
+
     // Availability stored as separate fields
     public string AvailabilityDays { get; set; } = string.Empty; // JSON array e.g. ["Monday","Wednesday"]
     public string AvailabilityHours { get; set; } = string.Empty; // e.g. "09:00-17:00"

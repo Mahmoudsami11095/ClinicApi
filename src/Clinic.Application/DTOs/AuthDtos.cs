@@ -141,6 +141,11 @@ public class UserDto
     public List<string>? ClinicIds { get; set; }
     public string? DoctorId { get; set; }
     public string? PatientId { get; set; }
+    public string? SubscriptionStatus { get; set; }
+    public DateTime? TrialEndDate { get; set; }
+    public DateTime? SubscriptionEndDate { get; set; }
+    public bool? IsInitialFeePaid { get; set; }
+    public string? AppliedPromoCode { get; set; }
 }
 
 // ── User Profile DTO ──
@@ -163,6 +168,11 @@ public class UserProfileDto
     public string? Avatar { get; set; }
     public string? AvailabilityDays { get; set; }
     public string? AvailabilityHours { get; set; }
+    public string? SubscriptionStatus { get; set; }
+    public DateTime? TrialEndDate { get; set; }
+    public DateTime? SubscriptionEndDate { get; set; }
+    public bool? IsInitialFeePaid { get; set; }
+    public string? AppliedPromoCode { get; set; }
 
     // Patient Specific fields
     public string? PatientId { get; set; }
