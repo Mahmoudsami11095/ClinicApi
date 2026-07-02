@@ -156,6 +156,9 @@ public class UserRepository : GenericRepository<User>, IUserRepository
     public async Task<User?> GetByEmailAsync(string email)
         => await _dbSet.Include(u => u.UserClinics).FirstOrDefaultAsync(u => u.Email.ToLower() == email.ToLower());
 
+    public async Task<User?> GetByEmailIncludeDeletedAsync(string email)
+        => await _dbSet.IgnoreQueryFilters().Include(u => u.UserClinics).FirstOrDefaultAsync(u => u.Email.ToLower() == email.ToLower());
+
     public async Task<User?> GetByPhoneNumberAsync(string phoneNumber)
     {
         var split = Clinic.Domain.Helpers.PhoneHelper.SplitContactNumber(phoneNumber);

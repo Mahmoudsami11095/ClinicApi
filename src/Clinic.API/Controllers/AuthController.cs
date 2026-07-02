@@ -60,6 +60,13 @@ public class AuthController : ControllerBase
 
         if (user == null)
         {
+            // Check if the user was soft-deleted
+            var deletedUser = await _userRepo.GetByEmailIncludeDeletedAsync(request.Email);
+            if (deletedUser != null && deletedUser.IsDeleted)
+            {
+                return BadRequest(new { message = "This account has been deactivated. Please sign in with Google to restore it, or contact an administrator." });
+            }
+
             bool isEmail = request.Email.Contains("@");
             return NotFound(new { message = isEmail ? "No account found with this email address" : "No account found with this phone number" });
         }
@@ -229,6 +236,41 @@ public class AuthController : ControllerBase
             return Unauthorized(new { message = "Social authentication failed: Invalid token" });
 
         var user = await _userRepo.GetByEmailAsync(socialInfo.Email);
+
+        // Check if user was soft-deleted and restore them
+        if (user == null)
+        {
+            var deletedUser = await _userRepo.GetByEmailIncludeDeletedAsync(socialInfo.Email);
+            if (deletedUser != null && deletedUser.IsDeleted)
+            {
+                deletedUser.IsDeleted = false;
+                await _userRepo.UpdateAsync(deletedUser);
+
+                // Restore linked doctor if soft-deleted
+                if (!string.IsNullOrEmpty(deletedUser.DoctorId))
+                {
+                    var doctor = await _doctorRepo.GetByIdAsync(deletedUser.DoctorId);
+                    if (doctor != null && doctor.IsDeleted)
+                    {
+                        doctor.IsDeleted = false;
+                        await _doctorRepo.UpdateAsync(doctor);
+                    }
+                }
+
+                // Restore linked patient if soft-deleted
+                if (!string.IsNullOrEmpty(deletedUser.PatientId))
+                {
+                    var patient = await _patientRepo.GetByIdAsync(deletedUser.PatientId);
+                    if (patient != null && patient.IsDeleted)
+                    {
+                        patient.IsDeleted = false;
+                        await _patientRepo.UpdateAsync(patient);
+                    }
+                }
+
+                user = deletedUser;
+            }
+        }
 
         if (user == null)
         {
