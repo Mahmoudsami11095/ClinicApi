@@ -207,7 +207,6 @@ public class SubscriptionsController : ControllerBase
 
         doctor.ReceiptUrl = $"/receipts/{fileName}";
         doctor.SubscriptionStatus = "PendingApproval";
-        doctor.IsInitialFeePaid = true;
 
         await _doctorRepo.UpdateAsync(doctor);
 

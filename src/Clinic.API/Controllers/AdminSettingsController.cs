@@ -255,9 +255,6 @@ public class AdminSettingsController : ControllerBase
             bool isTrialActive = doctor.TrialEndDate > DateTime.UtcNow;
             doctor.SubscriptionStatus = isTrialActive ? "Trial" : "Expired";
 
-            var doctorReceipts = await _receiptRepo.GetAllAsync();
-            doctor.IsInitialFeePaid = doctorReceipts.Any(r => r.DoctorId == doctor.Id && r.Status == "Approved");
-
             await _doctorRepo.UpdateAsync(doctor);
         }
 
