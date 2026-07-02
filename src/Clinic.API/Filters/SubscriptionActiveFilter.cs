@@ -41,6 +41,22 @@ public class SubscriptionActiveFilter : IAsyncActionFilter
 
                     if (doctor != null)
                     {
+                        // Self-healing migration for existing doctors who registered before the subscription feature
+                        if (string.IsNullOrEmpty(doctor.SubscriptionStatus))
+                        {
+                            var settingsRepo = context.HttpContext.RequestServices.GetRequiredService<IGenericRepository<SubscriptionSetting>>();
+                            var settingsList = await settingsRepo.GetAllAsync();
+                            var settings = settingsList.FirstOrDefault() ?? new SubscriptionSetting();
+
+                            doctor.SubscriptionStatus = "Trial";
+                            if (doctor.TrialEndDate == default || doctor.TrialEndDate == DateTime.MinValue)
+                            {
+                                var startFrom = doctor.CreatedAt == default ? DateTime.UtcNow : doctor.CreatedAt;
+                                doctor.TrialEndDate = startFrom.AddMonths(settings.TrialDurationMonths);
+                            }
+                            await doctorRepo.UpdateAsync(doctor);
+                        }
+
                         var isExpired = false;
 
                         // Check Trial status
