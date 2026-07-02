@@ -17,14 +17,8 @@ public static class DataSeeder
 
         try
         {
-            // Best Practice: Never automatically run migrations on startup in Production.
-            // This prevents concurrent migration collisions and startup crashes on Azure.
-            // You should apply migrations manually via SQL scripts in production.
-            var env = Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT");
-            if (env == "Development")
-            {
-                await context.Database.MigrateAsync();
-            }
+            // Safely apply pending database migrations automatically on application startup
+            await context.Database.MigrateAsync();
         }
         catch (Exception ex)
         {
