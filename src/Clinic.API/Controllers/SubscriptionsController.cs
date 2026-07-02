@@ -39,19 +39,28 @@ public class SubscriptionsController : ControllerBase
         var doctorId = User.FindFirst("DoctorId")?.Value;
         if (string.IsNullOrEmpty(doctorId))
         {
-            // Fallback: check if role is doctor, retrieve details
             var roleStr = User.FindFirst(ClaimTypes.Role)?.Value;
             if (!string.Equals(roleStr, "doctor", StringComparison.OrdinalIgnoreCase))
                 return BadRequest(new { message = "Only doctor accounts have subscription details." });
         }
 
-        // Fetch doctor
         var doctor = await GetCurrentDoctorAsync();
         if (doctor == null)
             return NotFound(new { message = "Doctor record not found." });
 
         var settingsList = await _settingsRepo.GetAllAsync();
         var settings = settingsList.FirstOrDefault() ?? new SubscriptionSetting();
+
+        var receipts = await _receiptRepo.GetAllAsync();
+        var doctorReceipts = receipts.Where(r => r.DoctorId == doctor.Id)
+                                     .OrderByDescending(r => r.UploadedAt)
+                                     .Select(r => new
+                                     {
+                                         id = r.Id,
+                                         receiptUrl = r.ReceiptUrl,
+                                         uploadedAt = r.UploadedAt,
+                                         status = r.Status
+                                     });
 
         return Ok(new
         {
@@ -60,6 +69,7 @@ public class SubscriptionsController : ControllerBase
             subscriptionEndDate = doctor.SubscriptionEndDate,
             isInitialFeePaid = doctor.IsInitialFeePaid,
             appliedPromoCode = doctor.AppliedPromoCode,
+            receipts = doctorReceipts,
             pricing = new
             {
                 initialSetupFee = settings.InitialSetupFee,
