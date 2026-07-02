@@ -179,6 +179,15 @@ public class AdminSettingsController : ControllerBase
         doctor.SubscriptionEndDate = baseDate.AddYears(1).AddMonths(extraMonths);
         await _doctorRepo.UpdateAsync(doctor);
 
+        // Approve all pending receipts for this doctor
+        var receipts = await _receiptRepo.GetAllAsync();
+        var pendingReceipts = receipts.Where(r => r.DoctorId == doctor.Id && r.Status == "PendingApproval");
+        foreach (var r in pendingReceipts)
+        {
+            r.Status = "Approved";
+            await _receiptRepo.UpdateAsync(r);
+        }
+
         return Ok(new { message = "Doctor subscription approved and activated successfully." });
     }
 
@@ -192,5 +201,66 @@ public class AdminSettingsController : ControllerBase
         await _doctorRepo.UpdateAsync(doctor);
 
         return Ok(new { message = "Doctor subscription deactivated/suspended successfully." });
+    }
+
+    [HttpPost("receipts/{receiptId}/approve")]
+    public async Task<IActionResult> ApproveReceipt(string receiptId)
+    {
+        var receipt = await _receiptRepo.GetByIdAsync(receiptId);
+        if (receipt == null) return NotFound(new { message = "Receipt not found." });
+
+        receipt.Status = "Approved";
+        await _receiptRepo.UpdateAsync(receipt);
+
+        var doctor = await _doctorRepo.GetByIdAsync(receipt.DoctorId);
+        if (doctor != null)
+        {
+            int extraMonths = 0;
+            if (!string.IsNullOrEmpty(doctor.AppliedPromoCode))
+            {
+                var promoList = await _promoRepo.GetAllAsync();
+                var promo = promoList.FirstOrDefault(p => string.Equals(p.Code, doctor.AppliedPromoCode, StringComparison.OrdinalIgnoreCase));
+                if (promo != null && promo.DiscountType == "FreeMonths")
+                {
+                    extraMonths = (int)promo.Value;
+                }
+            }
+
+            doctor.SubscriptionStatus = "Active";
+            doctor.IsInitialFeePaid = true;
+
+            var baseDate = doctor.SubscriptionEndDate.HasValue && doctor.SubscriptionEndDate > DateTime.UtcNow 
+                ? doctor.SubscriptionEndDate.Value 
+                : DateTime.UtcNow;
+
+            doctor.SubscriptionEndDate = baseDate.AddYears(1).AddMonths(extraMonths);
+            await _doctorRepo.UpdateAsync(doctor);
+        }
+
+        return Ok(new { message = "Receipt approved and doctor subscription activated successfully." });
+    }
+
+    [HttpPost("receipts/{receiptId}/reject")]
+    public async Task<IActionResult> RejectReceipt(string receiptId)
+    {
+        var receipt = await _receiptRepo.GetByIdAsync(receiptId);
+        if (receipt == null) return NotFound(new { message = "Receipt not found." });
+
+        receipt.Status = "Rejected";
+        await _receiptRepo.UpdateAsync(receipt);
+
+        var doctor = await _doctorRepo.GetByIdAsync(receipt.DoctorId);
+        if (doctor != null)
+        {
+            bool isTrialActive = doctor.TrialEndDate > DateTime.UtcNow;
+            doctor.SubscriptionStatus = isTrialActive ? "Trial" : "Expired";
+
+            var doctorReceipts = await _receiptRepo.GetAllAsync();
+            doctor.IsInitialFeePaid = doctorReceipts.Any(r => r.DoctorId == doctor.Id && r.Status == "Approved");
+
+            await _doctorRepo.UpdateAsync(doctor);
+        }
+
+        return Ok(new { message = "Receipt rejected successfully." });
     }
 }
