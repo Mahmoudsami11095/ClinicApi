@@ -135,6 +135,10 @@ public class AdminSettingsController : ControllerBase
     [HttpPost("accounts/{email}/soft-delete")]
     public async Task<IActionResult> SoftDeleteAccount(string email)
     {
+        var currentUserEmail = User.FindFirst(System.Security.Claims.ClaimTypes.Email)?.Value;
+        if (string.Equals(currentUserEmail, email, StringComparison.OrdinalIgnoreCase))
+            return BadRequest(new { message = "You cannot delete your own admin account." });
+
         var user = await _userRepo.GetByEmailAsync(email);
 
         if (user != null)
