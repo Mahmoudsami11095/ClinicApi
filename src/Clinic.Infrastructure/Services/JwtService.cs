@@ -31,19 +31,22 @@ public class JwtService : IJwtService
             new("title", user.Title ?? "")
         };
 
-        if (user.ClinicId != null)
-            claims.Add(new Claim("clinicId", user.ClinicId));
-
-        if (user.DoctorId != null)
-            claims.Add(new Claim("doctorId", user.DoctorId));
-
-        if (user.PatientId != null)
-            claims.Add(new Claim("patientId", user.PatientId));
-
-        if (clinicIds != null)
+        if (user.Role.ToString().ToLower() != "admin")
         {
-            foreach (var cid in clinicIds)
-                claims.Add(new Claim("clinicIds", cid));
+            if (user.ClinicId != null)
+                claims.Add(new Claim("clinicId", user.ClinicId));
+
+            if (user.DoctorId != null)
+                claims.Add(new Claim("doctorId", user.DoctorId));
+
+            if (user.PatientId != null)
+                claims.Add(new Claim("patientId", user.PatientId));
+
+            if (clinicIds != null)
+            {
+                foreach (var cid in clinicIds)
+                    claims.Add(new Claim("clinicIds", cid));
+            }
         }
 
         var credentials = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
