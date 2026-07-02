@@ -276,7 +276,8 @@ public class AuthController : ControllerBase
                     Specialization = request.Specialization ?? "General Medicine",
                     AvailabilityDays = request.AvailabilityDays ?? "[\"Monday\",\"Tuesday\",\"Wednesday\",\"Thursday\",\"Friday\"]",
                     AvailabilityHours = request.AvailabilityHours ?? "09:00-17:00",
-                    TrialEndDate = DateTime.UtcNow.AddMonths(settings.TrialDurationMonths)
+                    TrialEndDate = DateTime.UtcNow.AddMonths(settings.TrialDurationMonths),
+                    SubscriptionStatus = "Trial"
                 };
 
                 var doctorClinics = new List<DoctorClinic>();
@@ -620,7 +621,8 @@ public class AuthController : ControllerBase
                 Specialization = request.Specialization ?? "General Medicine",
                 AvailabilityDays = "[\"Monday\",\"Tuesday\",\"Wednesday\",\"Thursday\",\"Friday\"]",
                 AvailabilityHours = "09:00-17:00",
-                TrialEndDate = DateTime.UtcNow.AddMonths(settings.TrialDurationMonths)
+                TrialEndDate = DateTime.UtcNow.AddMonths(settings.TrialDurationMonths),
+                SubscriptionStatus = "Trial"
             };
             var clinics = request.ClinicIds ?? new List<string>();
             if (clinics.Count == 0)
@@ -1137,6 +1139,20 @@ public class AuthController : ControllerBase
             var doctor = await _doctorRepo.GetByIdAsync(user.DoctorId);
             if (doctor != null)
             {
+                if (string.IsNullOrEmpty(doctor.SubscriptionStatus))
+                {
+                    var settingsList = await _settingsRepo.GetAllAsync();
+                    var settings = settingsList.FirstOrDefault() ?? new SubscriptionSetting();
+
+                    doctor.SubscriptionStatus = "Trial";
+                    if (doctor.TrialEndDate == default || doctor.TrialEndDate == DateTime.MinValue)
+                    {
+                        var startFrom = doctor.CreatedAt == default ? DateTime.UtcNow : doctor.CreatedAt;
+                        doctor.TrialEndDate = startFrom.AddMonths(settings.TrialDurationMonths);
+                    }
+                    await _doctorRepo.UpdateAsync(doctor);
+                }
+
                 dto.SubscriptionStatus = doctor.SubscriptionStatus;
                 dto.TrialEndDate = doctor.TrialEndDate;
                 dto.SubscriptionEndDate = doctor.SubscriptionEndDate;
