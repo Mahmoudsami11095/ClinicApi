@@ -21,6 +21,26 @@ public class ClinicRepository : GenericRepository<ClinicEntity>, IClinicReposito
 public class PatientRepository : GenericRepository<Patient>, IPatientRepository
 {
     public PatientRepository(ClinicDbContext context) : base(context) { }
+
+    public override async Task DeleteAsync(string id)
+    {
+        var patient = await _dbSet.FindAsync(id);
+        if (patient != null)
+        {
+            patient.IsDeleted = true;
+            _dbSet.Update(patient);
+            
+            // Also soft-delete the linked User if it exists
+            var user = await _context.Users.IgnoreQueryFilters().FirstOrDefaultAsync(u => u.PatientId == id);
+            if (user != null)
+            {
+                user.IsDeleted = true;
+                _context.Users.Update(user);
+            }
+
+            await _context.SaveChangesAsync();
+        }
+    }
 }
 
 public class DoctorRepository : GenericRepository<Doctor>, IDoctorRepository
