@@ -1,7 +1,12 @@
 using Clinic.Application.Interfaces;
 using Clinic.Domain.Entities;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc;
+using System;
+using System.IO;
+using System.Linq;
+using System.Threading.Tasks;
 
 namespace Clinic.API.Controllers;
 
@@ -14,17 +19,23 @@ public class AdminSettingsController : ControllerBase
     private readonly IGenericRepository<SubscriptionSetting> _settingsRepo;
     private readonly IDoctorRepository _doctorRepo;
     private readonly IGenericRepository<SubscriptionReceipt> _receiptRepo;
+    private readonly IUserRepository _userRepo;
+    private readonly IWebHostEnvironment _env;
 
     public AdminSettingsController(
         IGenericRepository<PromoCode> promoRepo,
         IGenericRepository<SubscriptionSetting> settingsRepo,
         IDoctorRepository doctorRepo,
-        IGenericRepository<SubscriptionReceipt> receiptRepo)
+        IGenericRepository<SubscriptionReceipt> receiptRepo,
+        IUserRepository userRepo,
+        IWebHostEnvironment env)
     {
         _promoRepo = promoRepo;
         _settingsRepo = settingsRepo;
         _doctorRepo = doctorRepo;
         _receiptRepo = receiptRepo;
+        _userRepo = userRepo;
+        _env = env;
     }
 
     [HttpGet("subscription-settings")]
@@ -259,5 +270,37 @@ public class AdminSettingsController : ControllerBase
         }
 
         return Ok(new { message = "Receipt rejected successfully." });
+    }
+
+    [HttpDelete("accounts/{email}")]
+    public async Task<IActionResult> DeleteAccount(string email)
+    {
+        if (string.IsNullOrWhiteSpace(email))
+            return BadRequest(new { message = "Email is required." });
+
+        var user = await _userRepo.GetByEmailAsync(email);
+        if (user == null)
+            return NotFound(new { message = "Account not found." });
+
+        var currentUserEmail = User.FindFirst(System.Security.Claims.ClaimTypes.Email)?.Value;
+        if (string.Equals(currentUserEmail, email, StringComparison.OrdinalIgnoreCase))
+            return BadRequest(new { message = "You cannot delete your own admin account." });
+
+        try
+        {
+            var contentRoot = _env.ContentRootPath;
+            var webRoot = _env.WebRootPath;
+            if (string.IsNullOrEmpty(webRoot))
+            {
+                webRoot = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot");
+            }
+
+            await _userRepo.DeleteUserWithRelatedDataAsync(user.Id, contentRoot, webRoot);
+            return Ok(new { message = "Account and all associated records deleted successfully." });
+        }
+        catch (Exception ex)
+        {
+            return StatusCode(500, new { message = "An error occurred while deleting the account.", error = ex.Message });
+        }
     }
 }
