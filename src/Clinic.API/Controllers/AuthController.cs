@@ -20,6 +20,7 @@ public class AuthController : ControllerBase
     private readonly IEmailService _emailService;
     private readonly ISocialAuthService _socialAuth;
     private readonly IWhatsAppOtpService _whatsappOtpService;
+    private readonly IGenericRepository<SubscriptionSetting> _settingsRepo;
 
     public AuthController(
         IUserRepository userRepo,
@@ -30,7 +31,8 @@ public class AuthController : ControllerBase
         IOtpService otpService,
         IEmailService emailService,
         ISocialAuthService socialAuth,
-        IWhatsAppOtpService whatsappOtpService)
+        IWhatsAppOtpService whatsappOtpService,
+        IGenericRepository<SubscriptionSetting> settingsRepo)
     {
         _userRepo = userRepo;
         _patientRepo = patientRepo;
@@ -41,6 +43,7 @@ public class AuthController : ControllerBase
         _emailService = emailService;
         _socialAuth = socialAuth;
         _whatsappOtpService = whatsappOtpService;
+        _settingsRepo = settingsRepo;
     }
 
     [HttpPost("login")]
@@ -67,7 +70,7 @@ public class AuthController : ControllerBase
 
         var clinicIds = await GetUserClinicIds(user);
         var token = _jwtService.GenerateToken(user, clinicIds);
-        var userDto = MapToUserDto(user, clinicIds);
+        var userDto = await MapToUserDto(user, clinicIds);
 
         return Ok(new { message = "Login successful", data = userDto, token });
     }
@@ -167,7 +170,7 @@ public class AuthController : ControllerBase
 
             var clinicIds = await GetUserClinicIds(user);
             var token = _jwtService.GenerateToken(user, clinicIds);
-            var userDto = MapToUserDto(user, clinicIds);
+            var userDto = await MapToUserDto(user, clinicIds);
 
             return Ok(new { message = "OTP verified", data = userDto, token });
         }
@@ -192,7 +195,7 @@ public class AuthController : ControllerBase
 
             var clinicIds = await GetUserClinicIds(user);
             var token = _jwtService.GenerateToken(user, clinicIds);
-            var userDto = MapToUserDto(user, clinicIds);
+            var userDto = await MapToUserDto(user, clinicIds);
 
             return Ok(new { message = "OTP verified", data = userDto, token });
         }
@@ -210,7 +213,7 @@ public class AuthController : ControllerBase
 
         var emailClinicIds = await GetUserClinicIds(emailUser);
         var emailToken = _jwtService.GenerateToken(emailUser, emailClinicIds);
-        var emailUserDto = MapToUserDto(emailUser, emailClinicIds);
+        var emailUserDto = await MapToUserDto(emailUser, emailClinicIds);
 
         return Ok(new { message = "OTP verified", data = emailUserDto, token = emailToken });
     }
@@ -259,6 +262,8 @@ public class AuthController : ControllerBase
                 if (!isUnique)
                     return BadRequest(new { message = "Phone number already registered to another account." });
 
+                var settingsList = await _settingsRepo.GetAllAsync();
+                var settings = settingsList.FirstOrDefault() ?? new SubscriptionSetting();
                 var nameParts = socialInfo.Name.Split(' ', 2);
                 var doctor = new Doctor
                 {
@@ -270,7 +275,8 @@ public class AuthController : ControllerBase
                     SpecializationId = request.SpecializationId,
                     Specialization = request.Specialization ?? "General Medicine",
                     AvailabilityDays = request.AvailabilityDays ?? "[\"Monday\",\"Tuesday\",\"Wednesday\",\"Thursday\",\"Friday\"]",
-                    AvailabilityHours = request.AvailabilityHours ?? "09:00-17:00"
+                    AvailabilityHours = request.AvailabilityHours ?? "09:00-17:00",
+                    TrialEndDate = DateTime.UtcNow.AddMonths(settings.TrialDurationMonths)
                 };
 
                 var doctorClinics = new List<DoctorClinic>();
@@ -414,7 +420,7 @@ public class AuthController : ControllerBase
 
         var clinicIds = await GetUserClinicIds(user);
         var appToken = _jwtService.GenerateToken(user, clinicIds);
-        var userDto = MapToUserDto(user, clinicIds);
+        var userDto = await MapToUserDto(user, clinicIds);
 
         return Ok(new { message = $"Logged in via {request.Provider}", data = userDto, token = appToken });
     }
@@ -599,6 +605,8 @@ public class AuthController : ControllerBase
         if (role == UserRole.Doctor && string.IsNullOrEmpty(doctorId))
         {
             doctorId = Guid.NewGuid().ToString();
+            var settingsList = await _settingsRepo.GetAllAsync();
+            var settings = settingsList.FirstOrDefault() ?? new SubscriptionSetting();
             var nameParts = request.Name.Split(' ', 2);
             var doctor = new Doctor
             {
@@ -611,7 +619,8 @@ public class AuthController : ControllerBase
                 SpecializationId = request.SpecializationId,
                 Specialization = request.Specialization ?? "General Medicine",
                 AvailabilityDays = "[\"Monday\",\"Tuesday\",\"Wednesday\",\"Thursday\",\"Friday\"]",
-                AvailabilityHours = "09:00-17:00"
+                AvailabilityHours = "09:00-17:00",
+                TrialEndDate = DateTime.UtcNow.AddMonths(settings.TrialDurationMonths)
             };
             var clinics = request.ClinicIds ?? new List<string>();
             if (clinics.Count == 0)
@@ -739,7 +748,7 @@ public class AuthController : ControllerBase
 
         var clinicIds = registeredClinicIds ??
             (string.IsNullOrWhiteSpace(request.ClinicId) ? new List<string>() : new List<string> { request.ClinicId });
-        var userDto = MapToUserDto(newUser, clinicIds);
+        var userDto = await MapToUserDto(newUser, clinicIds);
 
         return Ok(new { message = "Registration successful", data = userDto });
     }
@@ -752,7 +761,7 @@ public class AuthController : ControllerBase
         foreach (var u in users)
         {
             var clinicIds = await GetUserClinicIds(u);
-            dtos.Add(MapToUserDto(u, clinicIds));
+            dtos.Add(await MapToUserDto(u, clinicIds));
         }
         return Ok(new { data = dtos });
     }
@@ -793,6 +802,11 @@ public class AuthController : ControllerBase
                 profile.Avatar = doctor.Avatar;
                 profile.AvailabilityDays = doctor.AvailabilityDays;
                 profile.AvailabilityHours = doctor.AvailabilityHours;
+                profile.SubscriptionStatus = doctor.SubscriptionStatus;
+                profile.TrialEndDate = doctor.TrialEndDate;
+                profile.SubscriptionEndDate = doctor.SubscriptionEndDate;
+                profile.IsInitialFeePaid = doctor.IsInitialFeePaid;
+                profile.AppliedPromoCode = doctor.AppliedPromoCode;
             }
         }
         else if (user.Role == UserRole.Patient && !string.IsNullOrEmpty(user.PatientId))
@@ -1103,9 +1117,9 @@ public class AuthController : ControllerBase
         return null;
     }
 
-    private static UserDto MapToUserDto(User user, List<string>? clinicIds)
+    private async Task<UserDto> MapToUserDto(User user, List<string>? clinicIds)
     {
-        return new UserDto
+        var dto = new UserDto
         {
             Id = user.Id,
             Name = user.Name,
@@ -1117,5 +1131,20 @@ public class AuthController : ControllerBase
             DoctorId = user.DoctorId,
             PatientId = user.PatientId
         };
+
+        if (user.Role == UserRole.Doctor && !string.IsNullOrEmpty(user.DoctorId))
+        {
+            var doctor = await _doctorRepo.GetByIdAsync(user.DoctorId);
+            if (doctor != null)
+            {
+                dto.SubscriptionStatus = doctor.SubscriptionStatus;
+                dto.TrialEndDate = doctor.TrialEndDate;
+                dto.SubscriptionEndDate = doctor.SubscriptionEndDate;
+                dto.IsInitialFeePaid = doctor.IsInitialFeePaid;
+                dto.AppliedPromoCode = doctor.AppliedPromoCode;
+            }
+        }
+
+        return dto;
     }
 }

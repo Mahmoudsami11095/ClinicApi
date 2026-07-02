@@ -22,6 +22,7 @@ builder.Services.AddScoped<INotificationDispatcher, SignalRNotificationDispatche
 builder.Services.AddControllers(options => 
     {
         options.Filters.Add<AssistantClinicRequirementFilter>();
+        options.Filters.Add<SubscriptionActiveFilter>();
     })
     .AddJsonOptions(options =>
     {
@@ -65,6 +66,7 @@ app.UseHttpsRedirection();
 app.UseCors("AngularApp");
 app.UseAuthentication();
 app.UseAuthorization();
+app.UseStaticFiles();
 app.MapControllers();
 app.MapHub<NotificationHub>("/hubs/notifications");
 
