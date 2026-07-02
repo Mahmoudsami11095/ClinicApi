@@ -121,7 +121,7 @@ public class AdminSettingsController : ControllerBase
         var doctors = await _doctorRepo.GetAllAsync();
         var result = doctors.Select(d => new {
             id = d.Id,
-            name = d.Name,
+            name = d.FirstName + " " + d.LastName,
             email = d.Email,
             subscriptionStatus = d.SubscriptionStatus,
             trialEndDate = d.TrialEndDate,
