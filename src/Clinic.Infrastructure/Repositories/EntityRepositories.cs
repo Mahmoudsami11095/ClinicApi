@@ -188,6 +188,168 @@ public class UserRepository : GenericRepository<User>, IUserRepository
 
         return true;
     }
+
+    public async Task DeleteUserWithRelatedDataAsync(string userId, string contentRootPath, string webRootPath)
+    {
+        var user = await _dbSet.FindAsync(userId);
+        if (user == null) return;
+
+        var strategy = _context.Database.CreateExecutionStrategy();
+        await strategy.ExecuteAsync(async () =>
+        {
+            using var transaction = await _context.Database.BeginTransactionAsync();
+            try
+            {
+            // 1. Notifications cleanup
+            var notifications = await _context.Notifications.Where(n => n.UserId == userId).ToListAsync();
+            _context.Notifications.RemoveRange(notifications);
+
+            // 2. Doctor cleanups
+            if (!string.IsNullOrEmpty(user.DoctorId))
+            {
+                var doctorId = user.DoctorId;
+
+                // Get all appointment IDs for this doctor (needed for dependent cleanup)
+                var doctorAppointmentIds = await _context.Appointments
+                    .Where(a => a.DoctorId == doctorId)
+                    .Select(a => a.Id)
+                    .ToListAsync();
+
+                // Delete Prescriptions FIRST (FK to Appointment with NoAction, FK to Patient/Doctor with NoAction)
+                var doctorPrescriptions = await _context.Prescriptions
+                    .Where(p => p.DoctorId == doctorId)
+                    .ToListAsync();
+                _context.Prescriptions.RemoveRange(doctorPrescriptions);
+
+                // Delete BillingRecords linked to doctor's appointments (FK to Patient with NoAction)
+                var doctorBillingRecords = await _context.BillingRecords
+                    .Where(b => doctorAppointmentIds.Contains(b.AppointmentId!))
+                    .ToListAsync();
+                _context.BillingRecords.RemoveRange(doctorBillingRecords);
+
+                // Now safe to delete Appointments
+                var doctorAppointments = await _context.Appointments
+                    .Where(a => a.DoctorId == doctorId)
+                    .ToListAsync();
+                _context.Appointments.RemoveRange(doctorAppointments);
+
+                var doctorDentalLogs = await _context.DentalLogs.Where(d => d.DoctorId == doctorId).ToListAsync();
+                _context.DentalLogs.RemoveRange(doctorDentalLogs);
+
+                var doctorRadiologyRecords = await _context.RadiologyRecords.Where(r => r.DoctorId == doctorId).ToListAsync();
+                _context.RadiologyRecords.RemoveRange(doctorRadiologyRecords);
+
+                var doctorReceipts = await _context.SubscriptionReceipts.Where(r => r.DoctorId == doctorId).ToListAsync();
+                _context.SubscriptionReceipts.RemoveRange(doctorReceipts);
+
+                var doctorClinics = await _context.DoctorClinics.Where(dc => dc.DoctorId == doctorId).ToListAsync();
+                _context.DoctorClinics.RemoveRange(doctorClinics);
+
+                var doctorMaterials = await _context.Materials.Where(m => m.DoctorId == doctorId).ToListAsync();
+                _context.Materials.RemoveRange(doctorMaterials);
+
+                var clinicsCreatedByDoctor = await _context.Clinics.Where(c => c.CreatorDoctorId == doctorId).ToListAsync();
+                foreach (var clinic in clinicsCreatedByDoctor)
+                {
+                    clinic.CreatorDoctorId = null;
+                }
+
+                var doctor = await _context.Doctors.FindAsync(doctorId);
+                if (doctor != null)
+                {
+                    _context.Doctors.Remove(doctor);
+                }
+
+                try
+                {
+                    var receiptsFolder = Path.Combine(webRootPath, "receipts");
+                    if (Directory.Exists(receiptsFolder))
+                    {
+                        var files = Directory.GetFiles(receiptsFolder, $"{doctorId}_*");
+                        foreach (var file in files)
+                        {
+                            System.IO.File.Delete(file);
+                        }
+                    }
+                }
+                catch
+                {
+                    // Suppress IO errors so DB transaction isn't broken
+                }
+            }
+
+            // 3. Patient cleanups
+            if (!string.IsNullOrEmpty(user.PatientId))
+            {
+                var patientId = user.PatientId;
+
+                // Get all appointment IDs for this patient (needed for dependent cleanup)
+                var patientAppointmentIds = await _context.Appointments
+                    .Where(a => a.PatientId == patientId)
+                    .Select(a => a.Id)
+                    .ToListAsync();
+
+                // Delete Prescriptions FIRST (FK to Appointment with NoAction)
+                var patientPrescriptions = await _context.Prescriptions
+                    .Where(p => p.PatientId == patientId)
+                    .ToListAsync();
+                _context.Prescriptions.RemoveRange(patientPrescriptions);
+
+                // Delete BillingRecords BEFORE Patient (FK to Patient with NoAction)
+                var patientBilling = await _context.BillingRecords
+                    .Where(b => b.PatientId == patientId)
+                    .ToListAsync();
+                _context.BillingRecords.RemoveRange(patientBilling);
+
+                // Now safe to delete Appointments
+                var patientAppointments = await _context.Appointments
+                    .Where(a => a.PatientId == patientId)
+                    .ToListAsync();
+                _context.Appointments.RemoveRange(patientAppointments);
+
+                var patientDentalLogs = await _context.DentalLogs.Where(d => d.PatientId == patientId).ToListAsync();
+                _context.DentalLogs.RemoveRange(patientDentalLogs);
+
+                var patientRadiologyRecords = await _context.RadiologyRecords.Where(r => r.PatientId == patientId).ToListAsync();
+                _context.RadiologyRecords.RemoveRange(patientRadiologyRecords);
+
+                var patient = await _context.Patients.FindAsync(patientId);
+                if (patient != null)
+                {
+                    _context.Patients.Remove(patient);
+                }
+
+                try
+                {
+                    var uploadsFolder = Path.Combine(contentRootPath, "uploads", patientId);
+                    if (Directory.Exists(uploadsFolder))
+                    {
+                        Directory.Delete(uploadsFolder, recursive: true);
+                    }
+                }
+                catch
+                {
+                    // Suppress
+                }
+            }
+
+            // 4. UserClinics join cleanup
+            var userClinics = await _context.UserClinics.Where(uc => uc.UserId == userId).ToListAsync();
+            _context.UserClinics.RemoveRange(userClinics);
+
+            // 5. Final User delete
+            _context.Users.Remove(user);
+
+            await _context.SaveChangesAsync();
+            await transaction.CommitAsync();
+        }
+        catch (Exception)
+        {
+                await transaction.RollbackAsync();
+                throw;
+            }
+        });
+    }
 }
 
 public class NotificationRepository : GenericRepository<Notification>, INotificationRepository
