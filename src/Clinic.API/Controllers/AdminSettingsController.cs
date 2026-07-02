@@ -135,34 +135,58 @@ public class AdminSettingsController : ControllerBase
     [HttpPost("accounts/{email}/soft-delete")]
     public async Task<IActionResult> SoftDeleteAccount(string email)
     {
-        var users = await _userRepo.GetAllAsync();
-        var user = users.FirstOrDefault(u => string.Equals(u.Email, email, StringComparison.OrdinalIgnoreCase));
-        if (user == null) return NotFound(new { message = "User account not found." });
+        var user = await _userRepo.GetByEmailAsync(email);
 
-        user.IsDeleted = true;
-        await _userRepo.UpdateAsync(user);
-
-        if (!string.IsNullOrEmpty(user.DoctorId))
+        if (user != null)
         {
-            var doctor = await _doctorRepo.GetByIdAsync(user.DoctorId);
-            if (doctor != null)
+            // User record exists — soft-delete user and linked doctor/patient
+            user.IsDeleted = true;
+            await _userRepo.UpdateAsync(user);
+
+            if (!string.IsNullOrEmpty(user.DoctorId))
             {
-                doctor.IsDeleted = true;
-                await _doctorRepo.UpdateAsync(doctor);
+                var doctor = await _doctorRepo.GetByIdAsync(user.DoctorId);
+                if (doctor != null)
+                {
+                    doctor.IsDeleted = true;
+                    await _doctorRepo.UpdateAsync(doctor);
+                }
             }
-        }
-        
-        if (!string.IsNullOrEmpty(user.PatientId))
-        {
-            var patient = await _patientRepo.GetByIdAsync(user.PatientId);
-            if (patient != null)
+            
+            if (!string.IsNullOrEmpty(user.PatientId))
             {
-                patient.IsDeleted = true;
-                await _patientRepo.UpdateAsync(patient);
+                var patient = await _patientRepo.GetByIdAsync(user.PatientId);
+                if (patient != null)
+                {
+                    patient.IsDeleted = true;
+                    await _patientRepo.UpdateAsync(patient);
+                }
             }
+
+            return Ok(new { message = "Account successfully deactivated." });
         }
 
-        return Ok(new { message = "Account successfully deactivated." });
+        // No User record found — check if a Doctor exists directly by email
+        var doctors = await _doctorRepo.GetAllAsync();
+        var directDoctor = doctors.FirstOrDefault(d => string.Equals(d.Email, email, StringComparison.OrdinalIgnoreCase));
+        if (directDoctor != null)
+        {
+            directDoctor.IsDeleted = true;
+            await _doctorRepo.UpdateAsync(directDoctor);
+            return Ok(new { message = "Doctor account successfully deactivated." });
+        }
+
+        // No User or Doctor found — check patients by email
+        var patients = await _patientRepo.GetAllAsync();
+        var directPatient = patients.FirstOrDefault(p => string.Equals(p.Email, email, StringComparison.OrdinalIgnoreCase));
+        if (directPatient != null)
+        {
+            directPatient.IsDeleted = true;
+            await _patientRepo.UpdateAsync(directPatient);
+            return Ok(new { message = "Patient account successfully deactivated." });
+        }
+
+        return NotFound(new { message = "No account found with this email." });
     }
 
     [HttpGet("doctors")]
@@ -171,7 +195,7 @@ public class AdminSettingsController : ControllerBase
         var doctors = await _doctorRepo.GetAllAsync();
         var receiptsList = await _receiptRepo.GetAllAsync();
 
-        var result = doctors.Select(d => new {
+        var result = doctors.Where(d => !d.IsDeleted).Select(d => new {
             id = d.Id,
             name = d.FirstName + " " + d.LastName,
             email = d.Email,
@@ -314,29 +338,63 @@ public class AdminSettingsController : ControllerBase
         if (string.IsNullOrWhiteSpace(email))
             return BadRequest(new { message = "Email is required." });
 
-        var user = await _userRepo.GetByEmailAsync(email);
-        if (user == null)
-            return NotFound(new { message = "Account not found." });
-
         var currentUserEmail = User.FindFirst(System.Security.Claims.ClaimTypes.Email)?.Value;
         if (string.Equals(currentUserEmail, email, StringComparison.OrdinalIgnoreCase))
             return BadRequest(new { message = "You cannot delete your own admin account." });
 
-        try
+        var contentRoot = _env.ContentRootPath;
+        var webRoot = _env.WebRootPath;
+        if (string.IsNullOrEmpty(webRoot))
         {
-            var contentRoot = _env.ContentRootPath;
-            var webRoot = _env.WebRootPath;
-            if (string.IsNullOrEmpty(webRoot))
-            {
-                webRoot = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot");
-            }
+            webRoot = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot");
+        }
 
-            await _userRepo.DeleteUserWithRelatedDataAsync(user.Id, contentRoot, webRoot);
-            return Ok(new { message = "Account and all associated records deleted successfully." });
-        }
-        catch (Exception ex)
+        var user = await _userRepo.GetByEmailAsync(email);
+        if (user != null)
         {
-            return StatusCode(500, new { message = "An error occurred while deleting the account.", error = ex.Message });
+            try
+            {
+                await _userRepo.DeleteUserWithRelatedDataAsync(user.Id, contentRoot, webRoot);
+                return Ok(new { message = "Account and all associated records deleted successfully." });
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { message = "An error occurred while deleting the account.", error = ex.Message });
+            }
         }
+
+        // No User record — try deleting a Doctor directly by email
+        var doctors = await _doctorRepo.GetAllAsync();
+        var doctor = doctors.FirstOrDefault(d => string.Equals(d.Email, email, StringComparison.OrdinalIgnoreCase));
+        if (doctor != null)
+        {
+            try
+            {
+                await _doctorRepo.DeleteAsync(doctor.Id);
+                return Ok(new { message = "Doctor account and all associated records deleted successfully." });
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { message = "An error occurred while deleting the doctor.", error = ex.Message });
+            }
+        }
+
+        // No User or Doctor — try deleting a Patient directly by email
+        var patients = await _patientRepo.GetAllAsync();
+        var patient = patients.FirstOrDefault(p => string.Equals(p.Email, email, StringComparison.OrdinalIgnoreCase));
+        if (patient != null)
+        {
+            try
+            {
+                await _patientRepo.DeleteAsync(patient.Id);
+                return Ok(new { message = "Patient account and all associated records deleted successfully." });
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { message = "An error occurred while deleting the patient.", error = ex.Message });
+            }
+        }
+
+        return NotFound(new { message = "No account found with this email." });
     }
 }
