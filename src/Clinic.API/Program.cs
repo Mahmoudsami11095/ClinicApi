@@ -66,6 +66,7 @@ app.UseHttpsRedirection();
 app.UseCors("AngularApp");
 app.UseAuthentication();
 app.UseAuthorization();
+app.UseStaticFiles();
 app.MapControllers();
 app.MapHub<NotificationHub>("/hubs/notifications");
 

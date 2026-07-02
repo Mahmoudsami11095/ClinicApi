@@ -2,6 +2,7 @@ using Clinic.Application.Interfaces;
 using Clinic.Domain.Entities;
 using Clinic.Domain.Enums;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc;
 using System.Security.Claims;
 
@@ -15,15 +16,18 @@ public class SubscriptionsController : ControllerBase
     private readonly IDoctorRepository _doctorRepo;
     private readonly IGenericRepository<PromoCode> _promoRepo;
     private readonly IGenericRepository<SubscriptionSetting> _settingsRepo;
+    private readonly IWebHostEnvironment _env;
 
     public SubscriptionsController(
         IDoctorRepository doctorRepo,
         IGenericRepository<PromoCode> promoRepo,
-        IGenericRepository<SubscriptionSetting> settingsRepo)
+        IGenericRepository<SubscriptionSetting> settingsRepo,
+        IWebHostEnvironment env)
     {
         _doctorRepo = doctorRepo;
         _promoRepo = promoRepo;
         _settingsRepo = settingsRepo;
+        _env = env;
     }
 
     [HttpGet("status")]
@@ -67,6 +71,10 @@ public class SubscriptionsController : ControllerBase
         if (string.IsNullOrWhiteSpace(request.Code))
             return BadRequest(new { message = "Promo code is required." });
 
+        var doctor = await GetCurrentDoctorAsync();
+        if (doctor == null)
+            return NotFound(new { message = "Doctor record not found." });
+
         var promoList = await _promoRepo.GetAllAsync();
         var promo = promoList.FirstOrDefault(p => string.Equals(p.Code, request.Code, StringComparison.OrdinalIgnoreCase));
 
@@ -76,7 +84,7 @@ public class SubscriptionsController : ControllerBase
         var settingsList = await _settingsRepo.GetAllAsync();
         var settings = settingsList.FirstOrDefault() ?? new SubscriptionSetting();
 
-        decimal initialFee = settings.InitialSetupFee;
+        decimal initialFee = doctor.IsInitialFeePaid ? 0 : settings.InitialSetupFee;
         decimal annualFee = settings.AnnualSubscriptionFee;
         decimal discountAmount = 0;
         int extraMonths = 0;
@@ -102,7 +110,8 @@ public class SubscriptionsController : ControllerBase
             code = promo.Code,
             discountType = promo.DiscountType,
             value = promo.Value,
-            originalSetupFee = initialFee,
+            originalSetupFee = settings.InitialSetupFee,
+            setupFeeToPay = initialFee,
             originalAnnualFee = annualFee,
             discountAmount,
             finalAnnualFee,
@@ -150,6 +159,50 @@ public class SubscriptionsController : ControllerBase
             message = "Subscription payment submitted. Pending administrator approval.",
             subscriptionStatus = doctor.SubscriptionStatus,
             subscriptionEndDate = doctor.SubscriptionEndDate,
+            isInitialFeePaid = doctor.IsInitialFeePaid
+        });
+    }
+
+    [HttpPost("upload-receipt")]
+    public async Task<IActionResult> UploadReceipt([FromForm] IFormFile file)
+    {
+        if (file == null || file.Length == 0)
+            return BadRequest(new { message = "Receipt file is required." });
+
+        var doctor = await GetCurrentDoctorAsync();
+        if (doctor == null)
+            return NotFound(new { message = "Doctor record not found." });
+
+        var webRoot = _env.WebRootPath;
+        if (string.IsNullOrEmpty(webRoot))
+        {
+            webRoot = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot");
+        }
+        var uploadsFolder = Path.Combine(webRoot, "receipts");
+        if (!Directory.Exists(uploadsFolder))
+        {
+            Directory.CreateDirectory(uploadsFolder);
+        }
+
+        var fileName = $"{doctor.Id}_{DateTime.UtcNow.Ticks}{Path.GetExtension(file.FileName)}";
+        var filePath = Path.Combine(uploadsFolder, fileName);
+
+        using (var stream = new FileStream(filePath, FileMode.Create))
+        {
+            await file.CopyToAsync(stream);
+        }
+
+        doctor.ReceiptUrl = $"/receipts/{fileName}";
+        doctor.SubscriptionStatus = "PendingApproval";
+        doctor.IsInitialFeePaid = true;
+
+        await _doctorRepo.UpdateAsync(doctor);
+
+        return Ok(new
+        {
+            message = "Receipt uploaded successfully. Awaiting administrator approval.",
+            receiptUrl = doctor.ReceiptUrl,
+            subscriptionStatus = doctor.SubscriptionStatus,
             isInitialFeePaid = doctor.IsInitialFeePaid
         });
     }

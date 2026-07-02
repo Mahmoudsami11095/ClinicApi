@@ -84,6 +84,7 @@ public class ClinicDbContext : DbContext
             entity.Property(e => e.Avatar).HasMaxLength(500);
             entity.Property(e => e.AvailabilityDays).HasMaxLength(500);
             entity.Property(e => e.AvailabilityHours).HasMaxLength(50);
+            entity.Property(e => e.ReceiptUrl).HasMaxLength(1000);
 
             entity.HasOne(e => e.SpecializationReference)
                   .WithMany(s => s.Doctors)

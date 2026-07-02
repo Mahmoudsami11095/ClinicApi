@@ -32,6 +32,7 @@ public class Doctor
     public DateTime? SubscriptionEndDate { get; set; }
     public bool IsInitialFeePaid { get; set; } = false;
     public string? AppliedPromoCode { get; set; }
+    public string? ReceiptUrl { get; set; }
 
     // Availability stored as separate fields
     public string AvailabilityDays { get; set; } = string.Empty; // JSON array e.g. ["Monday","Wednesday"]

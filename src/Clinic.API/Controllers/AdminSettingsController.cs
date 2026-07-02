@@ -127,7 +127,8 @@ public class AdminSettingsController : ControllerBase
             trialEndDate = d.TrialEndDate,
             subscriptionEndDate = d.SubscriptionEndDate,
             isInitialFeePaid = d.IsInitialFeePaid,
-            appliedPromoCode = d.AppliedPromoCode
+            appliedPromoCode = d.AppliedPromoCode,
+            receiptUrl = d.ReceiptUrl
         });
         return Ok(new { data = result });
     }
