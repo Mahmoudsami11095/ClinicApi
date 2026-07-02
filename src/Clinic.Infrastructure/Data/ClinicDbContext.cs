@@ -46,6 +46,7 @@ public class ClinicDbContext : DbContext
         modelBuilder.Entity<User>(entity =>
         {
             entity.ToTable("Users");
+            entity.HasQueryFilter(e => !e.IsDeleted);
             entity.HasKey(e => e.Id);
             entity.Property(e => e.Name).HasMaxLength(200).IsRequired();
             entity.Property(e => e.Email).HasMaxLength(200).IsRequired();
@@ -74,6 +75,7 @@ public class ClinicDbContext : DbContext
         modelBuilder.Entity<Doctor>(entity =>
         {
             entity.ToTable("Doctors");
+            entity.HasQueryFilter(e => !e.IsDeleted);
             entity.HasKey(e => e.Id);
             entity.Property(e => e.FirstName).HasMaxLength(100).IsRequired();
             entity.Property(e => e.LastName).HasMaxLength(100).IsRequired();
@@ -170,6 +172,7 @@ public class ClinicDbContext : DbContext
         modelBuilder.Entity<Patient>(entity =>
         {
             entity.ToTable("Patients");
+            entity.HasQueryFilter(e => !e.IsDeleted);
             entity.HasKey(e => e.Id);
             entity.Property(e => e.FirstName).HasMaxLength(100).IsRequired();
             entity.Property(e => e.LastName).HasMaxLength(100).IsRequired();

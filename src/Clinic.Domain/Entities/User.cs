@@ -23,4 +23,6 @@ public class User
     // Optional FK – links a user account to a Patient record
     public string? PatientId { get; set; }
     public Patient? Patient { get; set; }
+
+    public bool IsDeleted { get; set; } = false;
 }
