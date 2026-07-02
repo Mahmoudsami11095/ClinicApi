@@ -182,6 +182,14 @@ public class SubscriptionsController : ControllerBase
         if (file == null || file.Length == 0)
             return BadRequest(new { message = "Receipt file is required." });
 
+        var allowedExtensions = new[] { ".jpg", ".jpeg", ".png", ".pdf" };
+        var extension = Path.GetExtension(file.FileName).ToLowerInvariant();
+        if (!allowedExtensions.Contains(extension))
+            return BadRequest(new { message = "Only image files (.jpg, .jpeg, .png) and PDF files (.pdf) are allowed." });
+
+        if (file.Length > 5 * 1024 * 1024) // 5MB
+            return BadRequest(new { message = "Receipt file size cannot exceed 5MB." });
+
         var doctor = await GetCurrentDoctorAsync();
         if (doctor == null)
             return NotFound(new { message = "Doctor record not found." });
