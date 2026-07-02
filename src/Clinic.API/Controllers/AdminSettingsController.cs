@@ -20,6 +20,7 @@ public class AdminSettingsController : ControllerBase
     private readonly IDoctorRepository _doctorRepo;
     private readonly IGenericRepository<SubscriptionReceipt> _receiptRepo;
     private readonly IUserRepository _userRepo;
+    private readonly IGenericRepository<Patient> _patientRepo;
     private readonly IWebHostEnvironment _env;
 
     public AdminSettingsController(
@@ -28,6 +29,7 @@ public class AdminSettingsController : ControllerBase
         IDoctorRepository doctorRepo,
         IGenericRepository<SubscriptionReceipt> receiptRepo,
         IUserRepository userRepo,
+        IGenericRepository<Patient> patientRepo,
         IWebHostEnvironment env)
     {
         _promoRepo = promoRepo;
@@ -35,6 +37,7 @@ public class AdminSettingsController : ControllerBase
         _doctorRepo = doctorRepo;
         _receiptRepo = receiptRepo;
         _userRepo = userRepo;
+        _patientRepo = patientRepo;
         _env = env;
     }
 
@@ -127,6 +130,39 @@ public class AdminSettingsController : ControllerBase
 
         await _promoRepo.DeleteAsync(id);
         return Ok(new { message = "Promo code deleted successfully." });
+    }
+
+    [HttpPost("accounts/{email}/soft-delete")]
+    public async Task<IActionResult> SoftDeleteAccount(string email)
+    {
+        var users = await _userRepo.GetAllAsync();
+        var user = users.FirstOrDefault(u => string.Equals(u.Email, email, StringComparison.OrdinalIgnoreCase));
+        if (user == null) return NotFound(new { message = "User account not found." });
+
+        user.IsDeleted = true;
+        await _userRepo.UpdateAsync(user);
+
+        if (!string.IsNullOrEmpty(user.DoctorId))
+        {
+            var doctor = await _doctorRepo.GetByIdAsync(user.DoctorId);
+            if (doctor != null)
+            {
+                doctor.IsDeleted = true;
+                await _doctorRepo.UpdateAsync(doctor);
+            }
+        }
+        
+        if (!string.IsNullOrEmpty(user.PatientId))
+        {
+            var patient = await _patientRepo.GetByIdAsync(user.PatientId);
+            if (patient != null)
+            {
+                patient.IsDeleted = true;
+                await _patientRepo.UpdateAsync(patient);
+            }
+        }
+
+        return Ok(new { message = "Account successfully deactivated." });
     }
 
     [HttpGet("doctors")]
