@@ -139,21 +139,15 @@ public class SubscriptionsController : ControllerBase
             }
         }
 
-        // Perform manual activation
-        doctor.SubscriptionStatus = "Active";
+        // Request manual activation / approval
+        doctor.SubscriptionStatus = "PendingApproval";
         doctor.IsInitialFeePaid = true;
 
-        // Reset subscription expiration date
-        var baseDate = doctor.SubscriptionEndDate.HasValue && doctor.SubscriptionEndDate > DateTime.UtcNow 
-            ? doctor.SubscriptionEndDate.Value 
-            : DateTime.UtcNow;
-
-        doctor.SubscriptionEndDate = baseDate.AddYears(1).AddMonths(extraMonths);
         await _doctorRepo.UpdateAsync(doctor);
 
         return Ok(new
         {
-            message = "Subscription manually activated successfully.",
+            message = "Subscription payment submitted. Pending administrator approval.",
             subscriptionStatus = doctor.SubscriptionStatus,
             subscriptionEndDate = doctor.SubscriptionEndDate,
             isInitialFeePaid = doctor.IsInitialFeePaid

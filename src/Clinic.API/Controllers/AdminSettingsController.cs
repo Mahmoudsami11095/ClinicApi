@@ -12,13 +12,16 @@ public class AdminSettingsController : ControllerBase
 {
     private readonly IGenericRepository<PromoCode> _promoRepo;
     private readonly IGenericRepository<SubscriptionSetting> _settingsRepo;
+    private readonly IDoctorRepository _doctorRepo;
 
     public AdminSettingsController(
         IGenericRepository<PromoCode> promoRepo,
-        IGenericRepository<SubscriptionSetting> settingsRepo)
+        IGenericRepository<SubscriptionSetting> settingsRepo,
+        IDoctorRepository doctorRepo)
     {
         _promoRepo = promoRepo;
         _settingsRepo = settingsRepo;
+        _doctorRepo = doctorRepo;
     }
 
     [HttpGet("subscription-settings")]
@@ -110,5 +113,58 @@ public class AdminSettingsController : ControllerBase
 
         await _promoRepo.DeleteAsync(id);
         return Ok(new { message = "Promo code deleted successfully." });
+    }
+
+    [HttpGet("doctors")]
+    public async Task<IActionResult> GetDoctorsSubscriptions()
+    {
+        var doctors = await _doctorRepo.GetAllAsync();
+        var result = doctors.Select(d => new {
+            id = d.Id,
+            name = d.Name,
+            email = d.Email,
+            subscriptionStatus = d.SubscriptionStatus,
+            trialEndDate = d.TrialEndDate,
+            subscriptionEndDate = d.SubscriptionEndDate,
+            isInitialFeePaid = d.IsInitialFeePaid,
+            appliedPromoCode = d.AppliedPromoCode
+        });
+        return Ok(new { data = result });
+    }
+
+    [HttpPost("doctors/{doctorId}/activate")]
+    public async Task<IActionResult> ApproveDoctorSubscription(string doctorId)
+    {
+        var doctor = await _doctorRepo.GetByIdAsync(doctorId);
+        if (doctor == null) return NotFound(new { message = "Doctor not found." });
+
+        var settingsList = await _settingsRepo.GetAllAsync();
+        var settings = settingsList.FirstOrDefault() ?? new SubscriptionSetting();
+
+        int extraMonths = 0;
+        if (!string.IsNullOrEmpty(doctor.AppliedPromoCode))
+        {
+            var promoList = await _promoRepo.GetAllAsync();
+            var promo = promoList.FirstOrDefault(p => string.Equals(p.Code, doctor.AppliedPromoCode, StringComparison.OrdinalIgnoreCase));
+            if (promo != null)
+            {
+                if (promo.DiscountType == "FreeMonths")
+                {
+                    extraMonths = (int)promo.Value;
+                }
+            }
+        }
+
+        doctor.SubscriptionStatus = "Active";
+        doctor.IsInitialFeePaid = true;
+        
+        var baseDate = doctor.SubscriptionEndDate.HasValue && doctor.SubscriptionEndDate > DateTime.UtcNow 
+            ? doctor.SubscriptionEndDate.Value 
+            : DateTime.UtcNow;
+
+        doctor.SubscriptionEndDate = baseDate.AddYears(1).AddMonths(extraMonths);
+        await _doctorRepo.UpdateAsync(doctor);
+
+        return Ok(new { message = "Doctor subscription approved and activated successfully." });
     }
 }

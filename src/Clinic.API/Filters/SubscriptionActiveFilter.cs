@@ -63,6 +63,20 @@ public class SubscriptionActiveFilter : IAsyncActionFilter
                             isExpired = true;
                         }
 
+                        // Check if PendingApproval
+                        if (doctor.SubscriptionStatus == "PendingApproval")
+                        {
+                            context.Result = new ObjectResult(new 
+                            { 
+                                message = "Your subscription payment is currently pending approval by the administrator. Please contact support or check back later.",
+                                isPendingApproval = true
+                            })
+                            {
+                                StatusCode = 402 // Payment Required
+                            };
+                            return;
+                        }
+
                         if (isExpired)
                         {
                             context.Result = new ObjectResult(new 
