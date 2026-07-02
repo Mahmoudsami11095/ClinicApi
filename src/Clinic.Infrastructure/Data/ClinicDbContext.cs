@@ -25,6 +25,7 @@ public class ClinicDbContext : DbContext
     public DbSet<Specialization> Specializations => Set<Specialization>();
     public DbSet<PromoCode> PromoCodes => Set<PromoCode>();
     public DbSet<SubscriptionSetting> SubscriptionSettings => Set<SubscriptionSetting>();
+    public DbSet<SubscriptionReceipt> SubscriptionReceipts => Set<SubscriptionReceipt>();
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
@@ -399,6 +400,16 @@ public class ClinicDbContext : DbContext
             entity.HasData(
                 new SubscriptionSetting { Id = "s_default", InitialSetupFee = 100.00m, AnnualSubscriptionFee = 300.00m, TrialDurationMonths = 6 }
             );
+        });
+
+        // ── SubscriptionReceipt ──
+        modelBuilder.Entity<SubscriptionReceipt>(entity =>
+        {
+            entity.ToTable("SubscriptionReceipts");
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.DoctorId).IsRequired().HasMaxLength(100);
+            entity.Property(e => e.ReceiptUrl).IsRequired().HasMaxLength(1000);
+            entity.Property(e => e.Status).IsRequired().HasMaxLength(50);
         });
     }
 }

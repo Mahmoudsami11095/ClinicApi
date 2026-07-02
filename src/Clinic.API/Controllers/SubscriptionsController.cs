@@ -16,17 +16,20 @@ public class SubscriptionsController : ControllerBase
     private readonly IDoctorRepository _doctorRepo;
     private readonly IGenericRepository<PromoCode> _promoRepo;
     private readonly IGenericRepository<SubscriptionSetting> _settingsRepo;
+    private readonly IGenericRepository<SubscriptionReceipt> _receiptRepo;
     private readonly IWebHostEnvironment _env;
 
     public SubscriptionsController(
         IDoctorRepository doctorRepo,
         IGenericRepository<PromoCode> promoRepo,
         IGenericRepository<SubscriptionSetting> settingsRepo,
+        IGenericRepository<SubscriptionReceipt> receiptRepo,
         IWebHostEnvironment env)
     {
         _doctorRepo = doctorRepo;
         _promoRepo = promoRepo;
         _settingsRepo = settingsRepo;
+        _receiptRepo = receiptRepo;
         _env = env;
     }
 
@@ -197,6 +200,15 @@ public class SubscriptionsController : ControllerBase
         doctor.IsInitialFeePaid = true;
 
         await _doctorRepo.UpdateAsync(doctor);
+
+        var receipt = new SubscriptionReceipt
+        {
+            DoctorId = doctor.Id,
+            ReceiptUrl = doctor.ReceiptUrl,
+            UploadedAt = DateTime.UtcNow,
+            Status = "PendingApproval"
+        };
+        await _receiptRepo.AddAsync(receipt);
 
         return Ok(new
         {

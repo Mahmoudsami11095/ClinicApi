@@ -13,15 +13,18 @@ public class AdminSettingsController : ControllerBase
     private readonly IGenericRepository<PromoCode> _promoRepo;
     private readonly IGenericRepository<SubscriptionSetting> _settingsRepo;
     private readonly IDoctorRepository _doctorRepo;
+    private readonly IGenericRepository<SubscriptionReceipt> _receiptRepo;
 
     public AdminSettingsController(
         IGenericRepository<PromoCode> promoRepo,
         IGenericRepository<SubscriptionSetting> settingsRepo,
-        IDoctorRepository doctorRepo)
+        IDoctorRepository doctorRepo,
+        IGenericRepository<SubscriptionReceipt> receiptRepo)
     {
         _promoRepo = promoRepo;
         _settingsRepo = settingsRepo;
         _doctorRepo = doctorRepo;
+        _receiptRepo = receiptRepo;
     }
 
     [HttpGet("subscription-settings")]
@@ -119,6 +122,8 @@ public class AdminSettingsController : ControllerBase
     public async Task<IActionResult> GetDoctorsSubscriptions()
     {
         var doctors = await _doctorRepo.GetAllAsync();
+        var receiptsList = await _receiptRepo.GetAllAsync();
+
         var result = doctors.Select(d => new {
             id = d.Id,
             name = d.FirstName + " " + d.LastName,
@@ -128,7 +133,15 @@ public class AdminSettingsController : ControllerBase
             subscriptionEndDate = d.SubscriptionEndDate,
             isInitialFeePaid = d.IsInitialFeePaid,
             appliedPromoCode = d.AppliedPromoCode,
-            receiptUrl = d.ReceiptUrl
+            receiptUrl = d.ReceiptUrl,
+            receipts = receiptsList.Where(r => r.DoctorId == d.Id)
+                                   .OrderByDescending(r => r.UploadedAt)
+                                   .Select(r => new {
+                                       id = r.Id,
+                                       receiptUrl = r.ReceiptUrl,
+                                       uploadedAt = r.UploadedAt,
+                                       status = r.Status
+                                   })
         });
         return Ok(new { data = result });
     }
