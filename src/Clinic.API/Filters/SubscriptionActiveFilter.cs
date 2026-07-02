@@ -77,6 +77,20 @@ public class SubscriptionActiveFilter : IAsyncActionFilter
                             return;
                         }
 
+                        // Check if Suspended
+                        if (doctor.SubscriptionStatus == "Suspended")
+                        {
+                            context.Result = new ObjectResult(new 
+                            { 
+                                message = "Your subscription has been suspended by the administrator. Please contact support.",
+                                isSuspended = true
+                            })
+                            {
+                                StatusCode = 402 // Payment Required
+                            };
+                            return;
+                        }
+
                         if (isExpired)
                         {
                             context.Result = new ObjectResult(new 

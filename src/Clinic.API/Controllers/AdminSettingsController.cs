@@ -167,4 +167,16 @@ public class AdminSettingsController : ControllerBase
 
         return Ok(new { message = "Doctor subscription approved and activated successfully." });
     }
+
+    [HttpPost("doctors/{doctorId}/deactivate")]
+    public async Task<IActionResult> DeactivateDoctorSubscription(string doctorId)
+    {
+        var doctor = await _doctorRepo.GetByIdAsync(doctorId);
+        if (doctor == null) return NotFound(new { message = "Doctor not found." });
+
+        doctor.SubscriptionStatus = "Suspended";
+        await _doctorRepo.UpdateAsync(doctor);
+
+        return Ok(new { message = "Doctor subscription deactivated/suspended successfully." });
+    }
 }
