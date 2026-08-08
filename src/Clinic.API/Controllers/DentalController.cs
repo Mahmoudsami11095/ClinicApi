@@ -15,12 +15,14 @@ public class DentalController : ControllerBase
     private readonly IDentalLogRepository _repo;
     private readonly IMaterialRepository _materialRepo;
     private readonly IClinicRepository _clinicRepo;
+    private readonly IPatientRepository _patientRepo;
 
-    public DentalController(IDentalLogRepository repo, IMaterialRepository materialRepo, IClinicRepository clinicRepo)
+    public DentalController(IDentalLogRepository repo, IMaterialRepository materialRepo, IClinicRepository clinicRepo, IPatientRepository patientRepo)
     {
         _repo = repo;
         _materialRepo = materialRepo;
         _clinicRepo = clinicRepo;
+        _patientRepo = patientRepo;
     }
 
     [HttpGet]
@@ -56,6 +58,15 @@ public class DentalController : ControllerBase
     {
         var doctorIdClaim = User.FindFirst("doctorId")?.Value;
         var clinicIdClaim = User.FindFirst("clinicId")?.Value;
+
+        if (string.IsNullOrEmpty(dto.ClinicId) && !string.IsNullOrEmpty(dto.PatientId))
+        {
+            var patient = await _patientRepo.GetByIdAsync(dto.PatientId);
+            if (patient != null)
+            {
+                dto.ClinicId = patient.ClinicId;
+            }
+        }
 
         if (!string.IsNullOrEmpty(doctorIdClaim) || !string.IsNullOrEmpty(clinicIdClaim))
         {
