@@ -80,3 +80,5 @@ app.MapGet("/api/debug-error", () =>
 });
 
 app.Run();
+
+public partial class Program { }
