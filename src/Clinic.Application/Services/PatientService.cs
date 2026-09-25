@@ -27,12 +27,7 @@ public class PatientService : IPatientService
         
         if (!string.IsNullOrEmpty(doctorIdClaim))
         {
-            var clinics = await _clinicRepo.GetAllAsync();
-            var allowedClinicIds = clinics
-                .Where(c => c.CreatorDoctorId == doctorIdClaim || 
-                            c.DoctorClinics.Any(dc => dc.DoctorId == doctorIdClaim && dc.Status == "Accepted"))
-                .Select(c => c.Id)
-                .ToList();
+            var allowedClinicIds = await GetAllowedClinicIdsAsync(doctorIdClaim);
             patients = patients.Where(p => allowedClinicIds.Contains(p.ClinicId ?? "")).ToList();
         }
         else if (!string.IsNullOrEmpty(clinicIdClaim))
@@ -40,30 +35,34 @@ public class PatientService : IPatientService
             patients = patients.Where(p => p.ClinicId == clinicIdClaim).ToList();
         }
 
-        return patients.Select(p => new PatientDto
+        return patients.Select(MapToDto).ToList();
+    }
+
+    public async Task<PatientDto?> GetByIdAsync(string id, string? doctorIdClaim, string? clinicIdClaim = null)
+    {
+        var p = await _repo.GetByIdAsync(id);
+        if (p == null) return null;
+
+        if (!string.IsNullOrEmpty(doctorIdClaim))
         {
-            Id = p.Id, FirstName = p.FirstName, LastName = p.LastName,
-            Gender = p.Gender, DateOfBirth = p.DateOfBirth,
-            ContactNumber = p.ContactNumber,
-            CountryCode = p.CountryCode,
-            PhoneNumber = p.PhoneNumber,
-            Email = p.Email,
-            BloodGroup = p.BloodGroup, Address = p.Address,
-            Latitude = p.Latitude, Longitude = p.Longitude,
-            City = p.City, State = p.State, Country = p.Country,
-            RegistrationDate = p.RegistrationDate, ClinicId = p.ClinicId,
-            Allergies = p.Allergies, ChronicDiseases = p.ChronicDiseases, PastIllnesses = p.PastIllnesses
-        }).ToList();
+            var isAllowed = await IsDoctorAuthorizedAsync(doctorIdClaim, p.ClinicId);
+            if (!isAllowed)
+                throw new UnauthorizedAccessException("You can only manage patients for your clinics");
+        }
+        else if (!string.IsNullOrEmpty(clinicIdClaim))
+        {
+            if (p.ClinicId != clinicIdClaim)
+                throw new UnauthorizedAccessException("You can only manage patients for your assigned clinic");
+        }
+
+        return MapToDto(p);
     }
 
     public async Task CreateAsync(PatientDto dto, string? doctorIdClaim, string? clinicIdClaim = null)
     {
         if (!string.IsNullOrEmpty(doctorIdClaim))
         {
-            var clinics = await _clinicRepo.GetAllAsync();
-            var isAllowed = clinics.Any(c => c.Id == dto.ClinicId && 
-                (c.CreatorDoctorId == doctorIdClaim || 
-                 c.DoctorClinics.Any(dc => dc.DoctorId == doctorIdClaim && dc.Status == "Accepted")));
+            var isAllowed = await IsDoctorAuthorizedAsync(doctorIdClaim, dto.ClinicId);
             if (!isAllowed)
                 throw new UnauthorizedAccessException("You can only manage patients for your clinics");
         }
@@ -123,10 +122,7 @@ public class PatientService : IPatientService
 
         if (!string.IsNullOrEmpty(doctorIdClaim))
         {
-            var clinics = await _clinicRepo.GetAllAsync();
-            var isAllowed = clinics.Any(c => c.Id == dto.ClinicId && 
-                (c.CreatorDoctorId == doctorIdClaim || 
-                 c.DoctorClinics.Any(dc => dc.DoctorId == doctorIdClaim && dc.Status == "Accepted")));
+            var isAllowed = await IsDoctorAuthorizedAsync(doctorIdClaim, dto.ClinicId);
             if (!isAllowed)
                 throw new UnauthorizedAccessException("You can only manage patients for your clinics");
         }
@@ -194,10 +190,7 @@ public class PatientService : IPatientService
 
         if (!string.IsNullOrEmpty(doctorIdClaim))
         {
-            var clinics = await _clinicRepo.GetAllAsync();
-            var isAllowed = clinics.Any(c => c.Id == existing.ClinicId && 
-                (c.CreatorDoctorId == doctorIdClaim || 
-                 c.DoctorClinics.Any(dc => dc.DoctorId == doctorIdClaim && dc.Status == "Accepted")));
+            var isAllowed = await IsDoctorAuthorizedAsync(doctorIdClaim, existing.ClinicId);
             if (!isAllowed)
                 throw new UnauthorizedAccessException("You can only manage patients for your clinics");
         }
@@ -209,4 +202,44 @@ public class PatientService : IPatientService
 
         await _repo.DeleteAsync(id);
     }
+
+    private async Task<List<string>> GetAllowedClinicIdsAsync(string doctorId)
+    {
+        var ids = await _clinicRepo.GetAllowedClinicIdsForDoctorAsync(doctorId);
+        if (ids != null) return ids;
+
+        var clinics = await _clinicRepo.GetAllAsync();
+        return clinics
+            .Where(c => c.CreatorDoctorId == doctorId || 
+                        c.DoctorClinics.Any(dc => dc.DoctorId == doctorId && dc.Status == "Accepted"))
+            .Select(c => c.Id)
+            .ToList();
+    }
+
+    private async Task<bool> IsDoctorAuthorizedAsync(string doctorId, string? clinicId)
+    {
+        if (string.IsNullOrEmpty(clinicId)) return false;
+        var isAuth = await _clinicRepo.IsDoctorAuthorizedForClinicAsync(doctorId, clinicId);
+        if (isAuth) return true;
+
+        var clinics = await _clinicRepo.GetAllAsync();
+        return clinics.Any(c => c.Id == clinicId && 
+            (c.CreatorDoctorId == doctorId || 
+             c.DoctorClinics.Any(dc => dc.DoctorId == doctorId && dc.Status == "Accepted")));
+    }
+
+    private static PatientDto MapToDto(Patient p) => new PatientDto
+    {
+        Id = p.Id, FirstName = p.FirstName, LastName = p.LastName,
+        Gender = p.Gender, DateOfBirth = p.DateOfBirth,
+        ContactNumber = p.ContactNumber,
+        CountryCode = p.CountryCode,
+        PhoneNumber = p.PhoneNumber,
+        Email = p.Email,
+        BloodGroup = p.BloodGroup, Address = p.Address,
+        Latitude = p.Latitude, Longitude = p.Longitude,
+        City = p.City, State = p.State, Country = p.Country,
+        RegistrationDate = p.RegistrationDate, ClinicId = p.ClinicId,
+        Allergies = p.Allergies, ChronicDiseases = p.ChronicDiseases, PastIllnesses = p.PastIllnesses
+    };
 }

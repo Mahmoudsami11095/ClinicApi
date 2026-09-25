@@ -11,7 +11,26 @@ public interface IGenericRepository<T> where T : class
     Task DeleteAsync(string id);
 }
 
-public interface IClinicRepository : IGenericRepository<ClinicEntity> { }
+public interface IClinicRepository : IGenericRepository<ClinicEntity>
+{
+    async Task<List<string>> GetAllowedClinicIdsForDoctorAsync(string doctorId)
+    {
+        var clinics = await GetAllAsync();
+        return clinics
+            .Where(c => c.CreatorDoctorId == doctorId ||
+                        c.DoctorClinics.Any(dc => dc.DoctorId == doctorId && dc.Status == "Accepted"))
+            .Select(c => c.Id)
+            .ToList();
+    }
+
+    async Task<bool> IsDoctorAuthorizedForClinicAsync(string doctorId, string clinicId)
+    {
+        var clinics = await GetAllAsync();
+        return clinics.Any(c => c.Id == clinicId &&
+                                (c.CreatorDoctorId == doctorId ||
+                                 c.DoctorClinics.Any(dc => dc.DoctorId == doctorId && dc.Status == "Accepted")));
+    }
+}
 
 public interface IPatientRepository : IGenericRepository<Patient> { }
 
