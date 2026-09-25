@@ -121,9 +121,9 @@ public class RadiologyService : IRadiologyService
             AmountPaid = r.AmountPaid,
             Date = r.Date,
             Notes = r.Notes,
-            // Basic manual lookup for names
-            PatientName = users.FirstOrDefault(u => u.PatientId == r.PatientId)?.Name ?? "Unknown",
-            RadiologyCenterName = centers.FirstOrDefault(c => c.Id == r.RadiologyCenterId)?.Name ?? "Unknown Center"
+            // Leverage navigation properties if eager-loaded, with fallback to user/center repos
+            PatientName = !string.IsNullOrWhiteSpace(r.Patient?.Name) ? r.Patient.Name : users.FirstOrDefault(u => u.PatientId == r.PatientId)?.Name ?? "Unknown",
+            RadiologyCenterName = r.RadiologyCenter?.Name ?? centers.FirstOrDefault(c => c.Id == r.RadiologyCenterId)?.Name ?? "Unknown Center"
         }).ToList();
     }
 

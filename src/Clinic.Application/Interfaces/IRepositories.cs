@@ -40,7 +40,10 @@ public interface IUserRepository : IGenericRepository<User>
     Task DeleteUserWithRelatedDataAsync(string userId, string contentRootPath, string webRootPath);
 }
 
-public interface INotificationRepository : IGenericRepository<Notification> { }
+public interface INotificationRepository : IGenericRepository<Notification>
+{
+    Task<List<Notification>> GetByUserIdAsync(string userId, int count);
+}
 
 public interface IRadiologyCenterRepository : IGenericRepository<RadiologyCenter> { }
 

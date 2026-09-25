@@ -329,7 +329,10 @@ public class BranchCoverageTests
             new Notification { UserId = "u2", CreatedAt = DateTime.UtcNow, Title = "Other User" }
         };
 
-        mockRepo.Setup(r => r.GetAllAsync()).ReturnsAsync(list);
+        mockRepo.Setup(r => r.GetByUserIdAsync("u1", 1)).ReturnsAsync(new List<Notification>
+        {
+            new Notification { UserId = "u1", CreatedAt = DateTime.UtcNow, Title = "Newest" }
+        });
 
         var service = new NotificationService(mockRepo.Object, mockDispatcher.Object);
 

@@ -34,6 +34,13 @@ builder.Services.AddControllers(options =>
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
+// ── Caching & Performance ──
+builder.Services.AddMemoryCache();
+builder.Services.AddResponseCompression(options =>
+{
+    options.EnableForHttps = true;
+});
+
 // ── CORS ──
 var allowedOrigins = builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>() ?? new[] { "http://localhost:4200", "http://127.0.0.1:4200", "https://127.0.0.1:4200","http://localhost:4300","https://clinic-app-ten-topaz.vercel.app" };
 builder.Services.AddCors(options =>
@@ -52,8 +59,20 @@ var app = builder.Build();
 // ── Seed Database ──
 await DataSeeder.SeedAsync(app.Services);
 
+// ── Security Headers ──
+app.Use(async (context, next) =>
+{
+    context.Response.Headers.Append("X-Content-Type-Options", "nosniff");
+    context.Response.Headers.Append("X-Frame-Options", "DENY");
+    context.Response.Headers.Append("Referrer-Policy", "strict-origin-when-cross-origin");
+    await next();
+});
+
 // ── Global Exception Middleware ──
 app.UseMiddleware<GlobalExceptionMiddleware>();
+
+// ── Response Compression ──
+app.UseResponseCompression();
 
 // ── Middleware Pipeline ──
 if (app.Environment.IsDevelopment())

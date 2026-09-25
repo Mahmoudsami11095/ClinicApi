@@ -5,6 +5,8 @@ public class Patient
     public string Id { get; set; } = string.Empty;
     public string FirstName { get; set; } = string.Empty;
     public string LastName { get; set; } = string.Empty;
+    [System.ComponentModel.DataAnnotations.Schema.NotMapped]
+    public string Name => $"{FirstName} {LastName}".Trim();
     public string Gender { get; set; } = string.Empty;
     public string DateOfBirth { get; set; } = string.Empty;
     public string CountryCode { get; set; } = "+20";
