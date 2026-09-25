@@ -50,6 +50,9 @@ public class DoctorRepository : GenericRepository<Doctor>, IDoctorRepository
     public override async Task<List<Doctor>> GetAllAsync()
         => await _dbSet.Include(d => d.DoctorClinics).AsNoTracking().ToListAsync();
 
+    public override async Task<Doctor?> GetByIdAsync(string id)
+        => await _dbSet.Include(d => d.DoctorClinics).AsNoTracking().FirstOrDefaultAsync(d => d.Id == id);
+
     public async Task<Doctor> AddWithClinicsAsync(Doctor doctor, List<string> clinicIds)
     {
         foreach (var clinicId in clinicIds)
@@ -379,6 +382,16 @@ public class NotificationRepository : GenericRepository<Notification>, INotifica
 {
     public NotificationRepository(ClinicDbContext context) : base(context) { }
 
+    public async Task<List<Notification>> GetByUserIdAsync(string userId, int count)
+    {
+        return await _dbSet
+            .AsNoTracking()
+            .Where(n => n.UserId == userId)
+            .OrderByDescending(n => n.CreatedAt)
+            .Take(count)
+            .ToListAsync();
+    }
+
     public override async Task<Notification?> GetByIdAsync(string id)
     {
         if (Guid.TryParse(id, out var guidId))
@@ -410,4 +423,11 @@ public class RadiologyCenterRepository : GenericRepository<RadiologyCenter>, IRa
 public class RadiologyRecordRepository : GenericRepository<RadiologyRecord>, IRadiologyRecordRepository
 {
     public RadiologyRecordRepository(ClinicDbContext context) : base(context) { }
+
+    public override async Task<List<RadiologyRecord>> GetAllAsync()
+        => await _dbSet
+            .Include(r => r.Patient)
+            .Include(r => r.RadiologyCenter)
+            .AsNoTracking()
+            .ToListAsync();
 }

@@ -42,8 +42,7 @@ public class AppointmentsController : ControllerBase
         if (string.IsNullOrEmpty(doctorId) || string.IsNullOrEmpty(clinicId) || string.IsNullOrEmpty(appointmentDateStr))
             return null;
 
-        var doctors = await _doctorRepo.GetAllAsync();
-        var d = doctors.FirstOrDefault(x => x.Id == doctorId);
+        var d = await _doctorRepo.GetByIdAsync(doctorId);
         if (d == null)
             return "Doctor not found";
 

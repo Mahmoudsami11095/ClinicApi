@@ -144,7 +144,8 @@ public class ClinicDbContext : DbContext
 
             entity.HasOne(dc => dc.Doctor)
                   .WithMany(d => d.DoctorClinics)
-                  .HasForeignKey(dc => dc.DoctorId);
+                  .HasForeignKey(dc => dc.DoctorId)
+                  .IsRequired(false);
 
             entity.HasOne(dc => dc.Clinic)
                   .WithMany(c => c.DoctorClinics)
@@ -160,6 +161,7 @@ public class ClinicDbContext : DbContext
             entity.HasOne(uc => uc.User)
                   .WithMany(u => u.UserClinics)
                   .HasForeignKey(uc => uc.UserId)
+                  .IsRequired(false)
                   .OnDelete(DeleteBehavior.Cascade);
 
             entity.HasOne(uc => uc.Clinic)
@@ -186,6 +188,11 @@ public class ClinicDbContext : DbContext
             entity.Property(e => e.Address).HasMaxLength(500);
             entity.Property(e => e.RegistrationDate).HasMaxLength(50);
 
+            // B-Tree Indexes for rapid clinic-level filtering and login/phone lookup
+            entity.HasIndex(e => e.ClinicId);
+            entity.HasIndex(e => new { e.CountryCode, e.PhoneNumber });
+            entity.HasIndex(e => e.IsDeleted);
+
             entity.HasOne(e => e.Clinic)
                   .WithMany(c => c.Patients)
                   .HasForeignKey(e => e.ClinicId)
@@ -202,14 +209,21 @@ public class ClinicDbContext : DbContext
             entity.Property(e => e.Type).HasMaxLength(200);
             entity.Property(e => e.Notes).HasMaxLength(1000);
 
+            // Compound indexes for scheduling, queue, and availability queries
+            entity.HasIndex(e => new { e.ClinicId, e.Date });
+            entity.HasIndex(e => new { e.DoctorId, e.Date });
+            entity.HasIndex(e => e.PatientId);
+
             entity.HasOne(e => e.Patient)
                   .WithMany(p => p.Appointments)
                   .HasForeignKey(e => e.PatientId)
+                  .IsRequired(false)
                   .OnDelete(DeleteBehavior.Cascade);
 
             entity.HasOne(e => e.Doctor)
                   .WithMany(d => d.Appointments)
                   .HasForeignKey(e => e.DoctorId)
+                  .IsRequired(false)
                   .OnDelete(DeleteBehavior.Cascade);
 
             entity.HasOne(e => e.Clinic)
@@ -230,9 +244,15 @@ public class ClinicDbContext : DbContext
             entity.Property(e => e.PaymentMethod).HasMaxLength(100);
             entity.Property(e => e.Description).HasMaxLength(500);
 
+            // Indexes for cashier and financial settlement queries
+            entity.HasIndex(e => e.ClinicId);
+            entity.HasIndex(e => e.PatientId);
+            entity.HasIndex(e => e.Status);
+
             entity.HasOne(e => e.Patient)
                   .WithMany(p => p.BillingRecords)
                   .HasForeignKey(e => e.PatientId)
+                  .IsRequired(false)
                   .OnDelete(DeleteBehavior.NoAction);
 
             entity.HasOne(e => e.Appointment)
@@ -263,6 +283,11 @@ public class ClinicDbContext : DbContext
             entity.Property(e => e.Date).HasMaxLength(50);
             entity.Property(e => e.Notes).HasMaxLength(1000);
 
+            // Indexes for patient and doctor prescription history
+            entity.HasIndex(e => e.PatientId);
+            entity.HasIndex(e => e.DoctorId);
+            entity.HasIndex(e => e.Date);
+
             entity.HasOne(e => e.Appointment)
                   .WithOne(a => a.Prescription)
                   .HasForeignKey<Prescription>(e => e.AppointmentId)
@@ -271,11 +296,13 @@ public class ClinicDbContext : DbContext
             entity.HasOne(e => e.Patient)
                   .WithMany(p => p.Prescriptions)
                   .HasForeignKey(e => e.PatientId)
+                  .IsRequired(false)
                   .OnDelete(DeleteBehavior.NoAction);
 
             entity.HasOne(e => e.Doctor)
                   .WithMany(d => d.Prescriptions)
                   .HasForeignKey(e => e.DoctorId)
+                  .IsRequired(false)
                   .OnDelete(DeleteBehavior.NoAction);
 
             // Owned collection – MedicationItem
@@ -304,9 +331,14 @@ public class ClinicDbContext : DbContext
             entity.Property(e => e.Medication).HasMaxLength(500);
             entity.Property(e => e.ConsumedMaterials).HasMaxLength(2000); // JSON array
 
+            // Indexes for tooth odontogram history
+            entity.HasIndex(e => e.PatientId);
+            entity.HasIndex(e => new { e.PatientId, e.ToothNumber });
+
             entity.HasOne(e => e.Patient)
                   .WithMany(p => p.DentalLogs)
                   .HasForeignKey(e => e.PatientId)
+                  .IsRequired(false)
                   .OnDelete(DeleteBehavior.Cascade);
         });
 
@@ -320,9 +352,14 @@ public class ClinicDbContext : DbContext
             entity.Property(e => e.Message).HasMaxLength(1000).IsRequired();
             entity.Property(e => e.Type).HasMaxLength(50);
 
+            // Indexes for user notification drawer feed and unread badge
+            entity.HasIndex(e => new { e.UserId, e.CreatedAt });
+            entity.HasIndex(e => new { e.UserId, e.IsRead });
+
             entity.HasOne(e => e.User)
                   .WithMany()
                   .HasForeignKey(e => e.UserId)
+                  .IsRequired(false)
                   .OnDelete(DeleteBehavior.Cascade);
         });
 
@@ -334,9 +371,15 @@ public class ClinicDbContext : DbContext
             entity.Property(e => e.Name).HasMaxLength(200).IsRequired();
             entity.Property(e => e.DoctorId).IsRequired();
             entity.Property(e => e.Unit).HasMaxLength(50);
+
+            // Indexes for stock lookups
+            entity.HasIndex(e => e.DoctorId);
+            entity.HasIndex(e => e.ClinicId);
+
             entity.HasOne(e => e.Doctor)
                   .WithMany()
                   .HasForeignKey(e => e.DoctorId)
+                  .IsRequired(false)
                   .OnDelete(DeleteBehavior.Cascade);
         });
 
@@ -360,6 +403,11 @@ public class ClinicDbContext : DbContext
             entity.Property(e => e.Date).HasMaxLength(50);
             entity.Property(e => e.Notes).HasMaxLength(1000);
 
+            // Indexes for patient and doctor radiology logs
+            entity.HasIndex(e => e.DoctorId);
+            entity.HasIndex(e => e.PatientId);
+            entity.HasIndex(e => e.RadiologyCenterId);
+
             entity.HasOne(e => e.RadiologyCenter)
                   .WithMany(c => c.RadiologyRecords)
                   .HasForeignKey(e => e.RadiologyCenterId)
@@ -368,11 +416,13 @@ public class ClinicDbContext : DbContext
             entity.HasOne(e => e.Doctor)
                   .WithMany(d => d.RadiologyRecords)
                   .HasForeignKey(e => e.DoctorId)
+                  .IsRequired(false)
                   .OnDelete(DeleteBehavior.Cascade);
 
             entity.HasOne(e => e.Patient)
                   .WithMany(p => p.RadiologyRecords)
                   .HasForeignKey(e => e.PatientId)
+                  .IsRequired(false)
                   .OnDelete(DeleteBehavior.Cascade);
         });
 

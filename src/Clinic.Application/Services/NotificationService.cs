@@ -41,12 +41,7 @@ public class NotificationService : INotificationService
 
     public async Task<IEnumerable<Notification>> GetUserNotificationsAsync(string userId, int count = 20)
     {
-        // Simple fetch all and filter for now. In a real app, the repository should have a GetByUserIdAsync method with pagination.
-        var all = await _notificationRepository.GetAllAsync();
-        var userNotifs = all.FindAll(n => n.UserId == userId);
-        userNotifs.Sort((a, b) => b.CreatedAt.CompareTo(a.CreatedAt));
-        
-        return userNotifs.GetRange(0, Math.Min(count, userNotifs.Count));
+        return await _notificationRepository.GetByUserIdAsync(userId, count);
     }
 
     public async Task MarkAsReadAsync(Guid notificationId, string userId)
