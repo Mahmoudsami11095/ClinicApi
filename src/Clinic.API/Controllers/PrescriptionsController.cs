@@ -1,3 +1,4 @@
+using Clinic.Application.Common;
 using Clinic.Application.DTOs;
 using Clinic.Application.Interfaces;
 using Clinic.Domain.Entities;
@@ -26,20 +27,15 @@ public class PrescriptionsController : ControllerBase
     public async Task<IActionResult> GetAll()
     {
         var prescriptions = await _repo.GetAllAsync();
-        var doctorIdClaim = User.FindFirst("doctorId")?.Value;
-        var clinicIdClaim = User.FindFirst("clinicId")?.Value;
+        var doctorIdClaim = User.GetDoctorId();
+        var clinicIdClaim = User.GetClinicId();
 
         if (!string.IsNullOrEmpty(doctorIdClaim) || !string.IsNullOrEmpty(clinicIdClaim))
         {
             var appointments = await _appointmentRepo.GetAllAsync();
             if (!string.IsNullOrEmpty(doctorIdClaim))
             {
-                var clinics = await _clinicRepo.GetAllAsync();
-                var allowedClinicIds = clinics
-                    .Where(c => c.CreatorDoctorId == doctorIdClaim || 
-                                c.DoctorClinics.Any(dc => dc.DoctorId == doctorIdClaim && dc.Status == "Accepted"))
-                    .Select(c => c.Id)
-                    .ToList();
+                var allowedClinicIds = await _clinicRepo.GetAllowedClinicIdsForDoctorAsync(doctorIdClaim);
                 var allowedApptIds = appointments.Where(a => allowedClinicIds.Contains(a.ClinicId ?? "")).Select(a => a.Id).ToList();
                 prescriptions = prescriptions.Where(p => allowedApptIds.Contains(p.AppointmentId)).ToList();
             }
@@ -57,8 +53,8 @@ public class PrescriptionsController : ControllerBase
     [HttpPost]
     public async Task<IActionResult> Create([FromBody] PrescriptionDto dto)
     {
-        var doctorIdClaim = User.FindFirst("doctorId")?.Value;
-        var clinicIdClaim = User.FindFirst("clinicId")?.Value;
+        var doctorIdClaim = User.GetDoctorId();
+        var clinicIdClaim = User.GetClinicId();
 
         if (!string.IsNullOrEmpty(doctorIdClaim) || !string.IsNullOrEmpty(clinicIdClaim))
         {
@@ -67,10 +63,8 @@ public class PrescriptionsController : ControllerBase
 
             if (!string.IsNullOrEmpty(doctorIdClaim))
             {
-                var clinics = await _clinicRepo.GetAllAsync();
-                var isAllowed = clinics.Any(c => c.Id == appointment.ClinicId && 
-                    (c.CreatorDoctorId == doctorIdClaim || 
-                     c.DoctorClinics.Any(dc => dc.DoctorId == doctorIdClaim && dc.Status == "Accepted")));
+                var isAllowed = !string.IsNullOrEmpty(appointment.ClinicId) && 
+                                await _clinicRepo.IsDoctorAuthorizedForClinicAsync(doctorIdClaim, appointment.ClinicId);
                 if (!isAllowed) return StatusCode(403, new { message = "You can only manage prescriptions for your clinics" });
             }
             else if (!string.IsNullOrEmpty(clinicIdClaim))
@@ -92,8 +86,8 @@ public class PrescriptionsController : ControllerBase
         var entity = await _repo.GetByIdAsync(id);
         if (entity == null) return NotFound(new { message = "Not found" });
 
-        var doctorIdClaim = User.FindFirst("doctorId")?.Value;
-        var clinicIdClaim = User.FindFirst("clinicId")?.Value;
+        var doctorIdClaim = User.GetDoctorId();
+        var clinicIdClaim = User.GetClinicId();
 
         if (!string.IsNullOrEmpty(doctorIdClaim) || !string.IsNullOrEmpty(clinicIdClaim))
         {
@@ -104,13 +98,10 @@ public class PrescriptionsController : ControllerBase
 
             if (!string.IsNullOrEmpty(doctorIdClaim))
             {
-                var clinics = await _clinicRepo.GetAllAsync();
-                var isAllowed = clinics.Any(c => c.Id == appointment.ClinicId && 
-                    (c.CreatorDoctorId == doctorIdClaim || 
-                     c.DoctorClinics.Any(dc => dc.DoctorId == doctorIdClaim && dc.Status == "Accepted"))) &&
-                     clinics.Any(c => c.Id == origAppointment.ClinicId && 
-                    (c.CreatorDoctorId == doctorIdClaim || 
-                     c.DoctorClinics.Any(dc => dc.DoctorId == doctorIdClaim && dc.Status == "Accepted")));
+                var isAllowed = !string.IsNullOrEmpty(appointment.ClinicId) && 
+                                await _clinicRepo.IsDoctorAuthorizedForClinicAsync(doctorIdClaim, appointment.ClinicId) &&
+                                !string.IsNullOrEmpty(origAppointment.ClinicId) && 
+                                await _clinicRepo.IsDoctorAuthorizedForClinicAsync(doctorIdClaim, origAppointment.ClinicId);
                 if (!isAllowed) return StatusCode(403, new { message = "You can only manage prescriptions for your clinics" });
             }
             else if (!string.IsNullOrEmpty(clinicIdClaim))

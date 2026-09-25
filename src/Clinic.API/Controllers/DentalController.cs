@@ -1,3 +1,4 @@
+using Clinic.Application.Common;
 using Clinic.Application.DTOs;
 using Clinic.Application.Interfaces;
 using Clinic.Domain.Entities;
@@ -29,19 +30,14 @@ public class DentalController : ControllerBase
     public async Task<IActionResult> GetAll()
     {
         var logs = await _repo.GetAllAsync();
-        var doctorIdClaim = User.FindFirst("doctorId")?.Value;
-        var clinicIdClaim = User.FindFirst("clinicId")?.Value;
+        var doctorIdClaim = User.GetDoctorId();
+        var clinicIdClaim = User.GetClinicId();
 
         if (!string.IsNullOrEmpty(doctorIdClaim) || !string.IsNullOrEmpty(clinicIdClaim))
         {
             if (!string.IsNullOrEmpty(doctorIdClaim))
             {
-                var clinics = await _clinicRepo.GetAllAsync();
-                var allowedClinicIds = clinics
-                    .Where(c => c.CreatorDoctorId == doctorIdClaim || 
-                                c.DoctorClinics.Any(dc => dc.DoctorId == doctorIdClaim && dc.Status == "Accepted"))
-                    .Select(c => c.Id)
-                    .ToList();
+                var allowedClinicIds = await _clinicRepo.GetAllowedClinicIdsForDoctorAsync(doctorIdClaim);
                 logs = logs.Where(l => allowedClinicIds.Contains(l.ClinicId ?? "")).ToList();
             }
             else if (!string.IsNullOrEmpty(clinicIdClaim))
@@ -56,8 +52,8 @@ public class DentalController : ControllerBase
     [HttpPost]
     public async Task<IActionResult> Create([FromBody] DentalLogDto dto)
     {
-        var doctorIdClaim = User.FindFirst("doctorId")?.Value;
-        var clinicIdClaim = User.FindFirst("clinicId")?.Value;
+        var doctorIdClaim = User.GetDoctorId();
+        var clinicIdClaim = User.GetClinicId();
 
         if (string.IsNullOrEmpty(dto.ClinicId) && !string.IsNullOrEmpty(dto.PatientId))
         {
@@ -72,10 +68,8 @@ public class DentalController : ControllerBase
         {
             if (!string.IsNullOrEmpty(doctorIdClaim))
             {
-                var clinics = await _clinicRepo.GetAllAsync();
-                var isAllowed = clinics.Any(c => c.Id == dto.ClinicId && 
-                    (c.CreatorDoctorId == doctorIdClaim || 
-                     c.DoctorClinics.Any(dc => dc.DoctorId == doctorIdClaim && dc.Status == "Accepted")));
+                var isAllowed = !string.IsNullOrEmpty(dto.ClinicId) && 
+                                await _clinicRepo.IsDoctorAuthorizedForClinicAsync(doctorIdClaim, dto.ClinicId);
                 if (!isAllowed) return StatusCode(403, new { message = "You can only manage dental logs for your clinics" });
             }
             else if (!string.IsNullOrEmpty(clinicIdClaim))

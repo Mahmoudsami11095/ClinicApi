@@ -75,4 +75,36 @@ public class PatientUnitTests
         Assert.Equal("Ahmed", patient.FirstName);
         Assert.Equal("Penicillin", patient.Allergies);
     }
+
+    [Fact]
+    public void Patient_NameProperty_ShouldCombineFirstNameAndLastName()
+    {
+        var patient = new Patient { FirstName = "John", LastName = "Doe" };
+        Assert.Equal("John Doe", patient.Name);
+    }
+
+    [Fact]
+    public void ClaimsPrincipalExtensions_ShouldExtractClaimsCorrectly()
+    {
+        var claims = new[]
+        {
+            new System.Security.Claims.Claim(System.Security.Claims.ClaimTypes.NameIdentifier, "user-123"),
+            new System.Security.Claims.Claim("doctorId", "doc-456"),
+            new System.Security.Claims.Claim("clinicId", "clinic-789"),
+            new System.Security.Claims.Claim(System.Security.Claims.ClaimTypes.Role, "doctor"),
+            new System.Security.Claims.Claim(System.Security.Claims.ClaimTypes.Email, "test@clinic.com")
+        };
+        var identity = new System.Security.Claims.ClaimsIdentity(claims, "TestAuth");
+        var principal = new System.Security.Claims.ClaimsPrincipal(identity);
+
+        Assert.Equal("user-123", Clinic.Application.Common.ClaimsPrincipalExtensions.GetUserId(principal));
+        Assert.Equal("doc-456", Clinic.Application.Common.ClaimsPrincipalExtensions.GetDoctorId(principal));
+        Assert.Equal("clinic-789", Clinic.Application.Common.ClaimsPrincipalExtensions.GetClinicId(principal));
+        Assert.Equal("doctor", Clinic.Application.Common.ClaimsPrincipalExtensions.GetUserRole(principal));
+        Assert.Equal("test@clinic.com", Clinic.Application.Common.ClaimsPrincipalExtensions.GetEmail(principal));
+
+        System.Security.Claims.ClaimsPrincipal? nullPrincipal = null;
+        Assert.Null(Clinic.Application.Common.ClaimsPrincipalExtensions.GetUserId(nullPrincipal));
+        Assert.Null(Clinic.Application.Common.ClaimsPrincipalExtensions.GetDoctorId(nullPrincipal));
+    }
 }

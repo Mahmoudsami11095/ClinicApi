@@ -1,3 +1,4 @@
+using Clinic.Application.Common;
 using Clinic.Application.DTOs;
 using Clinic.Application.Interfaces;
 using Clinic.Domain.Entities;
@@ -109,18 +110,13 @@ public class AppointmentsController : ControllerBase
     public async Task<IActionResult> GetAll()
     {
         var appointments = await _repo.GetAllAsync();
-        var doctorIdClaim = User.FindFirst("doctorId")?.Value;
-        var clinicIdClaim = User.FindFirst("clinicId")?.Value;
-        var roleClaim = User.FindFirst(System.Security.Claims.ClaimTypes.Role)?.Value;
+        var doctorIdClaim = User.GetDoctorId();
+        var clinicIdClaim = User.GetClinicId();
+        var roleClaim = User.GetUserRole();
 
         if (!string.IsNullOrEmpty(doctorIdClaim))
         {
-            var clinics = await _clinicRepo.GetAllAsync();
-            var allowedClinicIds = clinics
-                .Where(c => c.CreatorDoctorId == doctorIdClaim || 
-                            c.DoctorClinics.Any(dc => dc.DoctorId == doctorIdClaim && dc.Status == "Accepted"))
-                .Select(c => c.Id)
-                .ToList();
+            var allowedClinicIds = await _clinicRepo.GetAllowedClinicIdsForDoctorAsync(doctorIdClaim);
             appointments = appointments.Where(a => allowedClinicIds.Contains(a.ClinicId ?? "")).ToList();
         }
         else if (roleClaim == "assistant")
@@ -152,14 +148,12 @@ public class AppointmentsController : ControllerBase
     [HttpPost]
     public async Task<IActionResult> Create([FromBody] AppointmentDto dto)
     {
-        var doctorIdClaim = User.FindFirst("doctorId")?.Value;
-        var clinicIdClaim = User.FindFirst("clinicId")?.Value;
+        var doctorIdClaim = User.GetDoctorId();
+        var clinicIdClaim = User.GetClinicId();
         if (!string.IsNullOrEmpty(doctorIdClaim))
         {
-            var clinics = await _clinicRepo.GetAllAsync();
-            var isAllowed = clinics.Any(c => c.Id == dto.ClinicId && 
-                (c.CreatorDoctorId == doctorIdClaim || 
-                 c.DoctorClinics.Any(dc => dc.DoctorId == doctorIdClaim && dc.Status == "Accepted")));
+            var isAllowed = !string.IsNullOrEmpty(dto.ClinicId) && 
+                            await _clinicRepo.IsDoctorAuthorizedForClinicAsync(doctorIdClaim, dto.ClinicId);
             if (!isAllowed)
                 return StatusCode(403, new { message = "You can only manage appointments for your clinics" });
         }
@@ -229,14 +223,12 @@ public class AppointmentsController : ControllerBase
         var entity = await _repo.GetByIdAsync(id);
         if (entity == null) return NotFound(new { message = "Not found" });
 
-        var doctorIdClaim = User.FindFirst("doctorId")?.Value;
-        var clinicIdClaim = User.FindFirst("clinicId")?.Value;
+        var doctorIdClaim = User.GetDoctorId();
+        var clinicIdClaim = User.GetClinicId();
         if (!string.IsNullOrEmpty(doctorIdClaim))
         {
-            var clinics = await _clinicRepo.GetAllAsync();
-            var isAllowed = clinics.Any(c => c.Id == entity.ClinicId && 
-                (c.CreatorDoctorId == doctorIdClaim || 
-                 c.DoctorClinics.Any(dc => dc.DoctorId == doctorIdClaim && dc.Status == "Accepted")));
+            var isAllowed = !string.IsNullOrEmpty(entity.ClinicId) && 
+                            await _clinicRepo.IsDoctorAuthorizedForClinicAsync(doctorIdClaim, entity.ClinicId);
             if (!isAllowed)
                 return StatusCode(403, new { message = "You can only manage appointments for your clinics" });
         }
@@ -270,14 +262,12 @@ public class AppointmentsController : ControllerBase
         var entity = await _repo.GetByIdAsync(id);
         if (entity == null) return NotFound(new { message = "Not found" });
 
-        var doctorIdClaim = User.FindFirst("doctorId")?.Value;
-        var clinicIdClaim = User.FindFirst("clinicId")?.Value;
+        var doctorIdClaim = User.GetDoctorId();
+        var clinicIdClaim = User.GetClinicId();
         if (!string.IsNullOrEmpty(doctorIdClaim))
         {
-            var clinics = await _clinicRepo.GetAllAsync();
-            var isAllowed = clinics.Any(c => c.Id == entity.ClinicId && 
-                (c.CreatorDoctorId == doctorIdClaim || 
-                 c.DoctorClinics.Any(dc => dc.DoctorId == doctorIdClaim && dc.Status == "Accepted")));
+            var isAllowed = !string.IsNullOrEmpty(entity.ClinicId) && 
+                            await _clinicRepo.IsDoctorAuthorizedForClinicAsync(doctorIdClaim, entity.ClinicId);
             if (!isAllowed)
                 return StatusCode(403, new { message = "You can only manage appointments for your clinics" });
         }

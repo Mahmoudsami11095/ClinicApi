@@ -16,6 +16,25 @@ public class ClinicRepository : GenericRepository<ClinicEntity>, IClinicReposito
                 .ThenInclude(uc => uc.User)
             .AsNoTracking()
             .ToListAsync();
+
+    public async Task<List<string>> GetAllowedClinicIdsForDoctorAsync(string doctorId)
+    {
+        return await _dbSet
+            .AsNoTracking()
+            .Where(c => c.CreatorDoctorId == doctorId ||
+                        c.DoctorClinics.Any(dc => dc.DoctorId == doctorId && dc.Status == "Accepted"))
+            .Select(c => c.Id)
+            .ToListAsync();
+    }
+
+    public async Task<bool> IsDoctorAuthorizedForClinicAsync(string doctorId, string clinicId)
+    {
+        return await _dbSet
+            .AsNoTracking()
+            .AnyAsync(c => c.Id == clinicId &&
+                           (c.CreatorDoctorId == doctorId ||
+                            c.DoctorClinics.Any(dc => dc.DoctorId == doctorId && dc.Status == "Accepted")));
+    }
 }
 
 public class PatientRepository : GenericRepository<Patient>, IPatientRepository
