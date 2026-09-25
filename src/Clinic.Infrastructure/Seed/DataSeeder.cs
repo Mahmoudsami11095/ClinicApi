@@ -17,8 +17,11 @@ public static class DataSeeder
 
         try
         {
-            // Safely apply pending database migrations automatically on application startup
-            await context.Database.MigrateAsync();
+            // Safely apply pending database migrations automatically on relational application startup
+            if (context.Database.IsRelational())
+            {
+                await context.Database.MigrateAsync();
+            }
 
             // Auto-promote and restore the specified super admin emails
             var adminEmails = new[] { "mahmoudsami11095@gmail.com", "msami11095@gmail.com" };
