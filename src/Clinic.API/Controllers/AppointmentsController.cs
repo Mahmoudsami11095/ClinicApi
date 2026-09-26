@@ -67,8 +67,12 @@ public class AppointmentsController : ControllerBase
         }
         else
         {
-            hoursStr = d.AvailabilityHours;
-            daysStr = d.AvailabilityDays;
+            var cl = await _clinicRepo.GetByIdAsync(clinicId);
+            if (cl != null)
+            {
+                hoursStr = cl.AvailabilityHours;
+                daysStr = cl.AvailabilityDays;
+            }
         }
 
         if (string.IsNullOrEmpty(hoursStr))
