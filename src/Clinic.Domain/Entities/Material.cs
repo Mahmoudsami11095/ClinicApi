@@ -8,6 +8,7 @@ public class Material
     public string Name { get; set; } = string.Empty;
     public int Quantity { get; set; }
     public string? Unit { get; set; } // e.g. "Boxes", "Pieces", "ml"
+    public int MinStockAlert { get; set; } = 5;
 
     // Navigation properties
     public Doctor Doctor { get; set; } = null!;

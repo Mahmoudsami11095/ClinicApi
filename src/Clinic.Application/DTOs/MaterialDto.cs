@@ -8,6 +8,7 @@ public class MaterialDto
     public string Name { get; set; } = string.Empty;
     public int Quantity { get; set; }
     public string? Unit { get; set; }
+    public int MinStockAlert { get; set; } = 5;
 }
 
 public class ConsumedMaterialDto
