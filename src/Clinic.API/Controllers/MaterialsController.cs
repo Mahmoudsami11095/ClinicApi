@@ -63,7 +63,8 @@ public class MaterialsController : ControllerBase
             DoctorId = m.DoctorId,
             Name = m.Name,
             Quantity = m.Quantity,
-            Unit = m.Unit
+            Unit = m.Unit,
+            MinStockAlert = m.MinStockAlert
         });
         return Ok(new { data = dtos });
     }
@@ -85,7 +86,8 @@ public class MaterialsController : ControllerBase
             DoctorId = dto.DoctorId,
             Name = dto.Name,
             Quantity = dto.Quantity,
-            Unit = dto.Unit
+            Unit = dto.Unit,
+            MinStockAlert = dto.MinStockAlert > 0 ? dto.MinStockAlert : 5
         };
         await _repo.AddAsync(material);
         dto.Id = material.Id;
@@ -109,6 +111,7 @@ public class MaterialsController : ControllerBase
         material.Quantity = dto.Quantity;
         material.Unit = dto.Unit;
         material.ClinicId = dto.ClinicId;
+        material.MinStockAlert = dto.MinStockAlert > 0 ? dto.MinStockAlert : 5;
 
         await _repo.UpdateAsync(material);
         return Ok(new { message = "Material updated successfully", data = dto });
