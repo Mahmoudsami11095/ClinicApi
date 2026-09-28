@@ -14,6 +14,25 @@ public class MaterialRepository : IMaterialRepository
         _context = context;
     }
 
+    public async Task<IEnumerable<Material>> GetAllAsync()
+    {
+        return await _context.Materials.ToListAsync();
+    }
+
+    public async Task<IEnumerable<Material>> GetLowStockAsync(string? clinicId = null, string? doctorId = null)
+    {
+        var query = _context.Materials.Where(m => m.Quantity <= m.MinStockAlert);
+        if (!string.IsNullOrEmpty(clinicId) && clinicId != "all")
+        {
+            query = query.Where(m => m.ClinicId == clinicId);
+        }
+        if (!string.IsNullOrEmpty(doctorId))
+        {
+            query = query.Where(m => m.DoctorId == doctorId);
+        }
+        return await query.ToListAsync();
+    }
+
     public async Task<IEnumerable<Material>> GetByDoctorIdAsync(string doctorId)
     {
         return await _context.Materials

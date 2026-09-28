@@ -17,13 +17,20 @@ public class DentalController : ControllerBase
     private readonly IMaterialRepository _materialRepo;
     private readonly IClinicRepository _clinicRepo;
     private readonly IPatientRepository _patientRepo;
+    private readonly IMaterialAlertService? _alertService;
 
-    public DentalController(IDentalLogRepository repo, IMaterialRepository materialRepo, IClinicRepository clinicRepo, IPatientRepository patientRepo)
+    public DentalController(
+        IDentalLogRepository repo,
+        IMaterialRepository materialRepo,
+        IClinicRepository clinicRepo,
+        IPatientRepository patientRepo,
+        IMaterialAlertService? alertService = null)
     {
         _repo = repo;
         _materialRepo = materialRepo;
         _clinicRepo = clinicRepo;
         _patientRepo = patientRepo;
+        _alertService = alertService;
     }
 
     [HttpGet]
@@ -108,6 +115,11 @@ public class DentalController : ControllerBase
                     material.Quantity -= cm.Quantity;
                     if (material.Quantity < 0) material.Quantity = 0;
                     await _materialRepo.UpdateAsync(material);
+
+                    if (_alertService != null)
+                    {
+                        await _alertService.CheckAndTriggerLowStockAlertAsync(material);
+                    }
                 }
             }
         }

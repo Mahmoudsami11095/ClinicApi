@@ -1,4 +1,12 @@
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Threading.Tasks;
+using Clinic.Application.Interfaces;
+using Clinic.Application.Services;
 using Clinic.Domain.Entities;
+using Clinic.Domain.Enums;
+using Moq;
 using Xunit;
 
 namespace Clinic.UnitTests;
@@ -45,5 +53,202 @@ public class MaterialUnitTests
         Assert.Equal("Composite Resin Shade A2", material.Name);
         Assert.Equal(12, material.Quantity);
         Assert.Equal("Syringe", material.Unit);
+    }
+
+    [Fact]
+    public async Task BR_INV_02_WhenQuantityFallsBelowThreshold_TriggersAlertToDoctorAndAssistant()
+    {
+        // Arrange
+        var mockNotificationService = new Moq.Mock<Clinic.Application.Interfaces.INotificationService>();
+        var mockUserRepo = new Moq.Mock<Clinic.Application.Interfaces.IUserRepository>();
+
+        var doctorUser = new User
+        {
+            Id = "user-doc-1",
+            DoctorId = "doc-1",
+            Role = Clinic.Domain.Enums.UserRole.Doctor,
+            ClinicId = "clinic-1"
+        };
+        var assistantUser = new User
+        {
+            Id = "user-asst-1",
+            Role = Clinic.Domain.Enums.UserRole.Assistant,
+            ClinicId = "clinic-1"
+        };
+        var unrelatedUser = new User
+        {
+            Id = "user-other-clinic",
+            Role = Clinic.Domain.Enums.UserRole.Assistant,
+            ClinicId = "clinic-99"
+        };
+
+        mockUserRepo.Setup(r => r.GetAllAsync()).ReturnsAsync(new List<User> { doctorUser, assistantUser, unrelatedUser });
+
+        var alertService = new Clinic.Application.Services.MaterialAlertService(
+            mockNotificationService.Object,
+            mockUserRepo.Object
+        );
+
+        var lowStockMaterial = new Material
+        {
+            Id = "mat-1",
+            Name = "Surgical Masks",
+            Quantity = 4, // Below threshold of 10
+            MinStockAlert = 10,
+            Unit = "Boxes",
+            ClinicId = "clinic-1",
+            DoctorId = "doc-1"
+        };
+
+        // Act
+        await alertService.CheckAndTriggerLowStockAlertAsync(lowStockMaterial);
+
+        // Assert - Both doctor and assistant in clinic-1 receive the alert
+        mockNotificationService.Verify(n => n.CreateNotificationAsync(
+            "user-doc-1",
+            "Low Stock Alert",
+            Moq.It.Is<string>(s => s.Contains("Surgical Masks") && s.Contains("4 Boxes remaining")),
+            "Inventory"
+        ), Moq.Times.Once);
+
+        mockNotificationService.Verify(n => n.CreateNotificationAsync(
+            "user-asst-1",
+            "Low Stock Alert",
+            Moq.It.Is<string>(s => s.Contains("Surgical Masks") && s.Contains("4 Boxes remaining")),
+            "Inventory"
+        ), Moq.Times.Once);
+
+        // Unrelated clinic assistant does NOT receive notification
+        mockNotificationService.Verify(n => n.CreateNotificationAsync(
+            "user-other-clinic",
+            Moq.It.IsAny<string>(),
+            Moq.It.IsAny<string>(),
+            Moq.It.IsAny<string>()
+        ), Moq.Times.Never);
+    }
+
+    [Fact]
+    public async Task BR_INV_02_WhenQuantityEqualsThreshold_TriggersAlert()
+    {
+        // Arrange
+        var mockNotificationService = new Moq.Mock<Clinic.Application.Interfaces.INotificationService>();
+        var mockUserRepo = new Moq.Mock<Clinic.Application.Interfaces.IUserRepository>();
+
+        var doctorUser = new User
+        {
+            Id = "user-doc-1",
+            DoctorId = "doc-1",
+            Role = Clinic.Domain.Enums.UserRole.Doctor,
+            ClinicId = "clinic-1"
+        };
+
+        mockUserRepo.Setup(r => r.GetAllAsync()).ReturnsAsync(new List<User> { doctorUser });
+
+        var alertService = new Clinic.Application.Services.MaterialAlertService(
+            mockNotificationService.Object,
+            mockUserRepo.Object
+        );
+
+        var exactThresholdMaterial = new Material
+        {
+            Id = "mat-2",
+            Name = "Latex Gloves",
+            Quantity = 5, // Exactly equal to threshold
+            MinStockAlert = 5,
+            Unit = "Boxes",
+            ClinicId = "clinic-1",
+            DoctorId = "doc-1"
+        };
+
+        // Act
+        await alertService.CheckAndTriggerLowStockAlertAsync(exactThresholdMaterial);
+
+        // Assert
+        mockNotificationService.Verify(n => n.CreateNotificationAsync(
+            "user-doc-1",
+            "Low Stock Alert",
+            Moq.It.Is<string>(s => s.Contains("Latex Gloves") && s.Contains("5 Boxes remaining")),
+            "Inventory"
+        ), Moq.Times.Once);
+    }
+
+    [Fact]
+    public async Task BR_INV_02_WhenQuantityExceedsThreshold_DoesNotTriggerAlert()
+    {
+        // Arrange
+        var mockNotificationService = new Moq.Mock<Clinic.Application.Interfaces.INotificationService>();
+        var mockUserRepo = new Moq.Mock<Clinic.Application.Interfaces.IUserRepository>();
+
+        var alertService = new Clinic.Application.Services.MaterialAlertService(
+            mockNotificationService.Object,
+            mockUserRepo.Object
+        );
+
+        var healthyStockMaterial = new Material
+        {
+            Id = "mat-3",
+            Name = "Dental Needles",
+            Quantity = 50, // Above threshold of 10
+            MinStockAlert = 10,
+            Unit = "Pieces",
+            ClinicId = "clinic-1"
+        };
+
+        // Act
+        await alertService.CheckAndTriggerLowStockAlertAsync(healthyStockMaterial);
+
+        // Assert - No notifications dispatched
+        mockNotificationService.Verify(n => n.CreateNotificationAsync(
+            Moq.It.IsAny<string>(),
+            Moq.It.IsAny<string>(),
+            Moq.It.IsAny<string>(),
+            Moq.It.IsAny<string>()
+        ), Moq.Times.Never);
+    }
+
+    [Fact]
+    public async Task BR_INV_02_WhenUserClinicsContainsClinic_AssistantReceivesAlert()
+    {
+        // Arrange
+        var mockNotificationService = new Moq.Mock<Clinic.Application.Interfaces.INotificationService>();
+        var mockUserRepo = new Moq.Mock<Clinic.Application.Interfaces.IUserRepository>();
+
+        var multiClinicAssistant = new User
+        {
+            Id = "user-multi-asst",
+            Role = Clinic.Domain.Enums.UserRole.Assistant,
+            UserClinics = new List<UserClinic>
+            {
+                new UserClinic { ClinicId = "clinic-secondary", UserId = "user-multi-asst" }
+            }
+        };
+
+        mockUserRepo.Setup(r => r.GetAllAsync()).ReturnsAsync(new List<User> { multiClinicAssistant });
+
+        var alertService = new Clinic.Application.Services.MaterialAlertService(
+            mockNotificationService.Object,
+            mockUserRepo.Object
+        );
+
+        var lowStockMaterial = new Material
+        {
+            Id = "mat-4",
+            Name = "Sterilization Pouches",
+            Quantity = 2,
+            MinStockAlert = 15,
+            Unit = "Packs",
+            ClinicId = "clinic-secondary"
+        };
+
+        // Act
+        await alertService.CheckAndTriggerLowStockAlertAsync(lowStockMaterial);
+
+        // Assert
+        mockNotificationService.Verify(n => n.CreateNotificationAsync(
+            "user-multi-asst",
+            "Low Stock Alert",
+            Moq.It.IsAny<string>(),
+            "Inventory"
+        ), Moq.Times.Once);
     }
 }
