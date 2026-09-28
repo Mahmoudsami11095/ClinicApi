@@ -70,6 +70,14 @@ public class BillingController : ControllerBase
                 return StatusCode(403, new { message = "You can only manage billing for your assigned clinic" });
         }
 
+        var isDoctorOrAdmin = User.IsInRole("admin") || User.IsInRole("doctor") || !string.IsNullOrEmpty(User.GetDoctorId());
+
+        // BR-FIN-01: Courtesy Discount Authorization Matrix
+        if (dto.DiscountPercentage > 10 && !isDoctorOrAdmin && string.IsNullOrWhiteSpace(dto.DiscountAuthorizedBy))
+        {
+            return BadRequest(new { message = "Discounts exceeding 10% require Doctor or Admin authorization PIN verification." });
+        }
+
         var entity = MapToEntity(dto);
         entity.Id = string.IsNullOrEmpty(dto.Id) ? Guid.NewGuid().ToString() : dto.Id;
         await _repo.AddAsync(entity);
@@ -84,6 +92,8 @@ public class BillingController : ControllerBase
 
         var doctorIdClaim = User.GetDoctorId();
         var clinicIdClaim = User.GetClinicId();
+        var isDoctorOrAdmin = User.IsInRole("admin") || User.IsInRole("doctor") || !string.IsNullOrEmpty(doctorIdClaim);
+
         if (!string.IsNullOrEmpty(doctorIdClaim))
         {
             var isAllowed = !string.IsNullOrEmpty(entity.ClinicId) && 
@@ -97,8 +107,19 @@ public class BillingController : ControllerBase
                 return StatusCode(403, new { message = "You can only manage billing for your assigned clinic" });
         }
 
+        // BR-FIN-01: Courtesy Discount Authorization Matrix
+        if (dto.DiscountPercentage > 10 && !isDoctorOrAdmin && string.IsNullOrWhiteSpace(dto.DiscountAuthorizedBy))
+        {
+            return BadRequest(new { message = "Discounts exceeding 10% require Doctor or Admin authorization PIN verification." });
+        }
+
         entity.PatientId = dto.PatientId;
         entity.AppointmentId = dto.AppointmentId;
+        entity.Subtotal = dto.Subtotal > 0 ? dto.Subtotal : dto.Amount;
+        entity.DiscountPercentage = dto.DiscountPercentage;
+        entity.DiscountAmount = dto.DiscountAmount;
+        entity.DiscountReason = dto.DiscountReason;
+        entity.DiscountAuthorizedBy = dto.DiscountAuthorizedBy;
         entity.Amount = dto.Amount;
         entity.PaidAmount = dto.PaidAmount;
         entity.Status = dto.Status;
@@ -144,6 +165,11 @@ public class BillingController : ControllerBase
     private static BillingRecordDto MapToDto(BillingRecord b) => new()
     {
         Id = b.Id, PatientId = b.PatientId, AppointmentId = b.AppointmentId,
+        Subtotal = b.Subtotal,
+        DiscountPercentage = b.DiscountPercentage,
+        DiscountAmount = b.DiscountAmount,
+        DiscountReason = b.DiscountReason,
+        DiscountAuthorizedBy = b.DiscountAuthorizedBy,
         Amount = b.Amount, PaidAmount = b.PaidAmount, Status = b.Status,
         DateIssued = b.DateIssued, PaymentMethod = b.PaymentMethod,
         Description = b.Description, ClinicId = b.ClinicId,
@@ -156,6 +182,11 @@ public class BillingController : ControllerBase
     private static BillingRecord MapToEntity(BillingRecordDto dto) => new()
     {
         Id = dto.Id, PatientId = dto.PatientId, AppointmentId = dto.AppointmentId,
+        Subtotal = dto.Subtotal > 0 ? dto.Subtotal : dto.Amount,
+        DiscountPercentage = dto.DiscountPercentage,
+        DiscountAmount = dto.DiscountAmount,
+        DiscountReason = dto.DiscountReason,
+        DiscountAuthorizedBy = dto.DiscountAuthorizedBy,
         Amount = dto.Amount, PaidAmount = dto.PaidAmount, Status = dto.Status,
         DateIssued = dto.DateIssued, PaymentMethod = dto.PaymentMethod,
         Description = dto.Description, ClinicId = dto.ClinicId,
