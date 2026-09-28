@@ -12,10 +12,35 @@ namespace Clinic.API.Controllers;
 public class MaterialsController : ControllerBase
 {
     private readonly IMaterialRepository _repo;
+    private readonly IMaterialAlertService? _alertService;
 
-    public MaterialsController(IMaterialRepository repo)
+    public MaterialsController(IMaterialRepository repo, IMaterialAlertService? alertService = null)
     {
         _repo = repo;
+        _alertService = alertService;
+    }
+
+    [HttpGet("low-stock")]
+    public async Task<IActionResult> GetLowStock([FromQuery] string? clinicId, [FromQuery] string? doctorId)
+    {
+        var clinicIdClaim = User.FindFirst("clinicId")?.Value;
+        if (!string.IsNullOrEmpty(clinicIdClaim))
+        {
+            clinicId = clinicIdClaim;
+        }
+
+        var materials = await _repo.GetLowStockAsync(clinicId, doctorId);
+        var dtos = materials.Select(m => new MaterialDto
+        {
+            Id = m.Id,
+            ClinicId = m.ClinicId,
+            DoctorId = m.DoctorId,
+            Name = m.Name,
+            Quantity = m.Quantity,
+            Unit = m.Unit,
+            MinStockAlert = m.MinStockAlert
+        });
+        return Ok(new { data = dtos });
     }
 
     [HttpGet("doctor/{doctorId}")]
@@ -91,6 +116,12 @@ public class MaterialsController : ControllerBase
         };
         await _repo.AddAsync(material);
         dto.Id = material.Id;
+
+        if (_alertService != null)
+        {
+            await _alertService.CheckAndTriggerLowStockAlertAsync(material);
+        }
+
         return Ok(new { message = "Material added successfully", data = dto });
     }
 
@@ -114,6 +145,12 @@ public class MaterialsController : ControllerBase
         material.MinStockAlert = dto.MinStockAlert > 0 ? dto.MinStockAlert : 5;
 
         await _repo.UpdateAsync(material);
+
+        if (_alertService != null)
+        {
+            await _alertService.CheckAndTriggerLowStockAlertAsync(material);
+        }
+
         return Ok(new { message = "Material updated successfully", data = dto });
     }
 
