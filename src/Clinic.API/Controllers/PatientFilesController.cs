@@ -92,7 +92,7 @@ public class PatientFilesController : ControllerBase
     }
 
     [HttpGet("{fileName}")]
-    public IActionResult DownloadFile(string patientId, string fileName)
+    public IActionResult DownloadFile(string patientId, string fileName, [FromQuery] bool inline = false)
     {
         var filePath = Path.Combine(_uploadFolder, patientId, fileName);
         if (!System.IO.File.Exists(filePath))
@@ -101,8 +101,27 @@ public class PatientFilesController : ControllerBase
         }
 
         var bytes = System.IO.File.ReadAllBytes(filePath);
-        var contentType = "application/octet-stream";
+        var contentType = GetContentType(fileName);
+        if (inline)
+        {
+            return File(bytes, contentType);
+        }
         return File(bytes, contentType, fileName);
+    }
+
+    private static string GetContentType(string fileName)
+    {
+        var ext = Path.GetExtension(fileName).ToLowerInvariant();
+        return ext switch
+        {
+            ".jpg" or ".jpeg" => "image/jpeg",
+            ".png" => "image/png",
+            ".gif" => "image/gif",
+            ".webp" => "image/webp",
+            ".bmp" => "image/bmp",
+            ".pdf" => "application/pdf",
+            _ => "application/octet-stream"
+        };
     }
 
     [HttpDelete("{fileName}")]
