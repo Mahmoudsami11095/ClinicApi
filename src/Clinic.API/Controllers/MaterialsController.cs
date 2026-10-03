@@ -110,7 +110,11 @@ public class MaterialsController : ControllerBase
             Unit = dto.Unit,
             MinStockAlert = dto.MinStockAlert > 0 ? dto.MinStockAlert : 5,
             ExpirationDate = dto.ExpirationDate,
-            BatchNumber = dto.BatchNumber
+            BatchNumber = dto.BatchNumber,
+            SupplierName = dto.SupplierName,
+            UnitCost = dto.UnitCost,
+            PurchaseOrderRef = dto.PurchaseOrderRef,
+            LastRestockedAt = DateTime.UtcNow.ToString("o")
         };
         await _repo.AddAsync(material);
         dto.Id = material.Id;
@@ -143,6 +147,9 @@ public class MaterialsController : ControllerBase
         material.MinStockAlert = dto.MinStockAlert > 0 ? dto.MinStockAlert : 5;
         material.ExpirationDate = dto.ExpirationDate;
         material.BatchNumber = dto.BatchNumber;
+        material.SupplierName = dto.SupplierName;
+        material.UnitCost = dto.UnitCost;
+        material.PurchaseOrderRef = dto.PurchaseOrderRef;
 
         await _repo.UpdateAsync(material);
 
@@ -171,6 +178,49 @@ public class MaterialsController : ControllerBase
         return Ok(new { message = "Material deleted successfully" });
     }
 
+    /// <summary>
+    /// REQ-INV-02: Records an inward stock shipment / supplier purchase order delivery.
+    /// Increments inventory quantity, updates batch number, expiry date, supplier name, and unit cost.
+    /// </summary>
+    [HttpPost("{id}/inward-shipment")]
+    public async Task<IActionResult> ReceiveInwardShipment(string id, [FromBody] InwardShipmentRequest request)
+    {
+        var material = await _repo.GetByIdAsync(id);
+        if (material == null) return NotFound(new { message = "Material not found" });
+
+        if (request.QuantityReceived <= 0)
+        {
+            return BadRequest(new { message = "Quantity received must be greater than zero." });
+        }
+
+        var clinicIdClaim = User.FindFirst("clinicId")?.Value;
+        if (!string.IsNullOrEmpty(clinicIdClaim) && material.ClinicId != clinicIdClaim)
+        {
+            return StatusCode(403, new { message = "You can only manage materials for your assigned clinic" });
+        }
+
+        material.Quantity += request.QuantityReceived;
+        if (!string.IsNullOrWhiteSpace(request.SupplierName)) material.SupplierName = request.SupplierName;
+        if (!string.IsNullOrWhiteSpace(request.PurchaseOrderRef)) material.PurchaseOrderRef = request.PurchaseOrderRef;
+        if (!string.IsNullOrWhiteSpace(request.BatchNumber)) material.BatchNumber = request.BatchNumber;
+        if (request.ExpirationDate.HasValue) material.ExpirationDate = request.ExpirationDate;
+        if (request.UnitCost.HasValue) material.UnitCost = request.UnitCost;
+        material.LastRestockedAt = DateTime.UtcNow.ToString("o");
+
+        await _repo.UpdateAsync(material);
+
+        if (_alertService != null)
+        {
+            await _alertService.CheckAndTriggerLowStockAlertAsync(material);
+        }
+
+        return Ok(new
+        {
+            message = $"Successfully received inward shipment of {request.QuantityReceived} {material.Unit ?? "units"}.",
+            data = MapToDto(material)
+        });
+    }
+
     private static MaterialDto MapToDto(Material m) => new()
     {
         Id = m.Id,
@@ -181,6 +231,20 @@ public class MaterialsController : ControllerBase
         Unit = m.Unit,
         MinStockAlert = m.MinStockAlert,
         ExpirationDate = m.ExpirationDate,
-        BatchNumber = m.BatchNumber
+        BatchNumber = m.BatchNumber,
+        SupplierName = m.SupplierName,
+        UnitCost = m.UnitCost,
+        LastRestockedAt = m.LastRestockedAt,
+        PurchaseOrderRef = m.PurchaseOrderRef
     };
+}
+
+public class InwardShipmentRequest
+{
+    public int QuantityReceived { get; set; }
+    public string? SupplierName { get; set; }
+    public string? PurchaseOrderRef { get; set; }
+    public string? BatchNumber { get; set; }
+    public DateTime? ExpirationDate { get; set; }
+    public decimal? UnitCost { get; set; }
 }
