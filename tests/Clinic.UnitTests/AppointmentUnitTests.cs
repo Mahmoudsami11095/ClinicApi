@@ -131,4 +131,53 @@ public class AppointmentUnitTests
         Assert.Equal("2026-10-03T11:32:00Z", dto.ConsultationEndedAt);
         Assert.Equal(4, dto.QueueNumber);
     }
+
+    [Fact]
+    public void REQ_NOTIF_02_Appointment_TracksReminderTimestampAndCount()
+    {
+        // Arrange
+        var appt = new Appointment
+        {
+            Id = "apt-rem-1",
+            PatientId = "pat-1",
+            DoctorId = "doc-1",
+            Status = "scheduled"
+        };
+
+        // Act - Simulate sending 2 reminders
+        const string firstReminderTime = "2026-10-02T10:00:00Z";
+        appt.LastReminderSentAt = firstReminderTime;
+        appt.ReminderCount = (appt.ReminderCount ?? 0) + 1;
+
+        Assert.Equal(firstReminderTime, appt.LastReminderSentAt);
+        Assert.Equal(1, appt.ReminderCount);
+
+        const string secondReminderTime = "2026-10-03T08:00:00Z";
+        appt.LastReminderSentAt = secondReminderTime;
+        appt.ReminderCount = (appt.ReminderCount ?? 0) + 1;
+
+        // Assert
+        Assert.Equal(secondReminderTime, appt.LastReminderSentAt);
+        Assert.Equal(2, appt.ReminderCount);
+    }
+
+    [Fact]
+    public void REQ_NOTIF_02_AppointmentDto_PreservesReminderFields()
+    {
+        // Arrange
+        var dto = new AppointmentDto
+        {
+            Id = "apt-rem-dto",
+            PatientId = "pat-1",
+            DoctorId = "doc-1",
+            Date = "2026-10-04T10:00:00Z",
+            Status = "scheduled",
+            LastReminderSentAt = "2026-10-03T09:00:00Z",
+            ReminderCount = 1
+        };
+
+        // Assert
+        Assert.Equal("2026-10-03T09:00:00Z", dto.LastReminderSentAt);
+        Assert.Equal(1, dto.ReminderCount);
+    }
 }
