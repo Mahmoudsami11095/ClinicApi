@@ -133,6 +133,27 @@ public class PrescriptionDto
     public string Date { get; set; } = string.Empty;
     public List<MedicationItemDto> Medications { get; set; } = new();
     public string? Notes { get; set; }
+
+    // BR-RX-02 Immutability & Audit Lock
+    public bool IsFinalized { get; set; } = false;
+    public string Status { get; set; } = "draft";
+    public string? FinalizedAt { get; set; }
+    public string? DigitalSignature { get; set; }
+    public string? SupersedesPrescriptionId { get; set; }
+    public string? SupersededById { get; set; }
+    public string? SupersedeReason { get; set; }
+}
+
+public class FinalizePrescriptionDto
+{
+    public string? DoctorName { get; set; }
+}
+
+public class SupersedePrescriptionDto
+{
+    public string Reason { get; set; } = string.Empty;
+    public List<MedicationItemDto> NewMedications { get; set; } = new();
+    public string? Notes { get; set; }
 }
 
 public class DentalLogDto

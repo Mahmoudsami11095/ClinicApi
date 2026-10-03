@@ -9,6 +9,17 @@ public class Prescription
     public string Date { get; set; } = string.Empty;
     public string? Notes { get; set; }
 
+    /// <summary>
+    /// BR-RX-02: Prescription Immutability & Audit Lock
+    /// </summary>
+    public bool IsFinalized { get; set; } = false;
+    public string Status { get; set; } = "draft"; // "draft" | "finalized" | "superseded"
+    public string? FinalizedAt { get; set; }
+    public string? DigitalSignature { get; set; }
+    public string? SupersedesPrescriptionId { get; set; }
+    public string? SupersededById { get; set; }
+    public string? SupersedeReason { get; set; }
+
     // Owned collection
     public List<MedicationItem> Medications { get; set; } = new();
 
