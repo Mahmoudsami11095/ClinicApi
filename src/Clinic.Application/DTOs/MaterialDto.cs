@@ -9,6 +9,9 @@ public class MaterialDto
     public int Quantity { get; set; }
     public string? Unit { get; set; }
     public int MinStockAlert { get; set; } = 5;
+    public DateTime? ExpirationDate { get; set; }
+    public string? BatchNumber { get; set; }
+    public bool IsExpired => ExpirationDate.HasValue && ExpirationDate.Value.Date < DateTime.UtcNow.Date;
 }
 
 public class ConsumedMaterialDto

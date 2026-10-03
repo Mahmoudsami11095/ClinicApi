@@ -30,16 +30,21 @@ public class MaterialsController : ControllerBase
         }
 
         var materials = await _repo.GetLowStockAsync(clinicId, doctorId);
-        var dtos = materials.Select(m => new MaterialDto
+        var dtos = materials.Select(MapToDto);
+        return Ok(new { data = dtos });
+    }
+
+    [HttpGet("expired")]
+    public async Task<IActionResult> GetExpired([FromQuery] string? clinicId, [FromQuery] string? doctorId)
+    {
+        var clinicIdClaim = User.FindFirst("clinicId")?.Value;
+        if (!string.IsNullOrEmpty(clinicIdClaim))
         {
-            Id = m.Id,
-            ClinicId = m.ClinicId,
-            DoctorId = m.DoctorId,
-            Name = m.Name,
-            Quantity = m.Quantity,
-            Unit = m.Unit,
-            MinStockAlert = m.MinStockAlert
-        });
+            clinicId = clinicIdClaim;
+        }
+
+        var materials = await _repo.GetExpiredAsync(clinicId, doctorId);
+        var dtos = materials.Select(MapToDto);
         return Ok(new { data = dtos });
     }
 
@@ -81,16 +86,7 @@ public class MaterialsController : ControllerBase
             }
         }
 
-        var dtos = materials.Select(m => new MaterialDto
-        {
-            Id = m.Id,
-            ClinicId = m.ClinicId,
-            DoctorId = m.DoctorId,
-            Name = m.Name,
-            Quantity = m.Quantity,
-            Unit = m.Unit,
-            MinStockAlert = m.MinStockAlert
-        });
+        var dtos = materials.Select(MapToDto);
         return Ok(new { data = dtos });
     }
 
@@ -112,7 +108,9 @@ public class MaterialsController : ControllerBase
             Name = dto.Name,
             Quantity = dto.Quantity,
             Unit = dto.Unit,
-            MinStockAlert = dto.MinStockAlert > 0 ? dto.MinStockAlert : 5
+            MinStockAlert = dto.MinStockAlert > 0 ? dto.MinStockAlert : 5,
+            ExpirationDate = dto.ExpirationDate,
+            BatchNumber = dto.BatchNumber
         };
         await _repo.AddAsync(material);
         dto.Id = material.Id;
@@ -122,7 +120,7 @@ public class MaterialsController : ControllerBase
             await _alertService.CheckAndTriggerLowStockAlertAsync(material);
         }
 
-        return Ok(new { message = "Material added successfully", data = dto });
+        return Ok(new { message = "Material added successfully", data = MapToDto(material) });
     }
 
     [HttpPut("{id}")]
@@ -143,6 +141,8 @@ public class MaterialsController : ControllerBase
         material.Unit = dto.Unit;
         material.ClinicId = dto.ClinicId;
         material.MinStockAlert = dto.MinStockAlert > 0 ? dto.MinStockAlert : 5;
+        material.ExpirationDate = dto.ExpirationDate;
+        material.BatchNumber = dto.BatchNumber;
 
         await _repo.UpdateAsync(material);
 
@@ -151,7 +151,7 @@ public class MaterialsController : ControllerBase
             await _alertService.CheckAndTriggerLowStockAlertAsync(material);
         }
 
-        return Ok(new { message = "Material updated successfully", data = dto });
+        return Ok(new { message = "Material updated successfully", data = MapToDto(material) });
     }
 
     [HttpDelete("{id}")]
@@ -170,4 +170,17 @@ public class MaterialsController : ControllerBase
         await _repo.DeleteAsync(id);
         return Ok(new { message = "Material deleted successfully" });
     }
+
+    private static MaterialDto MapToDto(Material m) => new()
+    {
+        Id = m.Id,
+        ClinicId = m.ClinicId,
+        DoctorId = m.DoctorId,
+        Name = m.Name,
+        Quantity = m.Quantity,
+        Unit = m.Unit,
+        MinStockAlert = m.MinStockAlert,
+        ExpirationDate = m.ExpirationDate,
+        BatchNumber = m.BatchNumber
+    };
 }
