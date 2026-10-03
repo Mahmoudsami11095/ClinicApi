@@ -283,11 +283,18 @@ public class ClinicDbContext : DbContext
             entity.HasKey(e => e.Id);
             entity.Property(e => e.Date).HasMaxLength(50);
             entity.Property(e => e.Notes).HasMaxLength(1000);
+            entity.Property(e => e.Status).HasMaxLength(50);
+            entity.Property(e => e.FinalizedAt).HasMaxLength(50);
+            entity.Property(e => e.DigitalSignature).HasMaxLength(500);
+            entity.Property(e => e.SupersedesPrescriptionId).HasMaxLength(100);
+            entity.Property(e => e.SupersededById).HasMaxLength(100);
+            entity.Property(e => e.SupersedeReason).HasMaxLength(1000);
 
             // Indexes for patient and doctor prescription history
             entity.HasIndex(e => e.PatientId);
             entity.HasIndex(e => e.DoctorId);
             entity.HasIndex(e => e.Date);
+            entity.HasIndex(e => e.Status);
 
             entity.HasOne(e => e.Appointment)
                   .WithOne(a => a.Prescription)
