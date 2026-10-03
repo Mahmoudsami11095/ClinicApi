@@ -57,6 +57,21 @@ public class WhatsAppNotificationService : IWhatsAppNotificationService
         return await SendTemplateMessageAsync(phoneNumber, "appointment_cancellation", parameters);
     }
 
+    public async Task<bool> SendAppointmentReminderAsync(string phoneNumber, string patientName, string clinicName, string doctorName, string appointmentType, string date, string time)
+    {
+        var parameters = new[]
+        {
+            new { type = "text", text = patientName }, // {{1}} Patient Name
+            new { type = "text", text = clinicName },  // {{2}} Clinic Name
+            new { type = "text", text = doctorName },  // {{3}} Doctor Name
+            new { type = "text", text = appointmentType }, // {{4}} Appointment Type
+            new { type = "text", text = date },        // {{5}} Date
+            new { type = "text", text = time }         // {{6}} Time
+        };
+
+        return await SendTemplateMessageAsync(phoneNumber, "appointment_reminder", parameters);
+    }
+
     private async Task<bool> SendTemplateMessageAsync(string phoneNumber, string templateName, object[] parameters)
     {
         if (string.IsNullOrWhiteSpace(phoneNumber))

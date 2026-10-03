@@ -19,6 +19,12 @@ public class Appointment
     public string? ConsultationEndedAt { get; set; }
     public int? QueueNumber { get; set; }
 
+    /// <summary>
+    /// REQ-NOTIF-02: Patient Appointment Reminders (WhatsApp & SMS)
+    /// </summary>
+    public string? LastReminderSentAt { get; set; }
+    public int? ReminderCount { get; set; } = 0;
+
     // Navigation properties
     public Patient Patient { get; set; } = null!;
     public Doctor Doctor { get; set; } = null!;

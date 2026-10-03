@@ -212,6 +212,7 @@ public class ClinicDbContext : DbContext
             entity.Property(e => e.ArrivedAt).HasMaxLength(50);
             entity.Property(e => e.ConsultationStartedAt).HasMaxLength(50);
             entity.Property(e => e.ConsultationEndedAt).HasMaxLength(50);
+            entity.Property(e => e.LastReminderSentAt).HasMaxLength(50);
 
             // Compound indexes for scheduling, queue, and availability queries
             entity.HasIndex(e => new { e.ClinicId, e.Date });

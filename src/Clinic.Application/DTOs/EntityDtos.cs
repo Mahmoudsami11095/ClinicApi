@@ -90,6 +90,10 @@ public class AppointmentDto
     public string? ConsultationStartedAt { get; set; }
     public string? ConsultationEndedAt { get; set; }
     public int? QueueNumber { get; set; }
+
+    // REQ-NOTIF-02: Patient Appointment Reminders
+    public string? LastReminderSentAt { get; set; }
+    public int? ReminderCount { get; set; } = 0;
 }
 
 public class PaymentLogDto
