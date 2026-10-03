@@ -9,7 +9,7 @@ namespace Clinic.API.Controllers;
 
 [ApiController]
 [Route("api/clinical-notes")]
-[Authorize]
+[Authorize(Roles = "admin,doctor")]
 public class ClinicalNotesController : ControllerBase
 {
     private readonly IClinicalNoteRepository _noteRepo;

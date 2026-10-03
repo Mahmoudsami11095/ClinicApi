@@ -185,4 +185,45 @@ public class ClinicalNoteIntegrationTests : IClassFixture<CustomWebApplicationFa
         Assert.Equal("doc-test-1", amendments[0].GetProperty("authorId").GetString());
         Assert.Equal("Dr. Test Doctor", amendments[0].GetProperty("authorName").GetString());
     }
+
+    [Fact]
+    public async Task UAT_SEC_01_ReceptionistOrAssistant_CannotAccess_ClinicalNotes_ReturnsForbidden()
+    {
+        // Arrange - Assistant / Receptionist token
+        var assistantToken = GenerateJwtToken(doctorId: "", role: "assistant", clinicId: "clinic-1");
+
+        // Act - Attempt to query confidential clinical encounter notes
+        var request = new HttpRequestMessage(HttpMethod.Get, "/api/clinical-notes?patientId=pat-note-01");
+        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", assistantToken);
+
+        var response = await _client.SendAsync(request);
+
+        // Assert - REQ-SEC-01 / UAT-SEC-01: Front desk access denied
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task UAT_SEC_01_ReceptionistOrAssistant_CannotCreate_ClinicalNotes_ReturnsForbidden()
+    {
+        // Arrange - Assistant / Receptionist token
+        var assistantToken = GenerateJwtToken(doctorId: "", role: "assistant", clinicId: "clinic-1");
+
+        var createDto = new CreateClinicalNoteDto
+        {
+            PatientId = "pat-note-01",
+            Title = "Unauthorized Entry",
+            Notes = "Receptionist attempting clinical entry"
+        };
+
+        var request = new HttpRequestMessage(HttpMethod.Post, "/api/clinical-notes")
+        {
+            Content = new StringContent(JsonSerializer.Serialize(createDto), Encoding.UTF8, "application/json")
+        };
+        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", assistantToken);
+
+        var response = await _client.SendAsync(request);
+
+        // Assert - REQ-SEC-01 / UAT-SEC-01: Front desk cannot record clinical notes
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+    }
 }
