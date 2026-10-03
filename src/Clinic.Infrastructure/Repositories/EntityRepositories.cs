@@ -481,3 +481,33 @@ public class RadiologyRecordRepository : GenericRepository<RadiologyRecord>, IRa
             .AsNoTracking()
             .ToListAsync();
 }
+
+public class ClinicalNoteRepository : GenericRepository<ClinicalNote>, IClinicalNoteRepository
+{
+    public ClinicalNoteRepository(ClinicDbContext context) : base(context) { }
+
+    public override async Task<List<ClinicalNote>> GetAllAsync()
+        => await _dbSet
+            .Include(n => n.Amendments)
+            .AsNoTracking()
+            .ToListAsync();
+
+    public override async Task<ClinicalNote?> GetByIdAsync(string id)
+        => await _dbSet
+            .Include(n => n.Amendments)
+            .FirstOrDefaultAsync(n => n.Id == id);
+
+    public async Task<List<ClinicalNote>> GetByPatientIdAsync(string patientId)
+        => await _dbSet
+            .Include(n => n.Amendments)
+            .Where(n => n.PatientId == patientId)
+            .OrderByDescending(n => n.CreatedAt)
+            .AsNoTracking()
+            .ToListAsync();
+
+    public override Task DeleteAsync(string id)
+    {
+        // BR-RX-03 / BR-MED-01: Medical records cannot be deleted from database.
+        throw new InvalidOperationException("BR-RX-03 / BR-MED-01: Clinical encounter notes cannot be deleted from the database. Medical records are permanent and immutable.");
+    }
+}
