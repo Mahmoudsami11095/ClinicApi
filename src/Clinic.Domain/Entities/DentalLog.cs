@@ -14,6 +14,13 @@ public class DentalLog
     public string? Treatment { get; set; }
     public string? Medication { get; set; }
     public bool IsPlanned { get; set; }
+
+    // BR-DEN-02: Procedure Lifecycle State Machine
+    // Sequential progression: "proposed" -> "accepted" -> "in_progress" -> "completed" -> "invoiced"
+    public string Stage { get; set; } = "proposed";
+    public decimal Cost { get; set; } = 0m;
+    public string? InvoiceId { get; set; }
+
     public string ConsumedMaterials { get; set; } = "[]"; // JSON array of ConsumedMaterialDto objects
     public string? ClinicId { get; set; }
 

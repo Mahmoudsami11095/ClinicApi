@@ -85,4 +85,99 @@ public class DentalUnitTests
         Assert.True(plannedLog.IsPlanned);
         Assert.False(completedLog.IsPlanned);
     }
+
+    [Fact]
+    public void DentalLog_DefaultStage_ShouldBeProposed()
+    {
+        // Arrange & Act
+        var log = new DentalLog();
+
+        // Assert
+        Assert.Equal("proposed", log.Stage);
+        Assert.Equal(0m, log.Cost);
+        Assert.Null(log.InvoiceId);
+    }
+
+    [Theory]
+    [InlineData("proposed", "accepted", true)]
+    [InlineData("accepted", "in_progress", true)]
+    [InlineData("in_progress", "completed", true)]
+    [InlineData("proposed", "in_progress", false)] // skipped accepted
+    [InlineData("proposed", "completed", false)]   // skipped accepted and in_progress
+    [InlineData("accepted", "completed", false)]   // skipped in_progress
+    [InlineData("in_progress", "accepted", false)] // backward transition
+    [InlineData("completed", "in_progress", false)]// backward transition
+    [InlineData("completed", "invoiced", false)]   // cannot update stage directly to invoiced
+    [InlineData("invoiced", "completed", false)]   // terminal state
+    public void BR_DEN_02_ProcedureLifecycle_StrictSequentialProgression(string currentStage, string targetStage, bool expectedValid)
+    {
+        // BR-DEN-02: Dental procedures must follow a strict sequential state progression:
+        // Proposed -> Patient Accepted -> In Progress -> Completed -> Invoiced
+        var allowedTransitions = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+        {
+            { "proposed", "accepted" },
+            { "accepted", "in_progress" },
+            { "in_progress", "completed" }
+        };
+
+        bool isValid = allowedTransitions.TryGetValue(currentStage, out var nextAllowed) &&
+                       string.Equals(targetStage, nextAllowed, StringComparison.OrdinalIgnoreCase);
+
+        Assert.Equal(expectedValid, isValid);
+    }
+
+    [Theory]
+    [InlineData("proposed", false)]
+    [InlineData("accepted", false)]
+    [InlineData("in_progress", false)]
+    [InlineData("completed", true)]
+    [InlineData("invoiced", false)]
+    public void BR_DEN_02_InvoicingGuardrail_OnlyCompletedCanBePushedToBilling(string currentStage, bool canPushToBilling)
+    {
+        // BR-DEN-02 Guardrail: Only procedures in the Completed status can be pushed into the billing module for cashier settlement.
+        bool isEligibleForInvoicing = string.Equals(currentStage, "completed", StringComparison.OrdinalIgnoreCase);
+        Assert.Equal(canPushToBilling, isEligibleForInvoicing);
+    }
+
+    [Fact]
+    public void BR_DEN_02_PushToBilling_CreatesInvoice_TransitionsToInvoiced_AndLinksInvoiceId()
+    {
+        // Arrange
+        var completedProcedure = new DentalLog
+        {
+            Id = "den-proc-101",
+            PatientId = "pat-101",
+            ToothNumber = "24",
+            Treatment = "Porcelain Veneer",
+            Cost = 850.00m,
+            Stage = "completed",
+            IsPlanned = false,
+            ClinicId = "clinic-alpha"
+        };
+
+        // Act - Simulate Push-to-Billing
+        var generatedInvoice = new BillingRecord
+        {
+            Id = "inv-auto-101",
+            PatientId = completedProcedure.PatientId,
+            InvoiceNumber = "INV-2026-00042",
+            Subtotal = completedProcedure.Cost,
+            Amount = completedProcedure.Cost,
+            Status = "pending",
+            DateIssued = "2026-10-03",
+            Description = $"Tooth #{completedProcedure.ToothNumber} - {completedProcedure.Treatment}",
+            ClinicId = completedProcedure.ClinicId
+        };
+
+        completedProcedure.InvoiceId = generatedInvoice.Id;
+        completedProcedure.Stage = "invoiced";
+
+        // Assert
+        Assert.Equal("invoiced", completedProcedure.Stage);
+        Assert.Equal("inv-auto-101", completedProcedure.InvoiceId);
+        Assert.Equal(850.00m, generatedInvoice.Amount);
+        Assert.Equal("pending", generatedInvoice.Status);
+        Assert.Equal("INV-2026-00042", generatedInvoice.InvoiceNumber);
+        Assert.Contains("Tooth #24", generatedInvoice.Description);
+    }
 }

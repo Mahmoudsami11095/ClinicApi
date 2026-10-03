@@ -149,6 +149,15 @@ public class DentalLogDto
     public string? Treatment { get; set; }
     public string? Medication { get; set; }
     public bool IsPlanned { get; set; }
+    // BR-DEN-02: Procedure Lifecycle State Machine ("proposed", "accepted", "in_progress", "completed", "invoiced")
+    public string Stage { get; set; } = "proposed";
+    public decimal Cost { get; set; } = 0m;
+    public string? InvoiceId { get; set; }
     public List<ConsumedMaterialDto> ConsumedMaterials { get; set; } = new();
     public string? ClinicId { get; set; }
+}
+
+public class UpdateDentalStageDto
+{
+    public string Stage { get; set; } = string.Empty;
 }
