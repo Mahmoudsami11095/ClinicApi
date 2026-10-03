@@ -18,6 +18,10 @@ public class ClinicDto
     public string? City { get; set; }
     public string? State { get; set; }
     public string? Country { get; set; }
+
+    // REQ-CLI-03: Multi-Branch & Multi-Room Management
+    public string? BranchCode { get; set; }
+    public string? Rooms { get; set; }
 }
 
 public class PatientDto
@@ -98,6 +102,9 @@ public class AppointmentDto
     // REQ-NOTIF-02: Patient Appointment Reminders
     public string? LastReminderSentAt { get; set; }
     public int? ReminderCount { get; set; } = 0;
+
+    // REQ-CLI-03: Multi-Branch & Multi-Room Management
+    public string? RoomNumber { get; set; }
 }
 
 public class PaymentLogDto

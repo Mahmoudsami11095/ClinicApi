@@ -25,6 +25,11 @@ public class Appointment
     public string? LastReminderSentAt { get; set; }
     public int? ReminderCount { get; set; } = 0;
 
+    /// <summary>
+    /// REQ-CLI-03: Multi-Branch & Multi-Room Management
+    /// </summary>
+    public string? RoomNumber { get; set; }
+
     // Navigation properties
     public Patient Patient { get; set; } = null!;
     public Doctor Doctor { get; set; } = null!;
