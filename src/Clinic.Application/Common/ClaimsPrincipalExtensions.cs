@@ -30,4 +30,11 @@ public static class ClaimsPrincipalExtensions
     {
         return principal?.FindFirst(ClaimTypes.Email)?.Value;
     }
+
+    public static string? GetUserName(this ClaimsPrincipal? principal)
+    {
+        return principal?.FindFirst(ClaimTypes.Name)?.Value 
+            ?? principal?.FindFirst("name")?.Value 
+            ?? principal?.Identity?.Name;
+    }
 }

@@ -43,6 +43,7 @@ public static class DependencyInjection
         services.AddScoped<INotificationRepository, NotificationRepository>();
         services.AddScoped<IRadiologyCenterRepository, RadiologyCenterRepository>();
         services.AddScoped<IRadiologyRecordRepository, RadiologyRecordRepository>();
+        services.AddScoped<IClinicalNoteRepository, ClinicalNoteRepository>();
         services.AddScoped(typeof(IGenericRepository<>), typeof(GenericRepository<>));
 
         // ── Services ──

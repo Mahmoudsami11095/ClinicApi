@@ -26,6 +26,7 @@ public class ClinicDbContext : DbContext
     public DbSet<PromoCode> PromoCodes => Set<PromoCode>();
     public DbSet<SubscriptionSetting> SubscriptionSettings => Set<SubscriptionSetting>();
     public DbSet<SubscriptionReceipt> SubscriptionReceipts => Set<SubscriptionReceipt>();
+    public DbSet<ClinicalNote> ClinicalNotes => Set<ClinicalNote>();
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
@@ -468,6 +469,49 @@ public class ClinicDbContext : DbContext
             entity.Property(e => e.DoctorId).IsRequired().HasMaxLength(100);
             entity.Property(e => e.ReceiptUrl).IsRequired().HasMaxLength(1000);
             entity.Property(e => e.Status).IsRequired().HasMaxLength(50);
+        });
+
+        // ── ClinicalNote (BR-RX-03 / BR-MED-01) ──
+        modelBuilder.Entity<ClinicalNote>(entity =>
+        {
+            entity.ToTable("ClinicalNotes");
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.PatientId).IsRequired().HasMaxLength(100);
+            entity.Property(e => e.DoctorId).IsRequired().HasMaxLength(100);
+            entity.Property(e => e.DoctorName).HasMaxLength(200);
+            entity.Property(e => e.ClinicId).HasMaxLength(100);
+            entity.Property(e => e.CreatedAt).HasMaxLength(50);
+            entity.Property(e => e.Title).HasMaxLength(200);
+            entity.Property(e => e.Category).HasMaxLength(100);
+            entity.Property(e => e.Notes).HasMaxLength(4000).IsRequired();
+
+            entity.HasIndex(e => e.PatientId);
+            entity.HasIndex(e => e.DoctorId);
+            entity.HasIndex(e => e.ClinicId);
+
+            entity.HasOne(e => e.Patient)
+                  .WithMany(p => p.ClinicalNotes)
+                  .HasForeignKey(e => e.PatientId)
+                  .OnDelete(DeleteBehavior.NoAction);
+
+            entity.HasOne(e => e.Clinic)
+                  .WithMany()
+                  .HasForeignKey(e => e.ClinicId)
+                  .IsRequired(false)
+                  .OnDelete(DeleteBehavior.SetNull);
+
+            // Owned collection for legal immutable amendment audit trail
+            entity.OwnsMany(e => e.Amendments, amendment =>
+            {
+                amendment.ToTable("ClinicalNoteAmendments");
+                amendment.HasKey(a => a.Id);
+                amendment.Property(a => a.OriginalNoteId).HasMaxLength(100);
+                amendment.Property(a => a.AmendedText).HasMaxLength(4000).IsRequired();
+                amendment.Property(a => a.Reason).HasMaxLength(500);
+                amendment.Property(a => a.AuthorId).HasMaxLength(100);
+                amendment.Property(a => a.AuthorName).HasMaxLength(200);
+                amendment.Property(a => a.Timestamp).HasMaxLength(50);
+            });
         });
     }
 }

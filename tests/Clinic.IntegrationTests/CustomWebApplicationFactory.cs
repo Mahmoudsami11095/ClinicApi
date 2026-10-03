@@ -8,9 +8,12 @@ namespace Clinic.IntegrationTests;
 
 public class CustomWebApplicationFactory : WebApplicationFactory<Program>
 {
+    private readonly string _dbName = "ClinicIntegrationTestDb_" + Guid.NewGuid().ToString();
+
     static CustomWebApplicationFactory()
     {
         Environment.SetEnvironmentVariable("UseInMemoryDatabase", "true");
+        Environment.SetEnvironmentVariable("Jwt__Secret", "SuperSecretTestingKeyThatIsAtLeast32BytesLong!");
         Environment.SetEnvironmentVariable("Jwt__Key", "SuperSecretTestingKeyThatIsAtLeast32BytesLong!");
         Environment.SetEnvironmentVariable("Jwt__Issuer", "ClinicApiTesting");
         Environment.SetEnvironmentVariable("Jwt__Audience", "ClinicAppTesting");
@@ -22,7 +25,7 @@ public class CustomWebApplicationFactory : WebApplicationFactory<Program>
         {
             services.AddDbContext<ClinicDbContext>(options =>
             {
-                options.UseInMemoryDatabase("ClinicIntegrationTestDb_" + Guid.NewGuid().ToString());
+                options.UseInMemoryDatabase(_dbName);
             });
         });
 
