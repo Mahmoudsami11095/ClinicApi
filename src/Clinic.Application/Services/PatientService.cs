@@ -203,6 +203,31 @@ public class PatientService : IPatientService
         await _repo.DeleteAsync(id);
     }
 
+    public async Task<PatientDto> SaveConsentSignatureAsync(string patientId, string signature, string? doctorIdClaim, string? clinicIdClaim = null)
+    {
+        var existing = await _repo.GetByIdAsync(patientId);
+        if (existing == null)
+            throw new KeyNotFoundException("Patient not found");
+
+        if (!string.IsNullOrEmpty(doctorIdClaim))
+        {
+            var isAllowed = await IsDoctorAuthorizedAsync(doctorIdClaim, existing.ClinicId);
+            if (!isAllowed)
+                throw new UnauthorizedAccessException("You can only manage patients for your clinics");
+        }
+        else if (!string.IsNullOrEmpty(clinicIdClaim))
+        {
+            if (existing.ClinicId != clinicIdClaim)
+                throw new UnauthorizedAccessException("You can only manage patients for your assigned clinic");
+        }
+
+        existing.ConsentSignature = signature;
+        existing.ConsentSignedAt = DateTime.UtcNow.ToString("o");
+
+        await _repo.UpdateAsync(existing);
+        return MapToDto(existing);
+    }
+
     private async Task<List<string>> GetAllowedClinicIdsAsync(string doctorId)
     {
         var ids = await _clinicRepo.GetAllowedClinicIdsForDoctorAsync(doctorId);
@@ -240,6 +265,8 @@ public class PatientService : IPatientService
         Latitude = p.Latitude, Longitude = p.Longitude,
         City = p.City, State = p.State, Country = p.Country,
         RegistrationDate = p.RegistrationDate, ClinicId = p.ClinicId,
-        Allergies = p.Allergies, ChronicDiseases = p.ChronicDiseases, PastIllnesses = p.PastIllnesses
+        Allergies = p.Allergies, ChronicDiseases = p.ChronicDiseases, PastIllnesses = p.PastIllnesses,
+        ConsentSignature = p.ConsentSignature,
+        ConsentSignedAt = p.ConsentSignedAt
     };
 }

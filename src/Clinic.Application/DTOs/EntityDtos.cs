@@ -43,6 +43,10 @@ public class PatientDto
     public string? Allergies { get; set; }
     public string? ChronicDiseases { get; set; }
     public string? PastIllnesses { get; set; }
+
+    // REQ-PAT-03: Patient Document & Consent E-Signatures
+    public string? ConsentSignature { get; set; }
+    public string? ConsentSignedAt { get; set; }
 }
 
 public class DoctorAvailabilityDto
