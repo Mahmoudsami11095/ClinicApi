@@ -12,6 +12,12 @@ public class MaterialDto
     public DateTime? ExpirationDate { get; set; }
     public string? BatchNumber { get; set; }
     public bool IsExpired => ExpirationDate.HasValue && ExpirationDate.Value.Date < DateTime.UtcNow.Date;
+
+    // REQ-INV-02: Supplier & Purchase Order Workflow
+    public string? SupplierName { get; set; }
+    public decimal? UnitCost { get; set; }
+    public string? LastRestockedAt { get; set; }
+    public string? PurchaseOrderRef { get; set; }
 }
 
 public class ConsumedMaterialDto

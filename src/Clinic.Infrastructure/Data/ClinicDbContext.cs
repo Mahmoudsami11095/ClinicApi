@@ -390,6 +390,10 @@ public class ClinicDbContext : DbContext
             entity.Property(e => e.Name).HasMaxLength(200).IsRequired();
             entity.Property(e => e.DoctorId).IsRequired();
             entity.Property(e => e.Unit).HasMaxLength(50);
+            entity.Property(e => e.SupplierName).HasMaxLength(200);
+            entity.Property(e => e.PurchaseOrderRef).HasMaxLength(100);
+            entity.Property(e => e.UnitCost).HasPrecision(18, 2);
+            entity.Property(e => e.LastRestockedAt).HasMaxLength(50);
 
             // Indexes for stock lookups
             entity.HasIndex(e => e.DoctorId);
