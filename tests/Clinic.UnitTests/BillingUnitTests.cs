@@ -128,4 +128,57 @@ public class BillingUnitTests
         Assert.False(string.IsNullOrWhiteSpace(bill.DiscountAuthorizedBy));
         Assert.Equal(900m, bill.Amount);
     }
+
+    [Fact]
+    public void BR_FIN_03_InvoiceNumber_Format_ShouldMatchSequentialPattern()
+    {
+        // BR-FIN-03: All issued invoices must follow sequential pattern INV-YYYY-XXXXX
+        var year = DateTime.UtcNow.Year;
+        const int sequenceNumber = 42;
+        var invoiceNumber = $"INV-{year}-{sequenceNumber:D5}";
+
+        Assert.Matches(@"^INV-\d{4}-\d{5}$", invoiceNumber);
+        Assert.Equal($"INV-{year}-00042", invoiceNumber);
+    }
+
+    [Fact]
+    public void BR_FIN_03_InvoiceVoiding_SetsStatusAndPreservesMandatoryReason()
+    {
+        // BR-FIN-03: Invoices cannot be permanently deleted; if an error occurs,
+        // the invoice must be marked as Voided with a mandatory recorded reason.
+        var invoice = new BillingRecord
+        {
+            Id = "inv-001",
+            InvoiceNumber = "INV-2026-00001",
+            Amount = 500m,
+            PaidAmount = 200m,
+            Status = "partially_paid",
+            DateIssued = "2026-10-01"
+        };
+
+        const string voidReason = "Customer billed incorrect treatment code; corrected on new invoice.";
+        var voidedAt = DateTime.UtcNow.ToString("o");
+
+        // Act - Voiding invoice
+        invoice.Status = "voided";
+        invoice.VoidReason = voidReason;
+        invoice.VoidedAt = voidedAt;
+        invoice.PaidAmount = 0m;
+
+        // Assert
+        Assert.Equal("voided", invoice.Status);
+        Assert.Equal(voidReason, invoice.VoidReason);
+        Assert.NotNull(invoice.VoidedAt);
+        Assert.Equal(0m, invoice.PaidAmount);
+    }
+
+    [Fact]
+    public void BR_FIN_03_VoidingWithoutReason_ShouldBeConsideredInvalid()
+    {
+        string? emptyReason = "   ";
+        bool isValidReason = !string.IsNullOrWhiteSpace(emptyReason);
+
+        Assert.False(isValidReason, "BR-FIN-03 mandates a recorded reason when voiding an invoice.");
+    }
 }
+

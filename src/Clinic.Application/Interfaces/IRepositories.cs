@@ -44,7 +44,11 @@ public interface IDoctorRepository : IGenericRepository<Doctor>
 
 public interface IAppointmentRepository : IGenericRepository<Appointment> { }
 
-public interface IBillingRepository : IGenericRepository<BillingRecord> { }
+public interface IBillingRepository : IGenericRepository<BillingRecord>
+{
+    // BR-FIN-03: Generate sequential gapless invoice number per clinic
+    Task<string> GetNextInvoiceNumberAsync(string? clinicId);
+}
 
 public interface IPrescriptionRepository : IGenericRepository<Prescription> { }
 

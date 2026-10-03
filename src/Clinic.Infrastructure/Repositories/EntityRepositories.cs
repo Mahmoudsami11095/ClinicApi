@@ -170,6 +170,37 @@ public class BillingRepository : GenericRepository<BillingRecord>, IBillingRepos
 
     public override async Task<List<BillingRecord>> GetAllAsync()
         => await _dbSet.Include(b => b.Payments).AsNoTracking().ToListAsync();
+
+    // BR-FIN-03: Generate sequential, gapless invoice number per clinic
+    public async Task<string> GetNextInvoiceNumberAsync(string? clinicId)
+    {
+        var year = DateTime.UtcNow.Year;
+        var prefix = $"INV-{year}-";
+
+        // Find the highest existing sequence number for this clinic and year
+        var existingNumbers = await _dbSet
+            .Where(b => b.InvoiceNumber.StartsWith(prefix) &&
+                        (clinicId == null || b.ClinicId == clinicId))
+            .Select(b => b.InvoiceNumber)
+            .ToListAsync();
+
+        int maxSeq = 0;
+        foreach (var num in existingNumbers)
+        {
+            var seqPart = num.Substring(prefix.Length);
+            if (int.TryParse(seqPart, out var seq) && seq > maxSeq)
+                maxSeq = seq;
+        }
+
+        return $"{prefix}{(maxSeq + 1).ToString("D5")}";
+    }
+
+    // BR-FIN-03: Block permanent deletion — invoices must be voided, not deleted
+    public override Task DeleteAsync(string id)
+    {
+        throw new InvalidOperationException(
+            "BR-FIN-03: Invoices cannot be permanently deleted. Use the Void endpoint instead.");
+    }
 }
 
 public class PrescriptionRepository : GenericRepository<Prescription>, IPrescriptionRepository
