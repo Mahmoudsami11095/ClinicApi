@@ -331,6 +331,11 @@ public class ClinicDbContext : DbContext
             entity.Property(e => e.Medication).HasMaxLength(500);
             entity.Property(e => e.ConsumedMaterials).HasMaxLength(2000); // JSON array
 
+            // BR-DEN-02: Procedure Lifecycle State Machine
+            entity.Property(e => e.Stage).HasMaxLength(50).HasDefaultValue("proposed");
+            entity.Property(e => e.Cost).HasPrecision(18, 2);
+            entity.Property(e => e.InvoiceId).HasMaxLength(100);
+
             // Indexes for tooth odontogram history
             entity.HasIndex(e => e.PatientId);
             entity.HasIndex(e => new { e.PatientId, e.ToothNumber });

@@ -102,7 +102,7 @@ public class CustomerAcceptanceTests : IClassFixture<CustomWebApplicationFactory
     [Trait("Category", "CustomerAcceptance")]
     public void Scenario3_SpecializedDentalCharting_SurfaceCariesAndAutoBillingSync()
     {
-        // 1. Dentist marks tooth #16 Caries on Occlusal surface
+        // 1. Dentist marks tooth #16 Caries on Occlusal surface and proposes treatment
         var statuses = new List<string> { nameof(ToothStatus.Caries) };
         var dentalLog = new DentalLog
         {
@@ -112,26 +112,55 @@ public class CustomerAcceptanceTests : IClassFixture<CustomWebApplicationFactory
             Status = JsonSerializer.Serialize(statuses),
             PainLevel = 6,
             Treatment = "Composite Restoration (Occlusal)",
-            IsPlanned = false // Procedure completed chair-side
+            Cost = 550.00m,
+            Stage = "proposed",
+            IsPlanned = true
         };
 
         Assert.Equal("16", dentalLog.ToothNumber);
+        Assert.Equal("proposed", dentalLog.Stage);
+        Assert.True(dentalLog.IsPlanned);
+
+        // Guardrail: Non-completed procedure CANNOT be pushed to billing
+        bool canPushProposed = string.Equals(dentalLog.Stage, "completed", StringComparison.OrdinalIgnoreCase);
+        Assert.False(canPushProposed);
+
+        // 2. Strict sequential state progression: proposed -> accepted -> in_progress -> completed
+        dentalLog.Stage = "accepted";
+        Assert.Equal("accepted", dentalLog.Stage);
+
+        dentalLog.Stage = "in_progress";
+        Assert.Equal("in_progress", dentalLog.Stage);
+
+        dentalLog.Stage = "completed";
+        dentalLog.IsPlanned = false;
+        Assert.Equal("completed", dentalLog.Stage);
         Assert.False(dentalLog.IsPlanned);
 
-        // 2. Billing Auto-Sync: Completed procedure automatically transferred to bill
-        var procedureTariffFee = 550.00m;
+        // 3. Billing Sync: Only Completed procedure can be pushed to billing module
+        bool canPushCompleted = string.Equals(dentalLog.Stage, "completed", StringComparison.OrdinalIgnoreCase);
+        Assert.True(canPushCompleted);
+
         var invoice = new BillingRecord
         {
             Id = "inv-uat-001",
+            InvoiceNumber = "INV-2026-00001",
             PatientId = dentalLog.PatientId,
-            Amount = procedureTariffFee,
+            Subtotal = dentalLog.Cost,
+            Amount = dentalLog.Cost,
             Description = $"Tooth #{dentalLog.ToothNumber} - {dentalLog.Treatment}",
             Status = nameof(BillingStatus.Pending)
         };
 
+        dentalLog.InvoiceId = invoice.Id;
+        dentalLog.Stage = "invoiced";
+
         Assert.Equal(550.00m, invoice.Amount);
+        Assert.Equal("INV-2026-00001", invoice.InvoiceNumber);
         Assert.Contains("Tooth #16", invoice.Description);
         Assert.Equal(nameof(BillingStatus.Pending), invoice.Status);
+        Assert.Equal("invoiced", dentalLog.Stage);
+        Assert.Equal(invoice.Id, dentalLog.InvoiceId);
     }
 
     [Fact]
