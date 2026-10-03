@@ -98,6 +98,7 @@ public class BillingRecordDto
     public string Id { get; set; } = string.Empty;
     public string PatientId { get; set; } = string.Empty;
     public string? AppointmentId { get; set; }
+    public string InvoiceNumber { get; set; } = string.Empty; // BR-FIN-03
     public decimal Subtotal { get; set; }
     public decimal DiscountPercentage { get; set; }
     public decimal DiscountAmount { get; set; }
@@ -110,6 +111,8 @@ public class BillingRecordDto
     public string? PaymentMethod { get; set; }
     public string? Description { get; set; }
     public string? ClinicId { get; set; }
+    public string? VoidReason { get; set; }  // BR-FIN-03
+    public string? VoidedAt { get; set; }    // BR-FIN-03
     public List<PaymentLogDto>? Payments { get; set; }
 }
 

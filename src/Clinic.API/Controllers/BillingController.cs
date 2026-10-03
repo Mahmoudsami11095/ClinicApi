@@ -80,8 +80,14 @@ public class BillingController : ControllerBase
 
         var entity = MapToEntity(dto);
         entity.Id = string.IsNullOrEmpty(dto.Id) ? Guid.NewGuid().ToString() : dto.Id;
+
+        // BR-FIN-03: Generate sequential gapless invoice number
+        entity.InvoiceNumber = await _repo.GetNextInvoiceNumberAsync(dto.ClinicId);
+
         await _repo.AddAsync(entity);
-        return Ok(new { message = "Success", data = dto });
+
+        var resultDto = MapToDto(entity);
+        return Ok(new { message = "Success", data = resultDto });
     }
 
     [HttpPut("{id}")]
@@ -89,6 +95,12 @@ public class BillingController : ControllerBase
     {
         var entity = await _repo.GetByIdAsync(id);
         if (entity == null) return NotFound(new { message = "Not found" });
+
+        // BR-FIN-03: Voided invoices are immutable — cannot be edited
+        if (entity.Status == "voided")
+        {
+            return BadRequest(new { message = "BR-FIN-03: Voided invoices are permanently locked and cannot be modified." });
+        }
 
         var doctorIdClaim = User.GetDoctorId();
         var clinicIdClaim = User.GetClinicId();
@@ -162,9 +174,44 @@ public class BillingController : ControllerBase
         return Ok(new { message = "Success", data = MapToDto(entity) });
     }
 
+    // BR-FIN-03: Void endpoint — replaces DELETE. Requires mandatory reason.
+    [HttpPut("{id}/void")]
+    public async Task<IActionResult> VoidInvoice(string id, [FromBody] VoidInvoiceRequest request)
+    {
+        if (string.IsNullOrWhiteSpace(request.Reason) || request.Reason.Trim().Length < 5)
+        {
+            return BadRequest(new { message = "BR-FIN-03: A void reason with at least 5 characters is mandatory when voiding an invoice." });
+        }
+
+        var entity = await _repo.GetByIdAsync(id);
+        if (entity == null) return NotFound(new { message = "Not found" });
+
+        if (entity.Status == "voided")
+        {
+            return BadRequest(new { message = "This invoice has already been voided." });
+        }
+
+        entity.Status = "voided";
+        entity.VoidReason = request.Reason.Trim();
+        entity.VoidedAt = DateTime.UtcNow.ToString("o");
+        entity.PaidAmount = 0;
+
+        await _repo.UpdateAsync(entity);
+
+        return Ok(new { message = "Invoice voided successfully.", data = MapToDto(entity) });
+    }
+
+    // BR-FIN-03: DELETE endpoint is explicitly blocked
+    [HttpDelete("{id}")]
+    public IActionResult Delete(string id)
+    {
+        return BadRequest(new { message = "BR-FIN-03: Invoices cannot be permanently deleted. Use PUT /api/billing/{id}/void to void an invoice with a mandatory reason." });
+    }
+
     private static BillingRecordDto MapToDto(BillingRecord b) => new()
     {
         Id = b.Id, PatientId = b.PatientId, AppointmentId = b.AppointmentId,
+        InvoiceNumber = b.InvoiceNumber,
         Subtotal = b.Subtotal,
         DiscountPercentage = b.DiscountPercentage,
         DiscountAmount = b.DiscountAmount,
@@ -173,6 +220,8 @@ public class BillingController : ControllerBase
         Amount = b.Amount, PaidAmount = b.PaidAmount, Status = b.Status,
         DateIssued = b.DateIssued, PaymentMethod = b.PaymentMethod,
         Description = b.Description, ClinicId = b.ClinicId,
+        VoidReason = b.VoidReason,
+        VoidedAt = b.VoidedAt,
         Payments = b.Payments.Select(p => new PaymentLogDto
         {
             Amount = p.Amount, Date = p.Date, PaymentMethod = p.PaymentMethod
@@ -182,6 +231,7 @@ public class BillingController : ControllerBase
     private static BillingRecord MapToEntity(BillingRecordDto dto) => new()
     {
         Id = dto.Id, PatientId = dto.PatientId, AppointmentId = dto.AppointmentId,
+        InvoiceNumber = dto.InvoiceNumber,
         Subtotal = dto.Subtotal > 0 ? dto.Subtotal : dto.Amount,
         DiscountPercentage = dto.DiscountPercentage,
         DiscountAmount = dto.DiscountAmount,
@@ -190,9 +240,17 @@ public class BillingController : ControllerBase
         Amount = dto.Amount, PaidAmount = dto.PaidAmount, Status = dto.Status,
         DateIssued = dto.DateIssued, PaymentMethod = dto.PaymentMethod,
         Description = dto.Description, ClinicId = dto.ClinicId,
+        VoidReason = dto.VoidReason,
+        VoidedAt = dto.VoidedAt,
         Payments = (dto.Payments ?? new()).Select(p => new PaymentLog
         {
             Amount = p.Amount, Date = p.Date, PaymentMethod = p.PaymentMethod
         }).ToList()
     };
+}
+
+// BR-FIN-03: Void request payload
+public class VoidInvoiceRequest
+{
+    public string Reason { get; set; } = string.Empty;
 }
