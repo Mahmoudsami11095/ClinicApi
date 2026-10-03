@@ -173,7 +173,8 @@ public class AppointmentsController : ControllerBase
             Id = string.IsNullOrEmpty(dto.Id) ? Guid.NewGuid().ToString() : dto.Id,
             PatientId = dto.PatientId, DoctorId = dto.DoctorId,
             Date = dto.Date, Status = dto.Status, Type = dto.Type,
-            Notes = dto.Notes, ClinicId = dto.ClinicId
+            Notes = dto.Notes, ClinicId = dto.ClinicId,
+            RoomNumber = dto.RoomNumber
         };
         await _repo.AddAsync(entity);
 
@@ -250,6 +251,7 @@ public class AppointmentsController : ControllerBase
         entity.Type = dto.Type;
         entity.Notes = dto.Notes;
         entity.ClinicId = dto.ClinicId;
+        entity.RoomNumber = dto.RoomNumber;
         await _repo.UpdateAsync(entity);
 
         return Ok(new { message = "Success", data = dto });
@@ -384,11 +386,11 @@ public class AppointmentsController : ControllerBase
     }
 
     /// <summary>
-    /// REQ-APT-02: Doctor calls patient into exam room.
-    /// Advances status to "in_consultation" and stamps ConsultationStartedAt.
+    /// REQ-APT-02 & REQ-CLI-03: Doctor calls patient into exam room.
+    /// Advances status to "in_consultation", stamps ConsultationStartedAt, and optionally assigns room/chair.
     /// </summary>
     [HttpPost("{id}/start-consultation")]
-    public async Task<IActionResult> StartConsultation(string id)
+    public async Task<IActionResult> StartConsultation(string id, [FromQuery] string? roomNumber = null)
     {
         var entity = await _repo.GetByIdAsync(id);
         if (entity == null) return NotFound(new { message = "Appointment not found" });
@@ -408,6 +410,10 @@ public class AppointmentsController : ControllerBase
 
         entity.Status = "in_consultation";
         entity.ConsultationStartedAt = DateTime.UtcNow.ToString("o");
+        if (!string.IsNullOrEmpty(roomNumber))
+        {
+            entity.RoomNumber = roomNumber;
+        }
 
         await _repo.UpdateAsync(entity);
 
@@ -635,6 +641,7 @@ public class AppointmentsController : ControllerBase
         ConsultationEndedAt = a.ConsultationEndedAt,
         QueueNumber = a.QueueNumber,
         LastReminderSentAt = a.LastReminderSentAt,
-        ReminderCount = a.ReminderCount ?? 0
+        ReminderCount = a.ReminderCount ?? 0,
+        RoomNumber = a.RoomNumber
     };
 }

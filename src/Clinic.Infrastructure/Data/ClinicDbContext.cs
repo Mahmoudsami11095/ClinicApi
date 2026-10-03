@@ -41,6 +41,8 @@ public class ClinicDbContext : DbContext
             entity.Property(e => e.Phone).HasMaxLength(50);
             entity.Property(e => e.AvailabilityHours).HasMaxLength(50);
             entity.Property(e => e.AvailabilityDays).HasMaxLength(500);
+            entity.Property(e => e.BranchCode).HasMaxLength(50);
+            entity.Property(e => e.Rooms).HasMaxLength(500);
         });
 
         // ── User ──
@@ -214,6 +216,7 @@ public class ClinicDbContext : DbContext
             entity.Property(e => e.ConsultationStartedAt).HasMaxLength(50);
             entity.Property(e => e.ConsultationEndedAt).HasMaxLength(50);
             entity.Property(e => e.LastReminderSentAt).HasMaxLength(50);
+            entity.Property(e => e.RoomNumber).HasMaxLength(100);
 
             // Compound indexes for scheduling, queue, and availability queries
             entity.HasIndex(e => new { e.ClinicId, e.Date });

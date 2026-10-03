@@ -17,6 +17,10 @@ public class ClinicEntity
     public string? State { get; set; }
     public string? Country { get; set; }
 
+    // REQ-CLI-03: Multi-Branch & Multi-Room Management
+    public string? BranchCode { get; set; }
+    public string? Rooms { get; set; }
+
     // Navigation properties
     public ICollection<DoctorClinic> DoctorClinics { get; set; } = new List<DoctorClinic>();
     public ICollection<Patient> Patients { get; set; } = new List<Patient>();
