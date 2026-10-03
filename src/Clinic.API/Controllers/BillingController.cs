@@ -174,6 +174,73 @@ public class BillingController : ControllerBase
         return Ok(new { message = "Success", data = MapToDto(entity) });
     }
 
+    /// <summary>
+    /// REQ-BIL-02: Records a split payment or additional installment for an existing invoice.
+    /// Recalculates PaidAmount and updates Status ('paid' if fully paid, 'partially_paid' if partial).
+    /// </summary>
+    [HttpPost("{id}/payments")]
+    public async Task<IActionResult> AddPayment(string id, [FromBody] AddPaymentRequest request)
+    {
+        var entity = await _repo.GetByIdAsync(id);
+        if (entity == null) return NotFound(new { message = "Invoice not found" });
+
+        // BR-FIN-03: Cannot add payments to voided invoice
+        if (entity.Status == "voided")
+        {
+            return BadRequest(new { message = "Cannot add payments to a voided invoice." });
+        }
+
+        if (request.Amount <= 0)
+        {
+            return BadRequest(new { message = "Payment amount must be greater than zero." });
+        }
+
+        var doctorIdClaim = User.GetDoctorId();
+        var clinicIdClaim = User.GetClinicId();
+        if (!string.IsNullOrEmpty(doctorIdClaim))
+        {
+            var isAllowed = !string.IsNullOrEmpty(entity.ClinicId) && 
+                            await _clinicRepo.IsDoctorAuthorizedForClinicAsync(doctorIdClaim, entity.ClinicId);
+            if (!isAllowed) return StatusCode(403, new { message = "You can only manage billing for your clinics" });
+        }
+        else if (!string.IsNullOrEmpty(clinicIdClaim))
+        {
+            if (entity.ClinicId != clinicIdClaim) return StatusCode(403, new { message = "You can only manage billing for your assigned clinic" });
+        }
+
+        var paymentDate = !string.IsNullOrEmpty(request.Date) ? request.Date : DateTime.UtcNow.ToString("o");
+        var paymentMethod = !string.IsNullOrEmpty(request.PaymentMethod) ? request.PaymentMethod : "Cash";
+
+        entity.Payments.Add(new PaymentLog
+        {
+            Amount = request.Amount,
+            Date = paymentDate,
+            PaymentMethod = paymentMethod
+        });
+
+        entity.PaidAmount = entity.Payments.Sum(p => p.Amount);
+        if (entity.PaidAmount >= entity.Amount)
+        {
+            entity.Status = "paid";
+        }
+        else if (entity.PaidAmount > 0)
+        {
+            entity.Status = "partially_paid";
+        }
+
+        // If split methods used, note in PaymentMethod
+        var distinctMethods = entity.Payments.Select(p => p.PaymentMethod).Distinct().ToList();
+        entity.PaymentMethod = distinctMethods.Count > 1 ? "Split Payment" : distinctMethods.FirstOrDefault() ?? "Cash";
+
+        await _repo.UpdateAsync(entity);
+
+        return Ok(new
+        {
+            message = "Split payment installment recorded successfully.",
+            data = MapToDto(entity)
+        });
+    }
+
     // BR-FIN-03: Void endpoint — replaces DELETE. Requires mandatory reason.
     [HttpPut("{id}/void")]
     public async Task<IActionResult> VoidInvoice(string id, [FromBody] VoidInvoiceRequest request)
@@ -253,4 +320,12 @@ public class BillingController : ControllerBase
 public class VoidInvoiceRequest
 {
     public string Reason { get; set; } = string.Empty;
+}
+
+// REQ-BIL-02: Split payment installment request payload
+public class AddPaymentRequest
+{
+    public decimal Amount { get; set; }
+    public string PaymentMethod { get; set; } = "Cash";
+    public string? Date { get; set; }
 }
