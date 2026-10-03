@@ -9,6 +9,10 @@ public class Material
     public int Quantity { get; set; }
     public string? Unit { get; set; } // e.g. "Boxes", "Pieces", "ml"
     public int MinStockAlert { get; set; } = 5;
+    public DateTime? ExpirationDate { get; set; }
+    public string? BatchNumber { get; set; }
+
+    public bool IsExpired => ExpirationDate.HasValue && ExpirationDate.Value.Date < DateTime.UtcNow.Date;
 
     // Navigation properties
     public Doctor Doctor { get; set; } = null!;

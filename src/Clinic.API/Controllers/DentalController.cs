@@ -85,6 +85,23 @@ public class DentalController : ControllerBase
                     return StatusCode(403, new { message = "You can only manage dental logs for your assigned clinic" });
             }
         }
+        // Guardrail BR-INV-01: Expiration Date Quarantine
+        // Any consumable material whose batch expiration date has passed must be automatically locked from selection during clinical procedures.
+        if (dto.ConsumedMaterials != null && dto.ConsumedMaterials.Any())
+        {
+            foreach (var cm in dto.ConsumedMaterials)
+            {
+                var material = await _materialRepo.GetByIdAsync(cm.MaterialId);
+                if (material != null && material.IsExpired)
+                {
+                    return BadRequest(new
+                    {
+                        message = $"Material '{material.Name}' (Batch: {material.BatchNumber ?? "N/A"}) expired on {material.ExpirationDate!.Value:yyyy-MM-dd} and is quarantined from clinical procedures."
+                    });
+                }
+            }
+        }
+
         var entity = new DentalLog
         {
             Id = string.IsNullOrEmpty(dto.Id) ? Guid.NewGuid().ToString() : dto.Id,

@@ -251,4 +251,64 @@ public class MaterialUnitTests
             "Inventory"
         ), Moq.Times.Once);
     }
+
+    [Fact]
+    public void BR_INV_01_WhenExpirationDateInPast_IsExpiredIsTrue()
+    {
+        var expiredMaterial = new Material
+        {
+            Id = "mat-exp-1",
+            Name = "Composite Primer",
+            BatchNumber = "LOT-2024-09",
+            ExpirationDate = DateTime.UtcNow.AddDays(-10),
+            Quantity = 5
+        };
+
+        Assert.True(expiredMaterial.IsExpired);
+    }
+
+    [Fact]
+    public void BR_INV_01_WhenExpirationDateInFuture_IsExpiredIsFalse()
+    {
+        var validMaterial = new Material
+        {
+            Id = "mat-val-1",
+            Name = "Composite Primer",
+            BatchNumber = "LOT-2027-01",
+            ExpirationDate = DateTime.UtcNow.AddYears(1),
+            Quantity = 10
+        };
+
+        Assert.False(validMaterial.IsExpired);
+    }
+
+    [Fact]
+    public void BR_INV_01_WhenExpirationDateNull_IsExpiredIsFalse()
+    {
+        var nonPerishableMaterial = new Material
+        {
+            Id = "mat-np-1",
+            Name = "Mouth Mirrors",
+            ExpirationDate = null,
+            Quantity = 20
+        };
+
+        Assert.False(nonPerishableMaterial.IsExpired);
+    }
+
+    [Fact]
+    public void BR_INV_01_MaterialDto_ReflectsExpirationAndBatchProperties()
+    {
+        var dto = new Clinic.Application.DTOs.MaterialDto
+        {
+            Id = "dto-1",
+            Name = "Anesthetic Gel",
+            BatchNumber = "BATCH-882",
+            ExpirationDate = DateTime.UtcNow.AddMonths(-1),
+            Quantity = 3
+        };
+
+        Assert.Equal("BATCH-882", dto.BatchNumber);
+        Assert.True(dto.IsExpired);
+    }
 }
