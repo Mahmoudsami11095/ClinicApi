@@ -140,12 +140,7 @@ public class AppointmentsController : ControllerBase
             appointments = appointments.Where(a => a.ClinicId == clinicIdClaim).ToList();
         }
 
-        var dtos = appointments.Select(a => new AppointmentDto
-        {
-            Id = a.Id, PatientId = a.PatientId, DoctorId = a.DoctorId,
-            Date = a.Date, Status = a.Status, Type = a.Type,
-            Notes = a.Notes, ClinicId = a.ClinicId
-        }).ToList();
+        var dtos = appointments.Select(MapToDto).ToList();
         return Ok(new { data = dtos });
     }
 
@@ -320,4 +315,190 @@ public class AppointmentsController : ControllerBase
 
         return Ok(new { message = "Deleted" });
     }
+
+    /// <summary>
+    /// REQ-APT-02 / UAT-APT-02: Patient check-in by receptionist.
+    /// Advances status to "waiting", stamps ArrivedAt, calculates sequential daily QueueNumber,
+    /// and triggers real-time notification to the doctor.
+    /// </summary>
+    [HttpPost("{id}/check-in")]
+    public async Task<IActionResult> CheckIn(string id)
+    {
+        var entity = await _repo.GetByIdAsync(id);
+        if (entity == null) return NotFound(new { message = "Appointment not found" });
+
+        var doctorIdClaim = User.GetDoctorId();
+        var clinicIdClaim = User.GetClinicId();
+        if (!string.IsNullOrEmpty(doctorIdClaim))
+        {
+            var isAllowed = !string.IsNullOrEmpty(entity.ClinicId) && 
+                            await _clinicRepo.IsDoctorAuthorizedForClinicAsync(doctorIdClaim, entity.ClinicId);
+            if (!isAllowed) return StatusCode(403, new { message = "You can only manage appointments for your clinics" });
+        }
+        else if (!string.IsNullOrEmpty(clinicIdClaim))
+        {
+            if (entity.ClinicId != clinicIdClaim) return StatusCode(403, new { message = "You can only manage appointments for your assigned clinic" });
+        }
+
+        // Calculate today's next queue ticket number
+        var today = DateTime.UtcNow.ToString("yyyy-MM-dd");
+        var allAppts = await _repo.GetAllAsync();
+        var existingQueue = allAppts
+            .Where(a => a.ClinicId == entity.ClinicId && 
+                        a.DoctorId == entity.DoctorId && 
+                        !string.IsNullOrEmpty(a.ArrivedAt) && 
+                        a.ArrivedAt.StartsWith(today))
+            .ToList();
+
+        var nextQueueNum = existingQueue.Any() 
+            ? existingQueue.Max(a => a.QueueNumber ?? 0) + 1 
+            : 1;
+
+        entity.Status = "waiting";
+        entity.ArrivedAt = DateTime.UtcNow.ToString("o");
+        entity.QueueNumber = nextQueueNum;
+
+        await _repo.UpdateAsync(entity);
+
+        // Fetch patient name for the real-time notification
+        var patient = await _patientRepo.GetByIdAsync(entity.PatientId);
+        var patientName = patient != null ? $"{patient.FirstName} {patient.LastName}" : "Patient";
+
+        // Dispatch in-app notification to the doctor
+        var users = await _userRepo.GetAllAsync();
+        var doctorUser = users.FirstOrDefault(u => u.DoctorId == entity.DoctorId);
+        if (doctorUser != null)
+        {
+            await _notificationService.CreateNotificationAsync(
+                doctorUser.Id,
+                "Patient Arrived & Waiting",
+                $"{patientName} has arrived and is in the waiting room (Queue #{entity.QueueNumber}).",
+                "Queue"
+            );
+        }
+
+        return Ok(new { 
+            message = "Patient checked in and placed in waiting queue successfully.", 
+            data = MapToDto(entity) 
+        });
+    }
+
+    /// <summary>
+    /// REQ-APT-02: Doctor calls patient into exam room.
+    /// Advances status to "in_consultation" and stamps ConsultationStartedAt.
+    /// </summary>
+    [HttpPost("{id}/start-consultation")]
+    public async Task<IActionResult> StartConsultation(string id)
+    {
+        var entity = await _repo.GetByIdAsync(id);
+        if (entity == null) return NotFound(new { message = "Appointment not found" });
+
+        var doctorIdClaim = User.GetDoctorId();
+        var clinicIdClaim = User.GetClinicId();
+        if (!string.IsNullOrEmpty(doctorIdClaim))
+        {
+            var isAllowed = !string.IsNullOrEmpty(entity.ClinicId) && 
+                            await _clinicRepo.IsDoctorAuthorizedForClinicAsync(doctorIdClaim, entity.ClinicId);
+            if (!isAllowed) return StatusCode(403, new { message = "You can only manage appointments for your clinics" });
+        }
+        else if (!string.IsNullOrEmpty(clinicIdClaim))
+        {
+            if (entity.ClinicId != clinicIdClaim) return StatusCode(403, new { message = "You can only manage appointments for your assigned clinic" });
+        }
+
+        entity.Status = "in_consultation";
+        entity.ConsultationStartedAt = DateTime.UtcNow.ToString("o");
+
+        await _repo.UpdateAsync(entity);
+
+        return Ok(new { 
+            message = "Patient consultation started.", 
+            data = MapToDto(entity) 
+        });
+    }
+
+    /// <summary>
+    /// REQ-APT-02: Doctor completes consultation.
+    /// Advances status to "completed" and stamps ConsultationEndedAt.
+    /// </summary>
+    [HttpPost("{id}/complete")]
+    public async Task<IActionResult> CompleteConsultation(string id)
+    {
+        var entity = await _repo.GetByIdAsync(id);
+        if (entity == null) return NotFound(new { message = "Appointment not found" });
+
+        var doctorIdClaim = User.GetDoctorId();
+        var clinicIdClaim = User.GetClinicId();
+        if (!string.IsNullOrEmpty(doctorIdClaim))
+        {
+            var isAllowed = !string.IsNullOrEmpty(entity.ClinicId) && 
+                            await _clinicRepo.IsDoctorAuthorizedForClinicAsync(doctorIdClaim, entity.ClinicId);
+            if (!isAllowed) return StatusCode(403, new { message = "You can only manage appointments for your clinics" });
+        }
+        else if (!string.IsNullOrEmpty(clinicIdClaim))
+        {
+            if (entity.ClinicId != clinicIdClaim) return StatusCode(403, new { message = "You can only manage appointments for your assigned clinic" });
+        }
+
+        entity.Status = "completed";
+        entity.ConsultationEndedAt = DateTime.UtcNow.ToString("o");
+
+        await _repo.UpdateAsync(entity);
+
+        return Ok(new { 
+            message = "Consultation completed successfully.", 
+            data = MapToDto(entity) 
+        });
+    }
+
+    /// <summary>
+    /// REQ-APT-02: Retrieves live waiting room queue for today.
+    /// Orders active patients: in_consultation first, then waiting by QueueNumber, then scheduled.
+    /// </summary>
+    [HttpGet("live-queue")]
+    public async Task<IActionResult> GetLiveQueue([FromQuery] string? clinicId, [FromQuery] string? doctorId)
+    {
+        var appointments = await _repo.GetAllAsync();
+        var doctorIdClaim = User.GetDoctorId();
+        var clinicIdClaim = User.GetClinicId();
+
+        var targetClinicId = !string.IsNullOrEmpty(clinicId) ? clinicId : clinicIdClaim;
+        var targetDoctorId = !string.IsNullOrEmpty(doctorId) ? doctorId : doctorIdClaim;
+
+        if (!string.IsNullOrEmpty(targetClinicId))
+        {
+            appointments = appointments.Where(a => a.ClinicId == targetClinicId).ToList();
+        }
+        if (!string.IsNullOrEmpty(targetDoctorId))
+        {
+            appointments = appointments.Where(a => a.DoctorId == targetDoctorId).ToList();
+        }
+
+        var today = DateTime.UtcNow.ToString("yyyy-MM-dd");
+        var activeQueue = appointments
+            .Where(a => a.Date.StartsWith(today) || a.Status == "waiting" || a.Status == "in_consultation")
+            .OrderBy(a => a.Status == "in_consultation" ? 0 : a.Status == "waiting" ? 1 : 2)
+            .ThenBy(a => a.QueueNumber ?? int.MaxValue)
+            .ThenBy(a => a.Date)
+            .Select(MapToDto)
+            .ToList();
+
+        return Ok(new { data = activeQueue });
+    }
+
+    private static AppointmentDto MapToDto(Appointment a) => new()
+    {
+        Id = a.Id,
+        PatientId = a.PatientId,
+        DoctorId = a.DoctorId,
+        Date = a.Date,
+        Status = a.Status,
+        Type = a.Type,
+        Notes = a.Notes,
+        ClinicId = a.ClinicId,
+        ArrivedAt = a.ArrivedAt,
+        ConsultationStartedAt = a.ConsultationStartedAt,
+        ConsultationEndedAt = a.ConsultationEndedAt,
+        QueueNumber = a.QueueNumber
+    };
 }

@@ -84,6 +84,12 @@ public class AppointmentDto
     public string Type { get; set; } = string.Empty;
     public string Notes { get; set; } = string.Empty;
     public string? ClinicId { get; set; }
+
+    // REQ-APT-02: Live Waiting Room Queue Management
+    public string? ArrivedAt { get; set; }
+    public string? ConsultationStartedAt { get; set; }
+    public string? ConsultationEndedAt { get; set; }
+    public int? QueueNumber { get; set; }
 }
 
 public class PaymentLogDto
