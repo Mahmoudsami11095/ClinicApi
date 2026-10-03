@@ -89,4 +89,35 @@ public class PatientsController : ControllerBase
             return StatusCode(403, new { message = ex.Message });
         }
     }
+
+    /// <summary>
+    /// REQ-PAT-03: Records patient digital consent signature (touchscreen or stylus capture).
+    /// </summary>
+    [HttpPost("{id}/consent-signature")]
+    public async Task<IActionResult> SaveConsentSignature(string id, [FromBody] ConsentSignatureRequest request)
+    {
+        if (string.IsNullOrWhiteSpace(request.Signature))
+        {
+            return BadRequest(new { message = "Signature content is required." });
+        }
+
+        try
+        {
+            var updated = await _service.SaveConsentSignatureAsync(id, request.Signature, User.GetDoctorId(), User.GetClinicId());
+            return Ok(new { message = "Consent signature saved successfully.", data = updated });
+        }
+        catch (KeyNotFoundException)
+        {
+            return NotFound(new { message = "Patient not found." });
+        }
+        catch (UnauthorizedAccessException ex)
+        {
+            return StatusCode(403, new { message = ex.Message });
+        }
+    }
+}
+
+public class ConsentSignatureRequest
+{
+    public string Signature { get; set; } = string.Empty;
 }

@@ -188,6 +188,7 @@ public class ClinicDbContext : DbContext
             entity.Property(e => e.BloodGroup).HasMaxLength(10);
             entity.Property(e => e.Address).HasMaxLength(500);
             entity.Property(e => e.RegistrationDate).HasMaxLength(50);
+            entity.Property(e => e.ConsentSignedAt).HasMaxLength(50);
 
             // B-Tree Indexes for rapid clinic-level filtering and login/phone lookup
             entity.HasIndex(e => e.ClinicId);
