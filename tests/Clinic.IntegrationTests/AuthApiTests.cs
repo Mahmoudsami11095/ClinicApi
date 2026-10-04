@@ -173,4 +173,78 @@ public class AuthApiTests : IClassFixture<CustomWebApplicationFactory>
         Assert.True(doc.RootElement.TryGetProperty("otp", out var otpProp));
         Assert.False(string.IsNullOrEmpty(otpProp.GetString()));
     }
+
+    [Fact]
+    public async Task RegisterSendOtp_WithDuplicateEmail_Returns400BadRequest()
+    {
+        const string duplicateEmail = "duplicate_register_user@example.com";
+
+        using (var scope = _factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<ClinicDbContext>();
+            if (!await db.Users.AnyAsync(u => u.Email == duplicateEmail))
+            {
+                db.Users.Add(new User
+                {
+                    Id = "u-dup-reg-user",
+                    Email = duplicateEmail,
+                    Name = "Duplicate Test User",
+                    Role = UserRole.Patient
+                });
+                await db.SaveChangesAsync();
+            }
+        }
+
+        var payload = JsonSerializer.Serialize(new { email = duplicateEmail });
+        var content = new StringContent(payload, Encoding.UTF8, "application/json");
+
+        var response = await _client.PostAsync("/api/auth/register-send-otp", content);
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        var json = await response.Content.ReadAsStringAsync();
+        Assert.Contains("already registered", json, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task RegisterSendOtp_WithMissingEmail_Returns400BadRequest()
+    {
+        var content = new StringContent("{}", Encoding.UTF8, "application/json");
+
+        var response = await _client.PostAsync("/api/auth/register-send-otp", content);
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Register_WithMissingRequiredFields_Returns400BadRequest()
+    {
+        var payload = JsonSerializer.Serialize(new
+        {
+            email = "incomplete_reg@example.com"
+        });
+        var content = new StringContent(payload, Encoding.UTF8, "application/json");
+
+        var response = await _client.PostAsync("/api/auth/register", content);
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Register_WithInvalidOtpCode_Returns400BadRequest()
+    {
+        var payload = JsonSerializer.Serialize(new
+        {
+            name = "Test New User",
+            email = "new_valid_email@example.com",
+            role = "patient",
+            otpCode = "000000",
+            phone = "+201019998888",
+            phoneOtpCode = "000000"
+        });
+        var content = new StringContent(payload, Encoding.UTF8, "application/json");
+
+        var response = await _client.PostAsync("/api/auth/register", content);
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
 }
