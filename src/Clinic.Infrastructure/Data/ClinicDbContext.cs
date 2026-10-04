@@ -496,10 +496,7 @@ public class ClinicDbContext : DbContext
         {
             entity.ToTable("ClinicalNotes");
             entity.HasKey(e => e.Id);
-            entity.Property(e => e.PatientId).IsRequired().HasMaxLength(100);
-            entity.Property(e => e.DoctorId).IsRequired().HasMaxLength(100);
             entity.Property(e => e.DoctorName).HasMaxLength(200);
-            entity.Property(e => e.ClinicId).HasMaxLength(100);
             entity.Property(e => e.CreatedAt).HasMaxLength(50);
             entity.Property(e => e.Title).HasMaxLength(200);
             entity.Property(e => e.Category).HasMaxLength(100);

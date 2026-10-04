@@ -1,4 +1,4 @@
-﻿using Microsoft.EntityFrameworkCore.Migrations;
+using Microsoft.EntityFrameworkCore.Migrations;
 
 #nullable disable
 
@@ -211,10 +211,10 @@ namespace Clinic.Infrastructure.Migrations
                 columns: table => new
                 {
                     Id = table.Column<string>(type: "nvarchar(450)", nullable: false),
-                    PatientId = table.Column<string>(type: "nvarchar(100)", maxLength: 100, nullable: false),
-                    DoctorId = table.Column<string>(type: "nvarchar(100)", maxLength: 100, nullable: false),
+                    PatientId = table.Column<string>(type: "nvarchar(450)", nullable: false),
+                    DoctorId = table.Column<string>(type: "nvarchar(450)", nullable: false),
                     DoctorName = table.Column<string>(type: "nvarchar(200)", maxLength: 200, nullable: false),
-                    ClinicId = table.Column<string>(type: "nvarchar(100)", maxLength: 100, nullable: true),
+                    ClinicId = table.Column<string>(type: "nvarchar(450)", nullable: true),
                     CreatedAt = table.Column<string>(type: "nvarchar(50)", maxLength: 50, nullable: false),
                     Title = table.Column<string>(type: "nvarchar(200)", maxLength: 200, nullable: false),
                     Category = table.Column<string>(type: "nvarchar(100)", maxLength: 100, nullable: false),
