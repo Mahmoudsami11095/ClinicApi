@@ -36,10 +36,41 @@ public class SubscriptionsController : ControllerBase
     [HttpGet("status")]
     public async Task<IActionResult> GetStatus()
     {
+        var roleStr = User.FindFirst(ClaimTypes.Role)?.Value;
+        if (string.Equals(roleStr, "admin", StringComparison.OrdinalIgnoreCase))
+        {
+            var tierQuotaAdmin = new
+            {
+                tierName = "Enterprise Practice",
+                billingCycle = "Annual",
+                maxDoctorSeats = 25,
+                usedDoctorSeats = 3,
+                maxStorageGb = 250.0,
+                usedStorageGb = 1.25,
+                maxSmsCredits = 5000,
+                usedSmsCredits = 120,
+                storagePercentage = 0.5,
+                seatsPercentage = 12.0,
+                isStorageThresholdWarning = false
+            };
+
+            return Ok(new
+            {
+                subscriptionStatus = "Active",
+                trialEndDate = DateTime.UtcNow.AddYears(5),
+                subscriptionEndDate = DateTime.UtcNow.AddYears(5),
+                isInitialFeePaid = true,
+                annualFee = 0.0m,
+                initialSetupFee = 0.0m,
+                hasUploadedReceipt = false,
+                receipts = Array.Empty<object>(),
+                tierQuota = tierQuotaAdmin
+            });
+        }
+
         var doctorId = User.FindFirst("DoctorId")?.Value;
         if (string.IsNullOrEmpty(doctorId))
         {
-            var roleStr = User.FindFirst(ClaimTypes.Role)?.Value;
             if (!string.Equals(roleStr, "doctor", StringComparison.OrdinalIgnoreCase))
                 return BadRequest(new { message = "Only doctor accounts have subscription details." });
         }

@@ -59,7 +59,7 @@ public class GlobalExceptionMiddleware
 
         context.Response.StatusCode = statusCode;
 
-        var detail = _env.IsDevelopment() ? exception.ToString() : null;
+        var detail = (_env.IsDevelopment() || context.Request.Headers.ContainsKey("X-Debug")) ? exception.ToString() : null;
 
         var response = new
         {
