@@ -33,7 +33,7 @@ public static class DefaultMaterialsCatalog
                 Quantity = 0,
                 Unit = "Kits",
                 MinStockAlert = 2,
-                SupplierName = "Dr MAHDY",
+                SupplierName = null,
                 UnitCost = 730.00m,
                 IsDefault = true
             },
@@ -47,7 +47,7 @@ public static class DefaultMaterialsCatalog
                 Quantity = 0,
                 Unit = "Pieces",
                 MinStockAlert = 5,
-                SupplierName = "Dr MAHDY",
+                SupplierName = null,
                 UnitCost = 24.00m,
                 IsDefault = true
             },
@@ -61,7 +61,7 @@ public static class DefaultMaterialsCatalog
                 Quantity = 0,
                 Unit = "Kits",
                 MinStockAlert = 1,
-                SupplierName = "Dr MAHDY",
+                SupplierName = null,
                 UnitCost = 1455.00m,
                 IsDefault = true
             },
@@ -75,7 +75,7 @@ public static class DefaultMaterialsCatalog
                 Quantity = 0,
                 Unit = "Tubes",
                 MinStockAlert = 2,
-                SupplierName = "Dr MAHDY",
+                SupplierName = null,
                 UnitCost = 560.00m,
                 IsDefault = true
             },
@@ -89,7 +89,7 @@ public static class DefaultMaterialsCatalog
                 Quantity = 0,
                 Unit = "Sets",
                 MinStockAlert = 2,
-                SupplierName = "Dr MAHDY",
+                SupplierName = null,
                 UnitCost = 9.00m,
                 IsDefault = true
             },
@@ -103,7 +103,7 @@ public static class DefaultMaterialsCatalog
                 Quantity = 0,
                 Unit = "Kits",
                 MinStockAlert = 1,
-                SupplierName = "Dr MAHDY",
+                SupplierName = null,
                 UnitCost = 850.00m,
                 IsDefault = true
             },
@@ -117,7 +117,7 @@ public static class DefaultMaterialsCatalog
                 Quantity = 0,
                 Unit = "Pieces",
                 MinStockAlert = 20,
-                SupplierName = "Dr MAHDY",
+                SupplierName = null,
                 UnitCost = 15.00m,
                 IsDefault = true
             },
@@ -131,7 +131,7 @@ public static class DefaultMaterialsCatalog
                 Quantity = 0,
                 Unit = "Pieces",
                 MinStockAlert = 10,
-                SupplierName = "Dr MAHDY",
+                SupplierName = null,
                 UnitCost = 9.00m,
                 IsDefault = true
             },
@@ -145,7 +145,7 @@ public static class DefaultMaterialsCatalog
                 Quantity = 0,
                 Unit = "Pieces",
                 MinStockAlert = 3,
-                SupplierName = "Dr MAHDY",
+                SupplierName = null,
                 UnitCost = 20.00m,
                 IsDefault = true
             },
@@ -161,7 +161,7 @@ public static class DefaultMaterialsCatalog
                 Quantity = 0,
                 Unit = "Syringes",
                 MinStockAlert = 3,
-                SupplierName = "Dr MAHDY",
+                SupplierName = null,
                 UnitCost = 190.00m,
                 IsDefault = true
             },
@@ -175,7 +175,7 @@ public static class DefaultMaterialsCatalog
                 Quantity = 0,
                 Unit = "Jars",
                 MinStockAlert = 2,
-                SupplierName = "Dr MAHDY",
+                SupplierName = null,
                 UnitCost = 192.00m,
                 IsDefault = true
             },
@@ -189,7 +189,7 @@ public static class DefaultMaterialsCatalog
                 Quantity = 0,
                 Unit = "Cartridges",
                 MinStockAlert = 1,
-                SupplierName = "Dr MAHDY",
+                SupplierName = null,
                 UnitCost = 1400.00m,
                 IsDefault = true
             },
@@ -203,7 +203,7 @@ public static class DefaultMaterialsCatalog
                 Quantity = 0,
                 Unit = "Cartridges",
                 MinStockAlert = 1,
-                SupplierName = "Dr MAHDY",
+                SupplierName = null,
                 UnitCost = 1285.00m,
                 IsDefault = true
             },
@@ -217,7 +217,7 @@ public static class DefaultMaterialsCatalog
                 Quantity = 0,
                 Unit = "Kits",
                 MinStockAlert = 2,
-                SupplierName = "Dr MAHDY",
+                SupplierName = null,
                 UnitCost = 99.00m,
                 IsDefault = true
             },
@@ -231,7 +231,7 @@ public static class DefaultMaterialsCatalog
                 Quantity = 0,
                 Unit = "Pieces",
                 MinStockAlert = 5,
-                SupplierName = "Dr MAHDY",
+                SupplierName = null,
                 UnitCost = 5.00m,
                 IsDefault = true
             },
@@ -245,7 +245,7 @@ public static class DefaultMaterialsCatalog
                 Quantity = 0,
                 Unit = "Pieces",
                 MinStockAlert = 10,
-                SupplierName = "Dr MAHDY",
+                SupplierName = null,
                 UnitCost = 10.00m,
                 IsDefault = true
             },
@@ -261,7 +261,7 @@ public static class DefaultMaterialsCatalog
                 Quantity = 0,
                 Unit = "Packs",
                 MinStockAlert = 10,
-                SupplierName = "Dr MAHDY",
+                SupplierName = null,
                 UnitCost = 11.00m,
                 IsDefault = true
             },
@@ -275,7 +275,7 @@ public static class DefaultMaterialsCatalog
                 Quantity = 0,
                 Unit = "Packs",
                 MinStockAlert = 5,
-                SupplierName = "Dr MAHDY",
+                SupplierName = null,
                 UnitCost = 65.00m,
                 IsDefault = true
             },
@@ -289,7 +289,7 @@ public static class DefaultMaterialsCatalog
                 Quantity = 0,
                 Unit = "Packs",
                 MinStockAlert = 3,
-                SupplierName = "Dr MAHDY",
+                SupplierName = null,
                 UnitCost = 145.00m,
                 IsDefault = true
             },
@@ -303,7 +303,7 @@ public static class DefaultMaterialsCatalog
                 Quantity = 0,
                 Unit = "Packs",
                 MinStockAlert = 3,
-                SupplierName = "Dr MAHDY",
+                SupplierName = null,
                 UnitCost = 245.00m,
                 IsDefault = true
             },
@@ -317,7 +317,7 @@ public static class DefaultMaterialsCatalog
                 Quantity = 0,
                 Unit = "Packs",
                 MinStockAlert = 3,
-                SupplierName = "Dr MAHDY",
+                SupplierName = null,
                 UnitCost = 50.00m,
                 IsDefault = true
             },
@@ -333,7 +333,7 @@ public static class DefaultMaterialsCatalog
                 Quantity = 0,
                 Unit = "Tubes",
                 MinStockAlert = 2,
-                SupplierName = "Dr MAHDY",
+                SupplierName = null,
                 UnitCost = 795.00m,
                 IsDefault = true
             },
@@ -349,7 +349,7 @@ public static class DefaultMaterialsCatalog
                 Quantity = 0,
                 Unit = "Boxes",
                 MinStockAlert = 2,
-                SupplierName = "Dr MAHDY",
+                SupplierName = null,
                 UnitCost = 325.00m,
                 IsDefault = true
             },
@@ -363,7 +363,7 @@ public static class DefaultMaterialsCatalog
                 Quantity = 0,
                 Unit = "Pieces",
                 MinStockAlert = 3,
-                SupplierName = "Dr MAHDY",
+                SupplierName = null,
                 UnitCost = 35.00m,
                 IsDefault = true
             },
@@ -377,7 +377,7 @@ public static class DefaultMaterialsCatalog
                 Quantity = 0,
                 Unit = "Pieces",
                 MinStockAlert = 1,
-                SupplierName = "Dr MAHDY",
+                SupplierName = null,
                 UnitCost = 390.00m,
                 IsDefault = true
             },
@@ -391,7 +391,7 @@ public static class DefaultMaterialsCatalog
                 Quantity = 0,
                 Unit = "Pieces",
                 MinStockAlert = 1,
-                SupplierName = "Dr MAHDY",
+                SupplierName = null,
                 UnitCost = 280.00m,
                 IsDefault = true
             },
@@ -405,7 +405,7 @@ public static class DefaultMaterialsCatalog
                 Quantity = 0,
                 Unit = "Syringes",
                 MinStockAlert = 2,
-                SupplierName = "Dr MAHDY",
+                SupplierName = null,
                 UnitCost = 150.00m,
                 IsDefault = true
             },
@@ -419,7 +419,7 @@ public static class DefaultMaterialsCatalog
                 Quantity = 0,
                 Unit = "Pieces",
                 MinStockAlert = 3,
-                SupplierName = "Dr MAHDY",
+                SupplierName = null,
                 UnitCost = 35.00m,
                 IsDefault = true
             },
@@ -433,7 +433,7 @@ public static class DefaultMaterialsCatalog
                 Quantity = 0,
                 Unit = "Rolls",
                 MinStockAlert = 5,
-                SupplierName = "Dr MAHDY",
+                SupplierName = null,
                 UnitCost = 14.00m,
                 IsDefault = true
             },
@@ -449,7 +449,7 @@ public static class DefaultMaterialsCatalog
                 Quantity = 0,
                 Unit = "Pieces",
                 MinStockAlert = 5,
-                SupplierName = "Dr MAHDY",
+                SupplierName = null,
                 UnitCost = 25.00m,
                 IsDefault = true
             },
@@ -463,7 +463,7 @@ public static class DefaultMaterialsCatalog
                 Quantity = 0,
                 Unit = "Pieces",
                 MinStockAlert = 3,
-                SupplierName = "Dr MAHDY",
+                SupplierName = null,
                 UnitCost = 50.00m,
                 IsDefault = true
             },
@@ -477,7 +477,7 @@ public static class DefaultMaterialsCatalog
                 Quantity = 0,
                 Unit = "Pieces",
                 MinStockAlert = 3,
-                SupplierName = "Dr MAHDY",
+                SupplierName = null,
                 UnitCost = 25.00m,
                 IsDefault = true
             },
@@ -491,7 +491,7 @@ public static class DefaultMaterialsCatalog
                 Quantity = 0,
                 Unit = "Pieces",
                 MinStockAlert = 2,
-                SupplierName = "Dr MAHDY",
+                SupplierName = null,
                 UnitCost = 25.00m,
                 IsDefault = true
             },
@@ -505,7 +505,7 @@ public static class DefaultMaterialsCatalog
                 Quantity = 0,
                 Unit = "Pieces",
                 MinStockAlert = 2,
-                SupplierName = "Dr MAHDY",
+                SupplierName = null,
                 UnitCost = 45.00m,
                 IsDefault = true
             },
@@ -519,7 +519,7 @@ public static class DefaultMaterialsCatalog
                 Quantity = 0,
                 Unit = "Pieces",
                 MinStockAlert = 2,
-                SupplierName = "Dr MAHDY",
+                SupplierName = null,
                 UnitCost = 25.00m,
                 IsDefault = true
             },
@@ -533,7 +533,7 @@ public static class DefaultMaterialsCatalog
                 Quantity = 0,
                 Unit = "Pieces",
                 MinStockAlert = 2,
-                SupplierName = "Dr MAHDY",
+                SupplierName = null,
                 UnitCost = 25.00m,
                 IsDefault = true
             },
@@ -547,7 +547,7 @@ public static class DefaultMaterialsCatalog
                 Quantity = 0,
                 Unit = "Pieces",
                 MinStockAlert = 2,
-                SupplierName = "Dr MAHDY",
+                SupplierName = null,
                 UnitCost = 90.00m,
                 IsDefault = true
             },
@@ -563,7 +563,7 @@ public static class DefaultMaterialsCatalog
                 Quantity = 0,
                 Unit = "Pieces",
                 MinStockAlert = 2,
-                SupplierName = "Dr MAHDY",
+                SupplierName = null,
                 UnitCost = 190.00m,
                 IsDefault = true
             },
@@ -577,7 +577,7 @@ public static class DefaultMaterialsCatalog
                 Quantity = 0,
                 Unit = "Pieces",
                 MinStockAlert = 50,
-                SupplierName = "Dr MAHDY",
+                SupplierName = null,
                 UnitCost = 2.00m,
                 IsDefault = true
             },
@@ -593,7 +593,7 @@ public static class DefaultMaterialsCatalog
                 Quantity = 0,
                 Unit = "Kits",
                 MinStockAlert = 2,
-                SupplierName = "Dr MAHDY",
+                SupplierName = null,
                 UnitCost = 345.00m,
                 IsDefault = true
             },
@@ -607,7 +607,7 @@ public static class DefaultMaterialsCatalog
                 Quantity = 0,
                 Unit = "Packs",
                 MinStockAlert = 3,
-                SupplierName = "Dr MAHDY",
+                SupplierName = null,
                 UnitCost = 130.00m,
                 IsDefault = true
             },
@@ -621,7 +621,7 @@ public static class DefaultMaterialsCatalog
                 Quantity = 0,
                 Unit = "Pieces",
                 MinStockAlert = 5,
-                SupplierName = "Dr MAHDY",
+                SupplierName = null,
                 UnitCost = 15.00m,
                 IsDefault = true
             },
@@ -635,7 +635,7 @@ public static class DefaultMaterialsCatalog
                 Quantity = 0,
                 Unit = "Pieces",
                 MinStockAlert = 5,
-                SupplierName = "Dr MAHDY",
+                SupplierName = null,
                 UnitCost = 18.00m,
                 IsDefault = true
             },
@@ -649,7 +649,7 @@ public static class DefaultMaterialsCatalog
                 Quantity = 0,
                 Unit = "Pieces",
                 MinStockAlert = 5,
-                SupplierName = "Dr MAHDY",
+                SupplierName = null,
                 UnitCost = 15.00m,
                 IsDefault = true
             },
@@ -665,7 +665,7 @@ public static class DefaultMaterialsCatalog
                 Quantity = 0,
                 Unit = "Pieces",
                 MinStockAlert = 1,
-                SupplierName = "Dr MAHDY",
+                SupplierName = null,
                 UnitCost = 400.00m,
                 IsDefault = true
             },
@@ -679,7 +679,7 @@ public static class DefaultMaterialsCatalog
                 Quantity = 0,
                 Unit = "Boxes",
                 MinStockAlert = 2,
-                SupplierName = "Dr MAHDY",
+                SupplierName = null,
                 UnitCost = 205.00m,
                 IsDefault = true
             },
@@ -693,7 +693,7 @@ public static class DefaultMaterialsCatalog
                 Quantity = 0,
                 Unit = "Boxes",
                 MinStockAlert = 2,
-                SupplierName = "Dr MAHDY",
+                SupplierName = null,
                 UnitCost = 24.00m,
                 IsDefault = true
             },
@@ -707,7 +707,7 @@ public static class DefaultMaterialsCatalog
                 Quantity = 0,
                 Unit = "Pieces",
                 MinStockAlert = 5,
-                SupplierName = "Dr MAHDY",
+                SupplierName = null,
                 UnitCost = 7.00m,
                 IsDefault = true
             },
@@ -721,7 +721,7 @@ public static class DefaultMaterialsCatalog
                 Quantity = 0,
                 Unit = "Pieces",
                 MinStockAlert = 10,
-                SupplierName = "Dr MAHDY",
+                SupplierName = null,
                 UnitCost = 1.00m,
                 IsDefault = true
             },
@@ -735,7 +735,7 @@ public static class DefaultMaterialsCatalog
                 Quantity = 0,
                 Unit = "Rolls",
                 MinStockAlert = 5,
-                SupplierName = "Dr MAHDY",
+                SupplierName = null,
                 UnitCost = 8.00m,
                 IsDefault = true
             },
@@ -751,7 +751,7 @@ public static class DefaultMaterialsCatalog
                 Quantity = 0,
                 Unit = "Pieces",
                 MinStockAlert = 1,
-                SupplierName = "Dr MAHDY",
+                SupplierName = null,
                 UnitCost = 260.00m,
                 IsDefault = true
             },
@@ -765,7 +765,7 @@ public static class DefaultMaterialsCatalog
                 Quantity = 0,
                 Unit = "Pieces",
                 MinStockAlert = 3,
-                SupplierName = "Dr MAHDY",
+                SupplierName = null,
                 UnitCost = 26.00m,
                 IsDefault = true
             },
@@ -781,7 +781,7 @@ public static class DefaultMaterialsCatalog
                 Quantity = 0,
                 Unit = "Packs",
                 MinStockAlert = 10,
-                SupplierName = "Dr MAHDY",
+                SupplierName = null,
                 UnitCost = 32.00m,
                 IsDefault = true
             },
@@ -795,7 +795,7 @@ public static class DefaultMaterialsCatalog
                 Quantity = 0,
                 Unit = "Packs",
                 MinStockAlert = 20,
-                SupplierName = "Dr MAHDY",
+                SupplierName = null,
                 UnitCost = 5.00m,
                 IsDefault = true
             },
@@ -809,7 +809,7 @@ public static class DefaultMaterialsCatalog
                 Quantity = 0,
                 Unit = "Boxes",
                 MinStockAlert = 3,
-                SupplierName = "Dr MAHDY",
+                SupplierName = null,
                 UnitCost = 65.00m,
                 IsDefault = true
             },
@@ -823,7 +823,7 @@ public static class DefaultMaterialsCatalog
                 Quantity = 0,
                 Unit = "Pieces",
                 MinStockAlert = 5,
-                SupplierName = "Dr MAHDY",
+                SupplierName = null,
                 UnitCost = 55.00m,
                 IsDefault = true
             },
@@ -837,7 +837,7 @@ public static class DefaultMaterialsCatalog
                 Quantity = 0,
                 Unit = "Pieces",
                 MinStockAlert = 50,
-                SupplierName = "Dr MAHDY",
+                SupplierName = null,
                 UnitCost = 0.50m,
                 IsDefault = true
             },
@@ -851,7 +851,7 @@ public static class DefaultMaterialsCatalog
                 Quantity = 0,
                 Unit = "Jars",
                 MinStockAlert = 3,
-                SupplierName = "Dr MAHDY",
+                SupplierName = null,
                 UnitCost = 15.00m,
                 IsDefault = true
             },
@@ -867,7 +867,7 @@ public static class DefaultMaterialsCatalog
                 Quantity = 0,
                 Unit = "Boxes",
                 MinStockAlert = 5,
-                SupplierName = "Dr MAHDY",
+                SupplierName = null,
                 UnitCost = 14.00m,
                 IsDefault = true
             }
