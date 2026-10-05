@@ -176,6 +176,11 @@ public class MaterialsController : ControllerBase
                 return StatusCode(403, new { message = "You can only manage materials for your assigned clinic" });
         }
 
+        if (string.IsNullOrEmpty(dto.ClinicId) || dto.ClinicId == "all")
+        {
+            return BadRequest(new { message = "A specific clinic must be selected to create a material." });
+        }
+
         var doctorId = !string.IsNullOrEmpty(dto.DoctorId) ? dto.DoctorId : User.FindFirst("doctorId")?.Value;
         if (string.IsNullOrEmpty(doctorId) && _context != null)
         {
@@ -202,7 +207,7 @@ public class MaterialsController : ControllerBase
             IsDefault = dto.IsDefault,
             Quantity = dto.Quantity,
             Unit = dto.Unit,
-            MinStockAlert = dto.MinStockAlert > 0 ? dto.MinStockAlert : 5,
+            MinStockAlert = dto.MinStockAlert >= 0 ? dto.MinStockAlert : 5,
             ExpirationDate = dto.ExpirationDate,
             BatchNumber = dto.BatchNumber,
             SupplierName = dto.SupplierName,
@@ -239,8 +244,15 @@ public class MaterialsController : ControllerBase
         if (dto.Category != null) material.Category = dto.Category;
         material.Quantity = dto.Quantity;
         material.Unit = dto.Unit;
-        material.ClinicId = dto.ClinicId;
-        material.MinStockAlert = dto.MinStockAlert > 0 ? dto.MinStockAlert : 5;
+        if (!string.IsNullOrEmpty(dto.ClinicId) && dto.ClinicId != "all")
+        {
+            material.ClinicId = dto.ClinicId;
+        }
+        if (!string.IsNullOrEmpty(dto.DoctorId))
+        {
+            material.DoctorId = dto.DoctorId;
+        }
+        material.MinStockAlert = dto.MinStockAlert >= 0 ? dto.MinStockAlert : 5;
         material.ExpirationDate = dto.ExpirationDate;
         material.BatchNumber = dto.BatchNumber;
         material.SupplierName = dto.SupplierName;
