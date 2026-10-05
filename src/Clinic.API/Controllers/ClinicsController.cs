@@ -125,7 +125,7 @@ public class ClinicsController : ControllerBase
             catch (Exception ex)
             {
                 // Non-blocking log if seeding fails
-                Console.WriteLine($"Warning: Failed to seed default materials for clinic {entity.Id}: {ex.Message}");
+                _logger.LogWarning(ex, "Failed to seed default materials for clinic {ClinicId}", entity.Id);
             }
         }
 

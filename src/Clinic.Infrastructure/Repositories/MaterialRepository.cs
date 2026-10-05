@@ -75,8 +75,9 @@ public class MaterialRepository : IMaterialRepository
 
     public async Task AddRangeAsync(IEnumerable<Material> materials)
     {
-        await _context.Materials.AddRangeAsync(materials);
-        await _context.SaveChangesAsync();
+        ArgumentNullException.ThrowIfNull(materials);
+        await _context.Materials.AddRangeAsync(materials).ConfigureAwait(false);
+        await _context.SaveChangesAsync().ConfigureAwait(false);
     }
 
     public async Task UpdateAsync(Material material)
