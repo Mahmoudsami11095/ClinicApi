@@ -237,6 +237,34 @@ public class DentalController : ControllerBase
             if (nextAllowed == "completed")
             {
                 entity.IsPlanned = false;
+
+                // REQ-INV-03: Auto-Deduct Recipe Consumables on Procedure Completion
+                if (!string.IsNullOrEmpty(entity.ConsumedMaterials) && entity.ConsumedMaterials != "[]")
+                {
+                    try
+                    {
+                        var consumed = JsonSerializer.Deserialize<List<ConsumedMaterialDto>>(entity.ConsumedMaterials);
+                        if (consumed != null)
+                        {
+                            foreach (var cm in consumed)
+                            {
+                                var material = await _materialRepo.GetByIdAsync(cm.MaterialId);
+                                if (material != null)
+                                {
+                                    material.Quantity -= cm.Quantity;
+                                    if (material.Quantity < 0) material.Quantity = 0;
+                                    await _materialRepo.UpdateAsync(material);
+
+                                    if (_alertService != null)
+                                    {
+                                        await _alertService.CheckAndTriggerLowStockAlertAsync(material);
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    catch { }
+                }
             }
         }
 
@@ -309,6 +337,34 @@ public class DentalController : ControllerBase
         if (nextAllowed == "completed")
         {
             entity.IsPlanned = false;
+
+            // REQ-INV-03: Auto-Deduct Recipe Consumables on Procedure Completion
+            if (!string.IsNullOrEmpty(entity.ConsumedMaterials) && entity.ConsumedMaterials != "[]")
+            {
+                try
+                {
+                    var consumed = JsonSerializer.Deserialize<List<ConsumedMaterialDto>>(entity.ConsumedMaterials);
+                    if (consumed != null)
+                    {
+                        foreach (var cm in consumed)
+                        {
+                            var material = await _materialRepo.GetByIdAsync(cm.MaterialId);
+                            if (material != null)
+                            {
+                                material.Quantity -= cm.Quantity;
+                                if (material.Quantity < 0) material.Quantity = 0;
+                                await _materialRepo.UpdateAsync(material);
+
+                                if (_alertService != null)
+                                {
+                                    await _alertService.CheckAndTriggerLowStockAlertAsync(material);
+                                }
+                            }
+                        }
+                    }
+                }
+                catch { }
+            }
         }
 
         await _repo.UpdateAsync(entity);
