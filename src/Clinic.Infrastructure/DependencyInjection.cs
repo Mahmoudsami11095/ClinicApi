@@ -54,6 +54,7 @@ public static class DependencyInjection
         services.AddHttpClient<IWhatsAppNotificationService, WhatsAppNotificationService>();
         services.AddTransient<IEmailService, EmailService>();
         services.AddTransient<ISocialAuthService, SocialAuthService>();
+        services.AddScoped<ICommissionService, CommissionService>();
 
         // ── JWT Authentication ──
         services.AddAuthentication(options =>
