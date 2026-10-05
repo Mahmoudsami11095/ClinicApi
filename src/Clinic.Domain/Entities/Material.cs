@@ -6,6 +6,8 @@ public class Material
     public string ClinicId { get; set; } = string.Empty;
     public string DoctorId { get; set; } = string.Empty;
     public string Name { get; set; } = string.Empty;
+    public string? Category { get; set; }
+    public bool IsDefault { get; set; }
     public int Quantity { get; set; }
     public string? Unit { get; set; } // e.g. "Boxes", "Pieces", "ml"
     public int MinStockAlert { get; set; } = 5;

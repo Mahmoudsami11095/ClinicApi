@@ -13,6 +13,7 @@ public static class DependencyInjection
         services.AddScoped<INotificationService, NotificationService>();
         services.AddScoped<IRadiologyService, RadiologyService>();
         services.AddScoped<IMaterialAlertService, MaterialAlertService>();
+        services.AddScoped<IMaterialSeedingService, MaterialSeedingService>();
         
         return services;
     }
