@@ -19,13 +19,20 @@ public class ClinicsController : ControllerBase
     private readonly IDoctorRepository _doctorRepo;
     private readonly ClinicDbContext _context;
     private readonly IEmailService _emailService;
+    private readonly IMaterialSeedingService _seedingService;
 
-    public ClinicsController(IClinicRepository repo, IDoctorRepository doctorRepo, ClinicDbContext context, IEmailService emailService)
+    public ClinicsController(
+        IClinicRepository repo, 
+        IDoctorRepository doctorRepo, 
+        ClinicDbContext context, 
+        IEmailService emailService,
+        IMaterialSeedingService seedingService)
     {
         _repo = repo;
         _doctorRepo = doctorRepo;
         _context = context;
         _emailService = emailService;
+        _seedingService = seedingService;
     }
 
     [HttpGet]
@@ -110,6 +117,16 @@ public class ClinicsController : ControllerBase
         if (!string.IsNullOrEmpty(doctorIdClaim))
         {
             await _doctorRepo.AssignToClinicAsync(doctorIdClaim, entity.Id);
+
+            try
+            {
+                await _seedingService.SeedDefaultMaterialsAsync(entity.Id, doctorIdClaim);
+            }
+            catch (Exception ex)
+            {
+                // Non-blocking log if seeding fails
+                Console.WriteLine($"Warning: Failed to seed default materials for clinic {entity.Id}: {ex.Message}");
+            }
         }
 
         var result = new ClinicDto 

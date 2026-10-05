@@ -311,4 +311,69 @@ public class MaterialUnitTests
         Assert.Equal("BATCH-882", dto.BatchNumber);
         Assert.True(dto.IsExpired);
     }
+
+    [Fact]
+    public void DefaultMaterialsCatalog_ShouldReturn59CuratedMaterialsWithStockZeroAndDefaultFlag()
+    {
+        // Act
+        var materials = Clinic.Domain.Helpers.DefaultMaterialsCatalog.GetDefaultMaterials("clinic-seed-1", "doc-seed-1");
+
+        // Assert
+        Assert.Equal(59, materials.Count);
+        Assert.All(materials, m =>
+        {
+            Assert.Equal("clinic-seed-1", m.ClinicId);
+            Assert.Equal("doc-seed-1", m.DoctorId);
+            Assert.Equal(0, m.Quantity);
+            Assert.True(m.IsDefault);
+            Assert.False(string.IsNullOrWhiteSpace(m.Name));
+            Assert.False(string.IsNullOrWhiteSpace(m.Category));
+            Assert.False(string.IsNullOrWhiteSpace(m.Unit));
+            Assert.Equal("Dr MAHDY", m.SupplierName);
+            Assert.True(m.UnitCost.HasValue && m.UnitCost.Value > 0);
+        });
+    }
+
+    [Fact]
+    public async Task MaterialSeedingService_WhenClinicHasNoDefaults_SeedsAllMaterials()
+    {
+        // Arrange
+        var mockRepo = new Mock<IMaterialRepository>();
+        mockRepo.Setup(r => r.GetByDoctorAndClinicAsync("doc-1", "clinic-1"))
+            .ReturnsAsync(new List<Material>());
+
+        var service = new MaterialSeedingService(mockRepo.Object);
+
+        // Act
+        await service.SeedDefaultMaterialsAsync("clinic-1", "doc-1");
+
+        // Assert
+        mockRepo.Verify(r => r.AddRangeAsync(It.Is<IEnumerable<Material>>(list => list.Count() == 59)), Times.Once);
+    }
+
+    [Fact]
+    public async Task MaterialSeedingService_WhenClinicAlreadyHasDefaultMaterials_DoesNotDuplicate()
+    {
+        // Arrange
+        var mockRepo = new Mock<IMaterialRepository>();
+        var existingSeededMaterial = new Material
+        {
+            Id = "existing-1",
+            ClinicId = "clinic-1",
+            DoctorId = "doc-1",
+            Name = "Sili Kit BMS",
+            IsDefault = true,
+            Quantity = 0
+        };
+        mockRepo.Setup(r => r.GetByDoctorAndClinicAsync("doc-1", "clinic-1"))
+            .ReturnsAsync(new List<Material> { existingSeededMaterial });
+
+        var service = new MaterialSeedingService(mockRepo.Object);
+
+        // Act
+        await service.SeedDefaultMaterialsAsync("clinic-1", "doc-1");
+
+        // Assert - AddRangeAsync should never be invoked to prevent duplicates
+        mockRepo.Verify(r => r.AddRangeAsync(It.IsAny<IEnumerable<Material>>()), Times.Never);
+    }
 }

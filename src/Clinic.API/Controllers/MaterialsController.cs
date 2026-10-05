@@ -1,8 +1,11 @@
 using Clinic.Application.DTOs;
 using Clinic.Application.Interfaces;
 using Clinic.Domain.Entities;
+using Clinic.Infrastructure.Data;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
+using System.Security.Claims;
 
 namespace Clinic.API.Controllers;
 
@@ -13,11 +16,19 @@ public class MaterialsController : ControllerBase
 {
     private readonly IMaterialRepository _repo;
     private readonly IMaterialAlertService? _alertService;
+    private readonly IMaterialSeedingService? _seedingService;
+    private readonly ClinicDbContext? _context;
 
-    public MaterialsController(IMaterialRepository repo, IMaterialAlertService? alertService = null)
+    public MaterialsController(
+        IMaterialRepository repo, 
+        IMaterialAlertService? alertService = null,
+        IMaterialSeedingService? seedingService = null,
+        ClinicDbContext? context = null)
     {
         _repo = repo;
         _alertService = alertService;
+        _seedingService = seedingService;
+        _context = context;
     }
 
     [HttpGet("low-stock")]
@@ -44,6 +55,71 @@ public class MaterialsController : ControllerBase
         }
 
         var materials = await _repo.GetExpiredAsync(clinicId, doctorId);
+        var dtos = materials.Select(MapToDto);
+        return Ok(new { data = dtos });
+    }
+
+    [HttpGet]
+    public async Task<IActionResult> GetAll([FromQuery] string? clinicId, [FromQuery] string? doctorId)
+    {
+        var role = User.FindFirst(ClaimTypes.Role)?.Value;
+        var doctorIdClaim = User.FindFirst("doctorId")?.Value;
+        var clinicIdClaim = User.FindFirst("clinicId")?.Value;
+
+        if (!string.IsNullOrEmpty(clinicIdClaim))
+        {
+            if (!string.IsNullOrEmpty(clinicId) && clinicId != "all" && clinicId != clinicIdClaim)
+            {
+                return StatusCode(403, new { message = "You can only view materials for your assigned clinic" });
+            }
+            clinicId = clinicIdClaim;
+        }
+
+        if (string.IsNullOrEmpty(doctorId) && !string.IsNullOrEmpty(doctorIdClaim) && role == "doctor")
+        {
+            doctorId = doctorIdClaim;
+        }
+
+        IEnumerable<Material> materials;
+
+        if (!string.IsNullOrEmpty(clinicId) && clinicId != "all")
+        {
+            if (!string.IsNullOrEmpty(doctorId))
+            {
+                materials = await _repo.GetByDoctorAndClinicAsync(doctorId, clinicId);
+            }
+            else
+            {
+                var all = await _repo.GetAllAsync();
+                materials = all.Where(m => m.ClinicId == clinicId);
+            }
+        }
+        else if (!string.IsNullOrEmpty(doctorId))
+        {
+            materials = await _repo.GetByDoctorIdAsync(doctorId);
+        }
+        else
+        {
+            if (role == "assistant")
+            {
+                var assistantClinicIds = User.FindAll("clinicIds").Select(c => c.Value).ToList();
+                var singleClinicId = User.FindFirst("clinicId")?.Value;
+                if (!string.IsNullOrEmpty(singleClinicId) && !assistantClinicIds.Contains(singleClinicId))
+                {
+                    assistantClinicIds.Add(singleClinicId);
+                }
+
+                var all = await _repo.GetAllAsync();
+                materials = assistantClinicIds.Any()
+                    ? all.Where(m => assistantClinicIds.Contains(m.ClinicId ?? ""))
+                    : all;
+            }
+            else
+            {
+                materials = await _repo.GetAllAsync();
+            }
+        }
+
         var dtos = materials.Select(MapToDto);
         return Ok(new { data = dtos });
     }
@@ -100,12 +176,30 @@ public class MaterialsController : ControllerBase
                 return StatusCode(403, new { message = "You can only manage materials for your assigned clinic" });
         }
 
+        var doctorId = !string.IsNullOrEmpty(dto.DoctorId) ? dto.DoctorId : User.FindFirst("doctorId")?.Value;
+        if (string.IsNullOrEmpty(doctorId) && _context != null)
+        {
+            var clinic = await _context.Clinics.Include(c => c.DoctorClinics).FirstOrDefaultAsync(c => c.Id == dto.ClinicId);
+            doctorId = clinic?.CreatorDoctorId ?? clinic?.DoctorClinics.FirstOrDefault()?.DoctorId;
+            if (string.IsNullOrEmpty(doctorId))
+            {
+                var anyDoctor = await _context.Doctors.FirstOrDefaultAsync();
+                doctorId = anyDoctor?.Id ?? "doc-default";
+            }
+        }
+        if (string.IsNullOrEmpty(doctorId))
+        {
+            doctorId = "doc-default";
+        }
+
         var material = new Material
         {
             Id = string.IsNullOrEmpty(dto.Id) ? Guid.NewGuid().ToString() : dto.Id,
             ClinicId = dto.ClinicId,
-            DoctorId = dto.DoctorId,
+            DoctorId = doctorId,
             Name = dto.Name,
+            Category = dto.Category,
+            IsDefault = dto.IsDefault,
             Quantity = dto.Quantity,
             Unit = dto.Unit,
             MinStockAlert = dto.MinStockAlert > 0 ? dto.MinStockAlert : 5,
@@ -141,6 +235,7 @@ public class MaterialsController : ControllerBase
         }
 
         material.Name = dto.Name;
+        if (dto.Category != null) material.Category = dto.Category;
         material.Quantity = dto.Quantity;
         material.Unit = dto.Unit;
         material.ClinicId = dto.ClinicId;
@@ -221,12 +316,53 @@ public class MaterialsController : ControllerBase
         });
     }
 
+    [HttpPost("seed-defaults")]
+    public async Task<IActionResult> SeedDefaults([FromQuery] string clinicId)
+    {
+        if (string.IsNullOrWhiteSpace(clinicId) || clinicId == "all")
+            return BadRequest(new { message = "A specific clinicId is required to seed default materials." });
+
+        var doctorIdClaim = User.FindFirst("doctorId")?.Value;
+        var clinicIdClaim = User.FindFirst("clinicId")?.Value;
+
+        if (!string.IsNullOrEmpty(clinicIdClaim) && clinicIdClaim != clinicId)
+            return StatusCode(403, new { message = "You can only seed materials for your assigned clinic." });
+
+        var targetDoctorId = doctorIdClaim;
+        if (string.IsNullOrEmpty(targetDoctorId) && _context != null)
+        {
+            var clinic = await _context.Clinics.Include(c => c.DoctorClinics).FirstOrDefaultAsync(c => c.Id == clinicId);
+            targetDoctorId = clinic?.CreatorDoctorId ?? clinic?.DoctorClinics.FirstOrDefault()?.DoctorId;
+            if (string.IsNullOrEmpty(targetDoctorId))
+            {
+                var anyDoctor = await _context.Doctors.FirstOrDefaultAsync();
+                targetDoctorId = anyDoctor?.Id ?? "doc-default";
+            }
+        }
+
+        if (string.IsNullOrEmpty(targetDoctorId))
+        {
+            targetDoctorId = "doc-default";
+        }
+
+        if (_seedingService != null)
+        {
+            await _seedingService.SeedDefaultMaterialsAsync(clinicId, targetDoctorId);
+        }
+
+        var all = await _repo.GetAllAsync();
+        var materials = all.Where(m => m.ClinicId == clinicId);
+        return Ok(new { message = "Default materials seeded successfully.", data = materials.Select(MapToDto) });
+    }
+
     private static MaterialDto MapToDto(Material m) => new()
     {
         Id = m.Id,
         ClinicId = m.ClinicId,
         DoctorId = m.DoctorId,
         Name = m.Name,
+        Category = m.Category,
+        IsDefault = m.IsDefault,
         Quantity = m.Quantity,
         Unit = m.Unit,
         MinStockAlert = m.MinStockAlert,

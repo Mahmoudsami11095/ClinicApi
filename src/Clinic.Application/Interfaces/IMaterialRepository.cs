@@ -11,6 +11,7 @@ public interface IMaterialRepository
     Task<IEnumerable<Material>> GetByDoctorAndClinicAsync(string doctorId, string clinicId);
     Task<Material?> GetByIdAsync(string id);
     Task AddAsync(Material material);
+    Task AddRangeAsync(IEnumerable<Material> materials);
     Task UpdateAsync(Material material);
     Task DeleteAsync(string id);
 }

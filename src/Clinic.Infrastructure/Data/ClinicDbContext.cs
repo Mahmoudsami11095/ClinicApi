@@ -391,6 +391,8 @@ public class ClinicDbContext : DbContext
             entity.ToTable("Materials");
             entity.HasKey(e => e.Id);
             entity.Property(e => e.Name).HasMaxLength(200).IsRequired();
+            entity.Property(e => e.Category).HasMaxLength(100);
+            entity.Property(e => e.IsDefault).HasDefaultValue(false);
             entity.Property(e => e.DoctorId).IsRequired();
             entity.Property(e => e.Unit).HasMaxLength(50);
             entity.Property(e => e.SupplierName).HasMaxLength(200);

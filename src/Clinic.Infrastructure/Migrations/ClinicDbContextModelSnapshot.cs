@@ -241,8 +241,7 @@ namespace Clinic.Infrastructure.Migrations
                         .HasColumnType("nvarchar(100)");
 
                     b.Property<string>("ClinicId")
-                        .HasMaxLength(100)
-                        .HasColumnType("nvarchar(100)");
+                        .HasColumnType("nvarchar(450)");
 
                     b.Property<string>("CreatedAt")
                         .IsRequired()
@@ -251,8 +250,7 @@ namespace Clinic.Infrastructure.Migrations
 
                     b.Property<string>("DoctorId")
                         .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("nvarchar(100)");
+                        .HasColumnType("nvarchar(450)");
 
                     b.Property<string>("DoctorName")
                         .IsRequired()
@@ -266,8 +264,7 @@ namespace Clinic.Infrastructure.Migrations
 
                     b.Property<string>("PatientId")
                         .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("nvarchar(100)");
+                        .HasColumnType("nvarchar(450)");
 
                     b.Property<string>("Title")
                         .IsRequired()
@@ -494,6 +491,10 @@ namespace Clinic.Infrastructure.Migrations
                     b.Property<string>("BatchNumber")
                         .HasColumnType("nvarchar(max)");
 
+                    b.Property<string>("Category")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
                     b.Property<string>("ClinicId")
                         .IsRequired()
                         .HasColumnType("nvarchar(450)");
@@ -504,6 +505,11 @@ namespace Clinic.Infrastructure.Migrations
 
                     b.Property<DateTime?>("ExpirationDate")
                         .HasColumnType("datetime2");
+
+                    b.Property<bool>("IsDefault")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bit")
+                        .HasDefaultValue(false);
 
                     b.Property<string>("LastRestockedAt")
                         .HasMaxLength(50)

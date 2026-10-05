@@ -73,6 +73,12 @@ public class MaterialRepository : IMaterialRepository
         await _context.SaveChangesAsync();
     }
 
+    public async Task AddRangeAsync(IEnumerable<Material> materials)
+    {
+        await _context.Materials.AddRangeAsync(materials);
+        await _context.SaveChangesAsync();
+    }
+
     public async Task UpdateAsync(Material material)
     {
         _context.Materials.Update(material);
