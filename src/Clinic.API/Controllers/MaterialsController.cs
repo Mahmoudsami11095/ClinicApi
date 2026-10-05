@@ -208,6 +208,7 @@ public class MaterialsController : ControllerBase
             SupplierName = dto.SupplierName,
             UnitCost = dto.UnitCost,
             PurchaseOrderRef = dto.PurchaseOrderRef,
+            ImageUrl = dto.ImageUrl?.Trim(),
             LastRestockedAt = DateTime.UtcNow.ToString("o")
         };
         await _repo.AddAsync(material);
@@ -245,6 +246,7 @@ public class MaterialsController : ControllerBase
         material.SupplierName = dto.SupplierName;
         material.UnitCost = dto.UnitCost;
         material.PurchaseOrderRef = dto.PurchaseOrderRef;
+        if (dto.ImageUrl != null) material.ImageUrl = dto.ImageUrl.Trim();
 
         await _repo.UpdateAsync(material);
 
@@ -420,6 +422,7 @@ public class MaterialsController : ControllerBase
                 SupplierName = dto.SupplierName,
                 UnitCost = dto.UnitCost,
                 PurchaseOrderRef = dto.PurchaseOrderRef,
+                ImageUrl = dto.ImageUrl?.Trim(),
                 LastRestockedAt = DateTime.UtcNow.ToString("o")
             });
         }
@@ -455,7 +458,8 @@ public class MaterialsController : ControllerBase
         SupplierName = m.SupplierName,
         UnitCost = m.UnitCost,
         LastRestockedAt = m.LastRestockedAt,
-        PurchaseOrderRef = m.PurchaseOrderRef
+        PurchaseOrderRef = m.PurchaseOrderRef,
+        ImageUrl = m.ImageUrl
     };
 }
 

@@ -503,6 +503,9 @@ namespace Clinic.Infrastructure.Migrations
                     b.Property<string>("DoctorId")
                         .HasColumnType("nvarchar(max)");
 
+                    b.Property<string>("ImageUrl")
+                        .HasColumnType("nvarchar(max)");
+
                     b.Property<DateTime?>("LastMaintenanceDate")
                         .HasColumnType("datetime2");
 
@@ -586,6 +589,9 @@ namespace Clinic.Infrastructure.Migrations
 
                     b.Property<DateTime?>("ExpirationDate")
                         .HasColumnType("datetime2");
+
+                    b.Property<string>("ImageUrl")
+                        .HasColumnType("nvarchar(max)");
 
                     b.Property<bool>("IsDefault")
                         .ValueGeneratedOnAdd()

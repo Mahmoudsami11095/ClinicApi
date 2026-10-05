@@ -19,6 +19,7 @@ public class Material
     public decimal? UnitCost { get; set; }
     public string? LastRestockedAt { get; set; }
     public string? PurchaseOrderRef { get; set; }
+    public string? ImageUrl { get; set; }
 
     public bool IsExpired => ExpirationDate.HasValue && ExpirationDate.Value.Date < DateTime.UtcNow.Date;
 
