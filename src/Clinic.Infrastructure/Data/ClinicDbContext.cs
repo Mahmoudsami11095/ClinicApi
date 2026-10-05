@@ -29,6 +29,9 @@ public class ClinicDbContext : DbContext
     public DbSet<ClinicalNote> ClinicalNotes => Set<ClinicalNote>();
     public DbSet<Equipment> Equipment => Set<Equipment>();
     public DbSet<ClinicChair> ClinicChairs => Set<ClinicChair>();
+    public DbSet<DoctorCommissionPlan> DoctorCommissionPlans => Set<DoctorCommissionPlan>();
+    public DbSet<CommissionPayout> CommissionPayouts => Set<CommissionPayout>();
+    public DbSet<CommissionPayoutItem> CommissionPayoutItems => Set<CommissionPayoutItem>();
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
@@ -573,6 +576,76 @@ public class ClinicDbContext : DbContext
             entity.Property(e => e.ProcedureName).HasMaxLength(200);
             entity.Property(e => e.Notes).HasMaxLength(1000);
             entity.HasIndex(e => e.ClinicId);
+        });
+
+        // ── DoctorCommissionPlan ──
+        modelBuilder.Entity<DoctorCommissionPlan>(entity =>
+        {
+            entity.ToTable("DoctorCommissionPlans");
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.DoctorId).HasMaxLength(100).IsRequired();
+            entity.Property(e => e.ClinicId).HasMaxLength(100);
+            entity.Property(e => e.DefaultCommissionRate).HasColumnType("decimal(18,2)");
+            entity.Property(e => e.LabFeeDeductionType).HasMaxLength(50).HasDefaultValue("BeforeCommission");
+            entity.Property(e => e.SpecialtyRatesJson).HasMaxLength(4000);
+            entity.HasIndex(e => new { e.DoctorId, e.ClinicId });
+
+            entity.HasOne(e => e.Doctor)
+                  .WithMany()
+                  .HasForeignKey(e => e.DoctorId)
+                  .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne(e => e.Clinic)
+                  .WithMany()
+                  .HasForeignKey(e => e.ClinicId)
+                  .OnDelete(DeleteBehavior.SetNull);
+        });
+
+        // ── CommissionPayout ──
+        modelBuilder.Entity<CommissionPayout>(entity =>
+        {
+            entity.ToTable("CommissionPayouts");
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.DoctorId).HasMaxLength(100).IsRequired();
+            entity.Property(e => e.ClinicId).HasMaxLength(100);
+            entity.Property(e => e.TotalGrossRevenue).HasColumnType("decimal(18,2)");
+            entity.Property(e => e.TotalLabFeesDeducted).HasColumnType("decimal(18,2)");
+            entity.Property(e => e.TotalNetCommission).HasColumnType("decimal(18,2)");
+            entity.Property(e => e.ClinicRetainedRevenue).HasColumnType("decimal(18,2)");
+            entity.Property(e => e.Status).HasMaxLength(50).HasDefaultValue("Draft");
+            entity.Property(e => e.PaymentReference).HasMaxLength(100);
+            entity.Property(e => e.Notes).HasMaxLength(1000);
+            entity.HasIndex(e => new { e.DoctorId, e.ClinicId, e.PeriodStart, e.PeriodEnd });
+
+            entity.HasOne(e => e.Doctor)
+                  .WithMany()
+                  .HasForeignKey(e => e.DoctorId)
+                  .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne(e => e.Clinic)
+                  .WithMany()
+                  .HasForeignKey(e => e.ClinicId)
+                  .OnDelete(DeleteBehavior.SetNull);
+
+            entity.HasMany(e => e.Items)
+                  .WithOne()
+                  .HasForeignKey(i => i.CommissionPayoutId)
+                  .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        // ── CommissionPayoutItem ──
+        modelBuilder.Entity<CommissionPayoutItem>(entity =>
+        {
+            entity.ToTable("CommissionPayoutItems");
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.PatientName).HasMaxLength(200);
+            entity.Property(e => e.ServiceCategory).HasMaxLength(100);
+            entity.Property(e => e.Description).HasMaxLength(500);
+            entity.Property(e => e.GrossAmount).HasColumnType("decimal(18,2)");
+            entity.Property(e => e.LabFee).HasColumnType("decimal(18,2)");
+            entity.Property(e => e.CommissionRate).HasColumnType("decimal(18,2)");
+            entity.Property(e => e.CommissionAmount).HasColumnType("decimal(18,2)");
+            entity.HasIndex(e => e.CommissionPayoutId);
         });
     }
 }
