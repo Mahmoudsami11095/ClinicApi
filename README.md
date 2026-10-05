@@ -17,7 +17,16 @@ ASP.NET Core Web API built on **Clean Architecture** principles serving the Smar
 ## 🏛️ Architecture Overview
 
 The solution adheres to Clean Architecture with 4 distinct layers:
-1. **`Clinic.API`**: REST controllers, SignalR hubs, JWT authentication middleware, and action filters.
-2. **`Clinic.Application`**: Application use cases, DTOs, business interfaces, and validators.
-3. **`Clinic.Domain`**: Core enterprise domain entities (`Patient`, `Doctor`, `DentalLog`, `Appointment`, `Prescription`, `BillingRecord`) and domain enums.
+1. **`Clinic.API`**: REST controllers (`AuthController`, `PatientsController`, `AppointmentsController`, `PrescriptionsController`, `BillingController`, `MaterialsController`, `EquipmentController`, `RadiologyController`), SignalR hubs, JWT authentication middleware, and action filters.
+2. **`Clinic.Application`**: Application use cases, DTOs (`EquipmentDto`, `MaterialDto`, etc.), business interfaces, and validators.
+3. **`Clinic.Domain`**: Core enterprise domain entities (`Patient`, `Doctor`, `DentalLog`, `Appointment`, `Prescription`, `BillingRecord`, `Material`, `Equipment`) and domain enums.
 4. **`Clinic.Infrastructure`**: Entity Framework Core persistence with Azure SQL, database seeders, and SignalR notification dispatchers.
+
+---
+
+## 🔬 Automated Test Suite
+
+- **Unit Tests (`tests/Clinic.UnitTests`):** 239 passing (xUnit + Moq). Covers domain models, lifecycle state transitions, and business alert rules.
+- **Integration Tests (`tests/Clinic.IntegrationTests`):** 54 passing (`CustomWebApplicationFactory`). Covers authenticated REST endpoints, CRUD lifecycle, multi-tenant isolation, and maintenance logging.
+- **Total Suite:** **293 Tests Passing (0 Failures)**.
+
