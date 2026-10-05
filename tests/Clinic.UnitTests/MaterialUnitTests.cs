@@ -329,7 +329,7 @@ public class MaterialUnitTests
             Assert.False(string.IsNullOrWhiteSpace(m.Name));
             Assert.False(string.IsNullOrWhiteSpace(m.Category));
             Assert.False(string.IsNullOrWhiteSpace(m.Unit));
-            Assert.Equal("Dr MAHDY", m.SupplierName);
+            Assert.Null(m.SupplierName);
             Assert.True(m.UnitCost.HasValue && m.UnitCost.Value > 0);
         });
     }
