@@ -123,6 +123,7 @@ public class EquipmentController : ControllerBase
             MaintenanceNotes = dto.MaintenanceNotes,
             ServiceProvider = dto.ServiceProvider,
             ServiceContactPhone = dto.ServiceContactPhone,
+            ImageUrl = dto.ImageUrl?.Trim(),
             CreatedAt = DateTime.UtcNow
         };
 
@@ -157,6 +158,7 @@ public class EquipmentController : ControllerBase
         item.MaintenanceNotes = dto.MaintenanceNotes;
         item.ServiceProvider = dto.ServiceProvider;
         item.ServiceContactPhone = dto.ServiceContactPhone;
+        item.ImageUrl = dto.ImageUrl?.Trim();
 
         await _repo.UpdateAsync(item);
         return Ok(new { message = "Equipment updated successfully.", data = MapToDto(item) });
@@ -227,6 +229,7 @@ public class EquipmentController : ControllerBase
                 SerialNumber = "SN-AUT-" + Guid.NewGuid().ToString().Substring(0, 8).ToUpper(),
                 RoomOrChair = "Sterilization Room",
                 Status = "Operational",
+                ImageUrl = "/images/equipment/autoclave.jpg",
                 NextMaintenanceDate = DateTime.UtcNow.AddMonths(3),
                 MaintenanceNotes = "Monthly spore test and door gasket inspection required."
             },
@@ -240,6 +243,7 @@ public class EquipmentController : ControllerBase
                 SerialNumber = "SN-CHR-" + Guid.NewGuid().ToString().Substring(0, 8).ToUpper(),
                 RoomOrChair = "Operatory 1",
                 Status = "Operational",
+                ImageUrl = "/images/equipment/dental-chair.jpg",
                 NextMaintenanceDate = DateTime.UtcNow.AddMonths(6),
                 MaintenanceNotes = "Hydraulic pressure and suction canister filter check."
             },
@@ -253,6 +257,7 @@ public class EquipmentController : ControllerBase
                 SerialNumber = "SN-HP-" + Guid.NewGuid().ToString().Substring(0, 8).ToUpper(),
                 RoomOrChair = "Operatory 1",
                 Status = "Operational",
+                ImageUrl = "/images/equipment/handpiece.jpg",
                 NextMaintenanceDate = DateTime.UtcNow.AddMonths(1),
                 MaintenanceNotes = "Turbine lubrication cycle and push-button chuck test."
             },
@@ -266,6 +271,7 @@ public class EquipmentController : ControllerBase
                 SerialNumber = "SN-LGT-" + Guid.NewGuid().ToString().Substring(0, 8).ToUpper(),
                 RoomOrChair = "Operatory 1",
                 Status = "Operational",
+                ImageUrl = "/images/equipment/curing-light.jpg",
                 NextMaintenanceDate = DateTime.UtcNow.AddMonths(6),
                 MaintenanceNotes = "Radiometer intensity test (minimum 1200 mW/cm²)."
             },
@@ -279,6 +285,7 @@ public class EquipmentController : ControllerBase
                 SerialNumber = "SN-SCL-" + Guid.NewGuid().ToString().Substring(0, 8).ToUpper(),
                 RoomOrChair = "Operatory 1",
                 Status = "Operational",
+                ImageUrl = "/images/equipment/ultrasonic-scaler.jpg",
                 NextMaintenanceDate = DateTime.UtcNow.AddMonths(4),
                 MaintenanceNotes = "Handpiece cable and water line disinfection."
             }
@@ -308,6 +315,7 @@ public class EquipmentController : ControllerBase
         MaintenanceNotes = e.MaintenanceNotes,
         ServiceProvider = e.ServiceProvider,
         ServiceContactPhone = e.ServiceContactPhone,
+        ImageUrl = e.ImageUrl,
         CreatedAt = e.CreatedAt,
         IsMaintenanceDue = e.IsMaintenanceDue,
         IsWarrantyExpired = e.IsWarrantyExpired

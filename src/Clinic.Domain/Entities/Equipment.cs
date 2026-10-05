@@ -20,6 +20,7 @@ public class Equipment
     public string? MaintenanceNotes { get; set; }
     public string? ServiceProvider { get; set; }
     public string? ServiceContactPhone { get; set; }
+    public string? ImageUrl { get; set; }
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 
     public bool IsMaintenanceDue => NextMaintenanceDate.HasValue && NextMaintenanceDate.Value.Date <= DateTime.UtcNow.Date;

@@ -20,6 +20,7 @@ public class MaterialDto
     public decimal? UnitCost { get; set; }
     public string? LastRestockedAt { get; set; }
     public string? PurchaseOrderRef { get; set; }
+    public string? ImageUrl { get; set; }
 }
 
 public class ConsumedMaterialDto

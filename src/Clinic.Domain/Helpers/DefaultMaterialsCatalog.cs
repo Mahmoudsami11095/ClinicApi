@@ -163,6 +163,7 @@ public static class DefaultMaterialsCatalog
                 MinStockAlert = 3,
                 SupplierName = null,
                 UnitCost = 190.00m,
+                ImageUrl = "/images/materials/composite.jpg",
                 IsDefault = true
             },
             new Material
@@ -565,6 +566,7 @@ public static class DefaultMaterialsCatalog
                 MinStockAlert = 2,
                 SupplierName = null,
                 UnitCost = 190.00m,
+                ImageUrl = "/images/materials/anesthetic.jpg",
                 IsDefault = true
             },
             new Material

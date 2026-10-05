@@ -20,6 +20,7 @@ public class EquipmentDto
     public string? MaintenanceNotes { get; set; }
     public string? ServiceProvider { get; set; }
     public string? ServiceContactPhone { get; set; }
+    public string? ImageUrl { get; set; }
     public DateTime? CreatedAt { get; set; }
     public bool IsMaintenanceDue { get; set; }
     public bool IsWarrantyExpired { get; set; }
