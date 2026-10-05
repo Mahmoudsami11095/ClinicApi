@@ -116,4 +116,29 @@ public class InwardShipmentIntegrationTests : IClassFixture<CustomWebApplication
         Assert.Equal(45.00m, data.GetProperty("unitCost").GetDecimal());
         Assert.NotNull(data.GetProperty("lastRestockedAt").GetString());
     }
+
+    [Fact]
+    public async Task BulkImport_ShouldInsertMultipleMaterials_AndReturn200()
+    {
+        var token = GenerateJwtToken(role: "admin", clinicId: "clinic-bulk-test-1");
+
+        var payload = new[]
+        {
+            new { Name = "Bulk Cavity Liner", Category = "Restorative", Quantity = 12, Unit = "Syringes", MinStockAlert = 3 },
+            new { Name = "Bulk Cotton Pellets", Category = "Disposables", Quantity = 100, Unit = "Boxes", MinStockAlert = 20 }
+        };
+
+        var request = new HttpRequestMessage(HttpMethod.Post, "/api/materials/bulk-import?clinicId=clinic-bulk-test-1")
+        {
+            Content = new StringContent(JsonSerializer.Serialize(payload), Encoding.UTF8, "application/json")
+        };
+        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
+
+        var response = await _client.SendAsync(request);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var json = await response.Content.ReadAsStringAsync();
+        using var doc = JsonDocument.Parse(json);
+        Assert.Equal(2, doc.RootElement.GetProperty("count").GetInt32());
+    }
 }

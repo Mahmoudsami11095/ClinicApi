@@ -355,6 +355,90 @@ public class MaterialsController : ControllerBase
         return Ok(new { message = "Default materials seeded successfully.", data = materials.Select(MapToDto) });
     }
 
+    [HttpPost("bulk-import")]
+    public async Task<IActionResult> BulkImport([FromBody] List<MaterialDto> dtos, [FromQuery] string? clinicId)
+    {
+        if (dtos == null || dtos.Count == 0)
+        {
+            return BadRequest(new { message = "No materials provided for import." });
+        }
+
+        var clinicIdClaim = User.FindFirst("clinicId")?.Value;
+        if (!string.IsNullOrEmpty(clinicIdClaim))
+        {
+            clinicId = clinicIdClaim;
+        }
+
+        if (string.IsNullOrEmpty(clinicId) || clinicId == "all")
+        {
+            return BadRequest(new { message = "A specific clinic must be selected for bulk import." });
+        }
+
+        var doctorIdClaim = User.FindFirst("doctorId")?.Value;
+        string targetDoctorId = doctorIdClaim ?? "";
+
+        if (string.IsNullOrEmpty(targetDoctorId) && _context != null)
+        {
+            var clinic = await _context.Clinics.FindAsync(clinicId);
+            if (clinic != null && !string.IsNullOrEmpty(clinic.CreatorDoctorId))
+            {
+                targetDoctorId = clinic.CreatorDoctorId;
+            }
+            else
+            {
+                var assignedDoc = await _context.DoctorClinics
+                    .Where(dc => dc.ClinicId == clinicId)
+                    .Select(dc => dc.DoctorId)
+                    .FirstOrDefaultAsync();
+                targetDoctorId = assignedDoc ?? "doc-default";
+            }
+        }
+
+        if (string.IsNullOrEmpty(targetDoctorId))
+        {
+            targetDoctorId = "doc-default";
+        }
+
+        var materialsToAdd = new List<Material>();
+        foreach (var dto in dtos)
+        {
+            if (string.IsNullOrWhiteSpace(dto.Name)) continue;
+
+            materialsToAdd.Add(new Material
+            {
+                Id = string.IsNullOrEmpty(dto.Id) ? Guid.NewGuid().ToString() : dto.Id,
+                ClinicId = clinicId,
+                DoctorId = targetDoctorId,
+                Name = dto.Name.Trim(),
+                Category = string.IsNullOrWhiteSpace(dto.Category) ? "General" : dto.Category.Trim(),
+                IsDefault = false,
+                Quantity = dto.Quantity >= 0 ? dto.Quantity : 0,
+                Unit = string.IsNullOrWhiteSpace(dto.Unit) ? "Pieces" : dto.Unit.Trim(),
+                MinStockAlert = dto.MinStockAlert > 0 ? dto.MinStockAlert : 5,
+                ExpirationDate = dto.ExpirationDate,
+                BatchNumber = dto.BatchNumber,
+                SupplierName = dto.SupplierName,
+                UnitCost = dto.UnitCost,
+                PurchaseOrderRef = dto.PurchaseOrderRef,
+                LastRestockedAt = DateTime.UtcNow.ToString("o")
+            });
+        }
+
+        if (materialsToAdd.Count == 0)
+        {
+            return BadRequest(new { message = "No valid materials found to import. Each item must have a Name." });
+        }
+
+        await _repo.AddRangeAsync(materialsToAdd);
+
+        return Ok(new 
+        { 
+            message = $"{materialsToAdd.Count} materials imported successfully.", 
+            count = materialsToAdd.Count,
+            data = materialsToAdd.Select(MapToDto)
+        });
+    }
+
     private static MaterialDto MapToDto(Material m) => new()
     {
         Id = m.Id,
