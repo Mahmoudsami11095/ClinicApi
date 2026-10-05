@@ -17,13 +17,10 @@ public class MaterialsController : ControllerBase
     private readonly IMaterialRepository _repo;
     private readonly IMaterialAlertService? _alertService;
     private readonly IMaterialSeedingService? _seedingService;
-    private readonly ClinicDbContext? _context;
-
     public MaterialsController(
         IMaterialRepository repo, 
         IMaterialAlertService? alertService = null,
-        IMaterialSeedingService? seedingService = null,
-        ClinicDbContext? context = null)
+        IMaterialSeedingService? seedingService = null)
     {
         _repo = repo;
         _alertService = alertService;
@@ -90,8 +87,7 @@ public class MaterialsController : ControllerBase
             }
             else
             {
-                var all = await _repo.GetAllAsync();
-                materials = all.Where(m => m.ClinicId == clinicId);
+                materials = await _repo.GetByClinicIdAsync(clinicId);
             }
         }
         else if (!string.IsNullOrEmpty(doctorId))
@@ -109,10 +105,9 @@ public class MaterialsController : ControllerBase
                     assistantClinicIds.Add(singleClinicId);
                 }
 
-                var all = await _repo.GetAllAsync();
                 materials = assistantClinicIds.Any()
-                    ? all.Where(m => assistantClinicIds.Contains(m.ClinicId ?? ""))
-                    : all;
+                    ? await _repo.GetByClinicIdsAsync(assistantClinicIds)
+                    : await _repo.GetAllAsync();
             }
             else
             {

@@ -1,9 +1,23 @@
+/* Copyright (c) 2026. All rights reserved. */
+/* Copyright (c) 2026. All rights reserved. */
 namespace Clinic.Domain.Helpers;
 
 using Clinic.Domain.Entities;
 
 public static class DefaultMaterialsCatalog
 {
+    /// <summary>
+    /// Generates a list of default materials for a given clinic and doctor.
+    /// </summary>
+    /// <param name="clinicId">The target clinic identifier.</param>
+    /// <param name="doctorId">The target doctor identifier.</param>
+    /// <returns>A list of initialized default Material entities.</returns>
+    /// <summary>
+    /// Generates a list of default materials for a given clinic and doctor.
+    /// </summary>
+    /// <param name="clinicId">The target clinic identifier.</param>
+    /// <param name="doctorId">The target doctor identifier.</param>
+    /// <returns>A list of initialized default Material entities.</returns>
     public static List<Material> GetDefaultMaterials(string clinicId, string doctorId)
     {
         return new List<Material>
