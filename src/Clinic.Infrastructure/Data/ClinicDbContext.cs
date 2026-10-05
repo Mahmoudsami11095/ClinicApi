@@ -28,6 +28,7 @@ public class ClinicDbContext : DbContext
     public DbSet<SubscriptionReceipt> SubscriptionReceipts => Set<SubscriptionReceipt>();
     public DbSet<ClinicalNote> ClinicalNotes => Set<ClinicalNote>();
     public DbSet<Equipment> Equipment => Set<Equipment>();
+    public DbSet<ClinicChair> ClinicChairs => Set<ClinicChair>();
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
@@ -554,6 +555,24 @@ public class ClinicDbContext : DbContext
                   .WithMany()
                   .HasForeignKey(e => e.ClinicId)
                   .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        // ── ClinicChair ──
+        modelBuilder.Entity<ClinicChair>(entity =>
+        {
+            entity.ToTable("ClinicChairs");
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.ClinicId).HasMaxLength(100).IsRequired();
+            entity.Property(e => e.RoomNumber).HasMaxLength(50);
+            entity.Property(e => e.ChairName).HasMaxLength(100).IsRequired();
+            entity.Property(e => e.Status).HasMaxLength(50).HasDefaultValue("available");
+            entity.Property(e => e.CurrentPatientId).HasMaxLength(100);
+            entity.Property(e => e.CurrentPatientName).HasMaxLength(200);
+            entity.Property(e => e.CurrentDoctorId).HasMaxLength(100);
+            entity.Property(e => e.CurrentDoctorName).HasMaxLength(200);
+            entity.Property(e => e.ProcedureName).HasMaxLength(200);
+            entity.Property(e => e.Notes).HasMaxLength(1000);
+            entity.HasIndex(e => e.ClinicId);
         });
     }
 }
