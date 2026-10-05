@@ -27,6 +27,7 @@ public class ClinicDbContext : DbContext
     public DbSet<SubscriptionSetting> SubscriptionSettings => Set<SubscriptionSetting>();
     public DbSet<SubscriptionReceipt> SubscriptionReceipts => Set<SubscriptionReceipt>();
     public DbSet<ClinicalNote> ClinicalNotes => Set<ClinicalNote>();
+    public DbSet<Equipment> Equipment => Set<Equipment>();
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
@@ -531,6 +532,28 @@ public class ClinicDbContext : DbContext
                 amendment.Property(a => a.AuthorName).HasMaxLength(200);
                 amendment.Property(a => a.Timestamp).HasMaxLength(50);
             });
+        });
+
+        // ── Equipment ──
+        modelBuilder.Entity<Equipment>(entity =>
+        {
+            entity.ToTable("Equipment");
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.Name).HasMaxLength(200).IsRequired();
+            entity.Property(e => e.Category).HasMaxLength(100).IsRequired();
+            entity.Property(e => e.SerialNumber).HasMaxLength(100);
+            entity.Property(e => e.ModelNumber).HasMaxLength(100);
+            entity.Property(e => e.Manufacturer).HasMaxLength(100);
+            entity.Property(e => e.RoomOrChair).HasMaxLength(100);
+            entity.Property(e => e.Status).HasMaxLength(50).HasDefaultValue("Operational");
+            entity.Property(e => e.ServiceProvider).HasMaxLength(200);
+            entity.Property(e => e.ServiceContactPhone).HasMaxLength(50);
+            entity.Property(e => e.PurchaseCost).HasColumnType("decimal(18,2)");
+
+            entity.HasOne(e => e.Clinic)
+                  .WithMany()
+                  .HasForeignKey(e => e.ClinicId)
+                  .OnDelete(DeleteBehavior.Cascade);
         });
     }
 }
