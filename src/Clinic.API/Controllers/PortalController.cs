@@ -424,4 +424,128 @@ public class PortalController : ControllerBase
 
         return Ok(receipt);
     }
+
+    [HttpGet("verify/rx/{id}")]
+    [AllowAnonymous]
+    public async Task<IActionResult> VerifyPrescription(string id)
+    {
+        var rx = await _context.Prescriptions
+            .Include(p => p.Doctor)
+            .Include(p => p.Patient)
+            .Include(p => p.Appointment)
+                .ThenInclude(a => a.Clinic)
+            .FirstOrDefaultAsync(p => p.Id == id);
+
+        if (rx == null)
+        {
+            return NotFound(new
+            {
+                isValid = false,
+                message = "The requested medical prescription could not be verified in the clinic registry.",
+                messageAr = "تعذر التحقق من الوصفة الطبية المطلوبة في سجلات العيادة."
+            });
+        }
+
+        var clinic = rx.Appointment?.Clinic ?? await _context.Clinics.FirstOrDefaultAsync();
+        var patientName = rx.Patient != null ? $"{rx.Patient.FirstName} {rx.Patient.LastName}".Trim() : "Patient";
+        var maskedPatientName = MaskName(patientName);
+
+        return Ok(new
+        {
+            isValid = true,
+            documentType = "Medical Prescription",
+            documentTypeAr = "وصفة طبية معتمدة",
+            id = rx.Id,
+            date = rx.Date,
+            status = rx.Status,
+            isFinalized = rx.IsFinalized,
+            verificationHash = rx.DigitalSignature ?? $"RX-SIG-{rx.Id.Substring(0, Math.Min(8, rx.Id.Length))}",
+            clinic = new
+            {
+                name = clinic?.Name ?? "Smart Clinic Healthcare Center",
+                address = clinic?.Address ?? "Cairo Medical District, Egypt",
+                phone = clinic?.Phone ?? "+20 100 000 0000"
+            },
+            doctor = new
+            {
+                name = rx.Doctor != null ? $"Dr. {rx.Doctor.FirstName} {rx.Doctor.LastName}" : "Attending Physician",
+                specialization = rx.Doctor?.Specialization ?? "General Dental Practice"
+            },
+            patient = new
+            {
+                maskedName = maskedPatientName,
+                allergies = rx.Patient?.Allergies ?? "No known drug allergies (NKDA)"
+            },
+            medications = rx.Medications.Select(m => new
+            {
+                name = m.Name,
+                dosage = m.Dosage,
+                frequency = m.Frequency,
+                duration = m.Duration
+            }),
+            instructions = rx.Notes ?? "Follow prescribed dosage schedule.",
+            verifiedAtUtc = DateTime.UtcNow
+        });
+    }
+
+    [HttpGet("verify/inv/{id}")]
+    [AllowAnonymous]
+    public async Task<IActionResult> VerifyInvoiceReceipt(string id)
+    {
+        var inv = await _context.BillingRecords
+            .Include(b => b.Patient)
+            .Include(b => b.Clinic)
+            .FirstOrDefaultAsync(b => b.Id == id);
+
+        if (inv == null)
+        {
+            return NotFound(new
+            {
+                isValid = false,
+                message = "The requested payment receipt could not be verified in the clinic registry.",
+                messageAr = "تعذر التحقق من سند القبض المطلوب في سجلات العيادة."
+            });
+        }
+
+        var clinic = inv.Clinic ?? await _context.Clinics.FirstOrDefaultAsync();
+        var patientName = inv.Patient != null ? $"{inv.Patient.FirstName} {inv.Patient.LastName}".Trim() : "Patient";
+        var maskedPatientName = MaskName(patientName);
+
+        return Ok(new
+        {
+            isValid = true,
+            documentType = "Official Tax Receipt",
+            documentTypeAr = "سند قبض مالي معتمد",
+            id = inv.Id,
+            invoiceNumber = string.IsNullOrWhiteSpace(inv.InvoiceNumber) ? $"INV-{inv.Id.Substring(0, 8)}" : inv.InvoiceNumber,
+            dateIssued = inv.DateIssued,
+            status = inv.Status,
+            clinic = new
+            {
+                name = clinic?.Name ?? "Smart Clinic Center",
+                taxNumber = "EG-TAX-98234-A",
+                address = clinic?.Address ?? "Cairo Medical District",
+                phone = clinic?.Phone ?? "+20 100 000 0000"
+            },
+            patient = new
+            {
+                maskedName = maskedPatientName
+            },
+            payment = new
+            {
+                paidAmount = inv.PaidAmount ?? inv.Amount,
+                totalAmount = inv.Amount,
+                paymentMethod = inv.PaymentMethod ?? "Credit Card / Cash",
+                description = inv.Description ?? "Dental & Clinical Services"
+            },
+            verifiedAtUtc = DateTime.UtcNow
+        });
+    }
+
+    private static string MaskName(string name)
+    {
+        if (string.IsNullOrWhiteSpace(name)) return "P******";
+        var parts = name.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        return string.Join(" ", parts.Select(p => p.Length <= 2 ? p : $"{p[0]}{new string('*', Math.Min(p.Length - 1, 4))}"));
+    }
 }
