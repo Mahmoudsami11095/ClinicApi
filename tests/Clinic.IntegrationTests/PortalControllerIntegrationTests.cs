@@ -1,4 +1,5 @@
 using System.Net;
+using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text.Json;
 using Xunit;
@@ -12,6 +13,20 @@ public class PortalControllerIntegrationTests : IClassFixture<CustomWebApplicati
     public PortalControllerIntegrationTests(CustomWebApplicationFactory factory)
     {
         _client = factory.CreateClient();
+    }
+
+    private async Task<string> GetPatientTokenAsync()
+    {
+        var phone = "+201088888888";
+        var sendRes = await _client.PostAsJsonAsync("/api/portal/auth/send-otp", new { phoneNumber = phone });
+        var sendJson = await sendRes.Content.ReadAsStringAsync();
+        using var sendDoc = JsonDocument.Parse(sendJson);
+        var code = sendDoc.RootElement.GetProperty("debugOtp").GetString();
+
+        var verifyRes = await _client.PostAsJsonAsync("/api/portal/auth/verify-otp", new { phoneNumber = phone, code });
+        var verifyJson = await verifyRes.Content.ReadAsStringAsync();
+        using var verifyDoc = JsonDocument.Parse(verifyJson);
+        return verifyDoc.RootElement.GetProperty("token").GetString()!;
     }
 
     [Fact]
@@ -79,5 +94,35 @@ public class PortalControllerIntegrationTests : IClassFixture<CustomWebApplicati
         using var doc = JsonDocument.Parse(content);
         Assert.True(doc.RootElement.TryGetProperty("slots", out var slots));
         Assert.True(slots.GetArrayLength() > 0);
+    }
+
+    [Fact]
+    public async Task GetInvoices_ShouldReturnOk()
+    {
+        // Arrange
+        var token = await GetPatientTokenAsync();
+        var client = _client;
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+
+        // Act
+        var response = await client.GetAsync("/api/portal/invoices?patientId=p-123");
+
+        // Assert
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task GetPrescriptionPrint_WhenNotFound_ShouldReturnNotFound()
+    {
+        // Arrange
+        var token = await GetPatientTokenAsync();
+        var client = _client;
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+
+        // Act
+        var response = await client.GetAsync("/api/portal/prescriptions/non-existent-id/print");
+
+        // Assert
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
     }
 }
