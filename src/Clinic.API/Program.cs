@@ -1,5 +1,6 @@
 using Clinic.Application;
 using Clinic.Infrastructure;
+using Clinic.Infrastructure.Data;
 using Clinic.Infrastructure.Seed;
 using System.Text.Json;
 using System.Text.Json.Serialization;
@@ -89,7 +90,49 @@ app.UseStaticFiles();
 app.MapControllers();
 app.MapHub<NotificationHub>("/hubs/notifications");
 
-app.MapGet("/api/health", () => Results.Ok(new { status = "awake", timestamp = DateTime.UtcNow }));
+var appStartTime = DateTime.UtcNow;
+
+app.MapGet("/api/health", async (ClinicDbContext db) => 
+{
+    var isDbHealthy = false;
+    try
+    {
+        isDbHealthy = await db.Database.CanConnectAsync();
+    }
+    catch
+    {
+        isDbHealthy = false;
+    }
+
+    return Results.Ok(new 
+    { 
+        status = "awake", 
+        version = "3.0.0",
+        environment = app.Environment.EnvironmentName,
+        database = isDbHealthy ? "connected" : "degraded",
+        uptimeSeconds = Math.Round((DateTime.UtcNow - appStartTime).TotalSeconds, 1),
+        timestamp = DateTime.UtcNow 
+    });
+});
+
+app.MapGet("/api/health/liveness", () => Results.Ok(new { status = "alive", timestamp = DateTime.UtcNow }));
+
+app.MapGet("/api/health/readiness", async (ClinicDbContext db) =>
+{
+    var isDbReady = false;
+    try
+    {
+        isDbReady = await db.Database.CanConnectAsync();
+    }
+    catch
+    {
+        isDbReady = false;
+    }
+
+    return isDbReady
+        ? Results.Ok(new { status = "ready", database = "connected", timestamp = DateTime.UtcNow })
+        : Results.StatusCode(503);
+});
 
 app.MapGet("/api/debug-error", () => 
 {
