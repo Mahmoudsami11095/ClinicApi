@@ -286,4 +286,142 @@ public class PortalController : ControllerBase
 
         return Ok(prescriptions);
     }
+
+    [HttpGet("prescriptions/{id}/print")]
+    [Authorize]
+    public async Task<IActionResult> GetPrescriptionPrint(string id)
+    {
+        var rx = await _context.Prescriptions
+            .Include(p => p.Doctor)
+            .Include(p => p.Patient)
+            .Include(p => p.Appointment)
+                .ThenInclude(a => a.Clinic)
+            .FirstOrDefaultAsync(p => p.Id == id);
+
+        if (rx == null)
+            return NotFound(new { message = "Prescription not found." });
+
+        var clinic = rx.Appointment?.Clinic ?? await _context.Clinics.FirstOrDefaultAsync();
+
+        var document = new
+        {
+            rxId = rx.Id,
+            qrCodeData = $"https://clinic-app-ten-topaz.vercel.app/verify/rx/{rx.Id}",
+            verificationHash = rx.DigitalSignature ?? $"RX-SIG-{rx.Id.Substring(0, Math.Min(8, rx.Id.Length))}",
+            date = rx.Date,
+            status = rx.Status,
+            isFinalized = rx.IsFinalized,
+            patient = new
+            {
+                id = rx.PatientId,
+                name = rx.Patient != null ? $"{rx.Patient.FirstName} {rx.Patient.LastName}".Trim() : "Patient",
+                phone = rx.Patient?.PhoneNumber,
+                allergies = rx.Patient?.Allergies ?? "No known drug allergies (NKDA)"
+            },
+            doctor = new
+            {
+                id = rx.DoctorId,
+                name = rx.Doctor != null ? $"Dr. {rx.Doctor.FirstName} {rx.Doctor.LastName}" : "Attending Physician",
+                specialization = rx.Doctor?.Specialization ?? "General Practice",
+                email = rx.Doctor?.Email
+            },
+            clinic = new
+            {
+                name = clinic?.Name ?? "Smart Clinic Healthcare Center",
+                address = clinic?.Address ?? "Cairo Medical District, Egypt",
+                phone = clinic?.Phone ?? "+20 100 000 0000"
+            },
+            instructions = rx.Notes ?? "Follow prescribed dosage schedule. Contact clinic if any adverse symptoms occur.",
+            medications = rx.Medications.Select(m => new
+            {
+                name = m.Name,
+                dosage = m.Dosage,
+                frequency = m.Frequency,
+                duration = m.Duration
+            })
+        };
+
+        return Ok(document);
+    }
+
+    [HttpGet("invoices")]
+    [Authorize]
+    public async Task<IActionResult> GetInvoices([FromQuery] string? patientId)
+    {
+        var targetPatientId = patientId;
+        if (string.IsNullOrWhiteSpace(targetPatientId))
+        {
+            var pat = await _context.Patients.FirstOrDefaultAsync();
+            targetPatientId = pat?.Id;
+        }
+
+        if (string.IsNullOrWhiteSpace(targetPatientId))
+            return Ok(new List<object>());
+
+        var invoices = await _context.BillingRecords
+            .Where(b => b.PatientId == targetPatientId)
+            .OrderByDescending(b => b.DateIssued)
+            .Take(20)
+            .Select(b => new
+            {
+                id = b.Id,
+                invoiceNumber = b.InvoiceNumber,
+                subtotal = b.Subtotal,
+                discountAmount = b.DiscountAmount,
+                amount = b.Amount,
+                paidAmount = b.PaidAmount ?? b.Amount,
+                status = b.Status,
+                dateIssued = b.DateIssued,
+                paymentMethod = b.PaymentMethod ?? "Cash",
+                description = b.Description ?? "Consultation & Treatment Service"
+            })
+            .ToListAsync();
+
+        return Ok(invoices);
+    }
+
+    [HttpGet("invoices/{id}/receipt")]
+    [Authorize]
+    public async Task<IActionResult> GetInvoiceReceipt(string id)
+    {
+        var inv = await _context.BillingRecords
+            .Include(b => b.Patient)
+            .Include(b => b.Clinic)
+            .FirstOrDefaultAsync(b => b.Id == id);
+
+        if (inv == null)
+            return NotFound(new { message = "Invoice record not found." });
+
+        var clinic = inv.Clinic ?? await _context.Clinics.FirstOrDefaultAsync();
+
+        var receipt = new
+        {
+            invoiceId = inv.Id,
+            invoiceNumber = string.IsNullOrWhiteSpace(inv.InvoiceNumber) ? $"INV-{inv.Id.Substring(0, 8)}" : inv.InvoiceNumber,
+            qrCodeData = $"https://clinic-app-ten-topaz.vercel.app/verify/inv/{inv.Id}",
+            dateIssued = inv.DateIssued,
+            subtotal = inv.Subtotal > 0 ? inv.Subtotal : inv.Amount,
+            discountAmount = inv.DiscountAmount,
+            totalAmount = inv.Amount,
+            paidAmount = inv.PaidAmount ?? inv.Amount,
+            status = inv.Status,
+            paymentMethod = inv.PaymentMethod ?? "Credit Card / Cash",
+            description = inv.Description ?? "Dental & Clinical Services",
+            patient = new
+            {
+                id = inv.PatientId,
+                name = inv.Patient != null ? $"{inv.Patient.FirstName} {inv.Patient.LastName}".Trim() : "Patient",
+                phone = inv.Patient?.PhoneNumber
+            },
+            clinic = new
+            {
+                name = clinic?.Name ?? "Smart Clinic Center",
+                address = clinic?.Address ?? "Cairo Medical District",
+                phone = clinic?.Phone ?? "+20 100 000 0000",
+                taxNumber = "EG-TAX-98234-A"
+            }
+        };
+
+        return Ok(receipt);
+    }
 }
