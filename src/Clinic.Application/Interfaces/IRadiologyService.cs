@@ -16,4 +16,8 @@ public interface IRadiologyService
     Task<RadiologyRecordDto> CreateRecordAsync(CreateRadiologyRecordDto dto);
     Task<RadiologyRecordDto> UpdateRecordAsync(string id, CreateRadiologyRecordDto dto);
     Task DeleteRecordAsync(string id);
+
+    // AI Computer Vision Diagnostics (Release v4.0.0)
+    Task<AiRadiologyAnalysisResultDto> AnalyzeScanAsync(string recordId);
+    Task<bool> SyncFindingsToOdontogramAsync(string recordId, SyncAiFindingsRequestDto request);
 }

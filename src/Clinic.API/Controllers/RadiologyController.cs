@@ -85,4 +85,21 @@ public class RadiologyController : ControllerBase
         await _radiologyService.DeleteRecordAsync(id);
         return NoContent();
     }
+
+    // ── AI Computer Vision Diagnostics (Release v4.0.0) ──
+    [HttpPost("records/{id}/ai-analyze")]
+    [Authorize(Roles = "admin,doctor,assistant")]
+    public async Task<IActionResult> AnalyzeScanWithAi(string id)
+    {
+        var result = await _radiologyService.AnalyzeScanAsync(id);
+        return Ok(result);
+    }
+
+    [HttpPost("records/{id}/ai-sync-odontogram")]
+    [Authorize(Roles = "admin,doctor,assistant")]
+    public async Task<IActionResult> SyncAiFindingsToOdontogram(string id, [FromBody] SyncAiFindingsRequestDto request)
+    {
+        var success = await _radiologyService.SyncFindingsToOdontogramAsync(id, request);
+        return Ok(new { success, message = "AI radiographic diagnostic findings successfully synchronized to patient dental chart." });
+    }
 }

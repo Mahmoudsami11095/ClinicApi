@@ -91,4 +91,38 @@ public class RadiologyIntegrationTests : IClassFixture<CustomWebApplicationFacto
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
     }
+
+    [Fact]
+    public async Task AnalyzeScanWithAi_ShouldReturn200Ok_WithMultiHeadFindings()
+    {
+        var token = GenerateJwtToken();
+        _client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+
+        var response = await _client.PostAsync("/api/radiology/records/rec-sample-1/ai-analyze", null);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var content = await response.Content.ReadAsStringAsync();
+        using var doc = JsonDocument.Parse(content);
+        Assert.True(doc.RootElement.TryGetProperty("findings", out var findings));
+        Assert.True(findings.GetArrayLength() >= 4);
+        Assert.True(doc.RootElement.GetProperty("overallConfidence").GetDouble() > 80.0);
+    }
+
+    [Fact]
+    public async Task SyncAiFindingsToOdontogram_ShouldReturn200Ok()
+    {
+        var token = GenerateJwtToken();
+        _client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+
+        var payload = JsonSerializer.Serialize(new
+        {
+            acceptedFindingIds = new[] { "ai-find-101", "ai-find-102" },
+            doctorNotes = "Verified by Dr. Jenkins during clinical inspection."
+        });
+        var content = new StringContent(payload, Encoding.UTF8, "application/json");
+
+        var response = await _client.PostAsync("/api/radiology/records/rec-sample-1/ai-sync-odontogram", content);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+    }
 }
