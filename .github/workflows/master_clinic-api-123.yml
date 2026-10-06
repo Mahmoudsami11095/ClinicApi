@@ -26,6 +26,9 @@ jobs:
       - name: Build with dotnet
         run: dotnet build src/Clinic.API/Clinic.API.csproj --configuration Release
 
+      - name: Run Automated Test Gate (340 Tests)
+        run: dotnet test --configuration Release --verbosity normal
+
       - name: dotnet publish
         run: dotnet publish src/Clinic.API/Clinic.API.csproj -c Release -r win-x86 --self-contained true -o "${{env.DOTNET_ROOT}}/myapp"
 
