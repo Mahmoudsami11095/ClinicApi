@@ -125,4 +125,30 @@ public class PortalControllerIntegrationTests : IClassFixture<CustomWebApplicati
         // Assert
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
     }
+
+    [Fact]
+    public async Task VerifyPrescription_WhenNotFound_ShouldReturnNotFound()
+    {
+        // Act - Public verification without auth header
+        var response = await _client.GetAsync("/api/portal/verify/rx/non-existent-rx-id");
+
+        // Assert
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+        var content = await response.Content.ReadAsStringAsync();
+        using var doc = JsonDocument.Parse(content);
+        Assert.False(doc.RootElement.GetProperty("isValid").GetBoolean());
+    }
+
+    [Fact]
+    public async Task VerifyInvoiceReceipt_WhenNotFound_ShouldReturnNotFound()
+    {
+        // Act - Public verification without auth header
+        var response = await _client.GetAsync("/api/portal/verify/inv/non-existent-inv-id");
+
+        // Assert
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+        var content = await response.Content.ReadAsStringAsync();
+        using var doc = JsonDocument.Parse(content);
+        Assert.False(doc.RootElement.GetProperty("isValid").GetBoolean());
+    }
 }
