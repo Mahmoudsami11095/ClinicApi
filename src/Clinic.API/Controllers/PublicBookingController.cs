@@ -163,6 +163,7 @@ public class PublicBookingController : ControllerBase
         var existingAppointments = await _context.Appointments
             .Where(a => a.DoctorId == doctorId && a.Date.StartsWith(date) && a.Status != "cancelled")
             .Select(a => a.Date)
+            .AsNoTracking()
             .ToListAsync();
 
         var slots = generatedSlots.Select(time => new PublicTimeSlotDto

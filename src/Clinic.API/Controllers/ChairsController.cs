@@ -41,6 +41,7 @@ public class ChairsController : ControllerBase
             .Where(c => c.ClinicId == targetClinicId)
             .OrderBy(c => c.RoomNumber)
             .ThenBy(c => c.ChairName)
+            .AsNoTracking()
             .ToListAsync();
 
         // Seed 4 standard operatories if none exist for this clinic

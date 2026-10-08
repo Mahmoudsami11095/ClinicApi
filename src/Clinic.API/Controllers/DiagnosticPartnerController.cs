@@ -103,7 +103,7 @@ public class DiagnosticPartnerController : ControllerBase
             query = query.Where(d => d.PatientId == patientId);
         }
 
-        var orders = await query.OrderByDescending(d => d.CreatedAt).ToListAsync();
+        var orders = await query.OrderByDescending(d => d.CreatedAt).AsNoTracking().ToListAsync();
 
         var dtos = orders.Select(d => new DiagnosticRequisitionDto
         {
@@ -151,7 +151,7 @@ public class DiagnosticPartnerController : ControllerBase
             DoctorId = order.DoctorId,
             DoctorName = $"{order.Doctor?.FirstName} {order.Doctor?.LastName}".Trim(),
             PatientId = order.PatientId,
-            PatientName = $"{order.Patient?.FirstName} {order.Patient?.LastName}".Trim(),
+            PatientName = MaskPatientName(order.Patient?.FirstName, order.Patient?.LastName),
             ToothNumber = order.ToothNumber,
             ServiceType = order.ServiceType,
             Indications = order.Indications,
@@ -165,6 +165,20 @@ public class DiagnosticPartnerController : ControllerBase
         };
 
         return Ok(new { data = dto });
+    }
+
+    private static string MaskPatientName(string? first, string? last)
+    {
+        if (string.IsNullOrWhiteSpace(first) && string.IsNullOrWhiteSpace(last))
+            return "P**** N****";
+
+        var f = (first ?? string.Empty).Trim();
+        var l = (last ?? string.Empty).Trim();
+
+        var maskedFirst = f.Length > 1 ? f[0] + new string('*', Math.Min(4, f.Length - 1)) : f;
+        var maskedLast = l.Length > 1 ? l[0] + new string('*', Math.Min(4, l.Length - 1)) : l;
+
+        return $"{maskedFirst} {maskedLast}".Trim();
     }
 
     // ── Public Partner Endpoint: Upload Diagnostic Results & Auto-Link to EMR ──

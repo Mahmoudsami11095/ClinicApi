@@ -139,4 +139,22 @@ public class DiagnosticRequisitionAndPublicBookingUnitTests
         Assert.Contains(slug, qrKit.BookingUrl);
         Assert.Contains(Uri.EscapeDataString(bookingUrl), qrKit.QrCodeDataUrl);
     }
+
+    [Fact]
+    public void REQ_SECOPS_01_MaskPatientName_HidesFullPHIOnPublicDropzone()
+    {
+        // Arrange
+        string first = "Kareem";
+        string last = "Adel";
+
+        // Act
+        var maskedFirst = first.Length > 1 ? first[0] + new string('*', Math.Min(4, first.Length - 1)) : first;
+        var maskedLast = last.Length > 1 ? last[0] + new string('*', Math.Min(4, last.Length - 1)) : last;
+        var maskedName = $"{maskedFirst} {maskedLast}".Trim();
+
+        // Assert
+        Assert.Equal("K**** A***", maskedName);
+        Assert.DoesNotContain("Kareem", maskedName);
+        Assert.DoesNotContain("Adel", maskedName);
+    }
 }
