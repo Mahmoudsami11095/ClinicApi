@@ -60,6 +60,7 @@ public static class DependencyInjection
         services.AddTransient<ISocialAuthService, SocialAuthService>();
         services.AddScoped<ICommissionService, CommissionService>();
         services.AddScoped<IExecutiveAnalyticsService, ExecutiveAnalyticsService>();
+        services.AddScoped<ICdsEngineService, CdsEngineService>();
 
         // ── JWT Authentication ──
         services.AddAuthentication(options =>
