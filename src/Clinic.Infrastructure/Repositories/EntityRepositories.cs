@@ -625,3 +625,72 @@ public class StockTransferRequisitionRepository : GenericRepository<StockTransfe
     }
 }
 
+public class InsuranceClaimRepository : GenericRepository<InsuranceClaim>, IInsuranceClaimRepository
+{
+    public InsuranceClaimRepository(ClinicDbContext context) : base(context) { }
+
+    public override async Task<InsuranceClaim?> GetByIdAsync(string id)
+        => await _dbSet
+            .Include(c => c.Clinic)
+            .Include(c => c.Patient)
+            .Include(c => c.Doctor)
+            .Include(c => c.InsuranceProvider)
+            .FirstOrDefaultAsync(c => c.Id == id && !c.IsDeleted);
+
+    public async Task<InsuranceClaim?> GetByClaimNumberAsync(string claimNumber)
+        => await _dbSet
+            .Include(c => c.Clinic)
+            .Include(c => c.Patient)
+            .Include(c => c.Doctor)
+            .Include(c => c.InsuranceProvider)
+            .FirstOrDefaultAsync(c => c.ClaimNumber == claimNumber && !c.IsDeleted);
+
+    public async Task<List<InsuranceClaim>> GetByClinicAsync(string clinicId, string? status = null)
+    {
+        var query = _dbSet
+            .Include(c => c.Clinic)
+            .Include(c => c.Patient)
+            .Include(c => c.Doctor)
+            .Include(c => c.InsuranceProvider)
+            .Where(c => c.ClinicId == clinicId && !c.IsDeleted);
+
+        if (!string.IsNullOrEmpty(status) && status != "all")
+            query = query.Where(c => c.Status == status);
+
+        return await query
+            .OrderByDescending(c => c.CreatedAt)
+            .AsNoTracking()
+            .ToListAsync();
+    }
+
+    public async Task<List<InsuranceClaim>> GetByPatientAsync(string patientId)
+        => await _dbSet
+            .Include(c => c.Clinic)
+            .Include(c => c.Doctor)
+            .Include(c => c.InsuranceProvider)
+            .Where(c => c.PatientId == patientId && !c.IsDeleted)
+            .OrderByDescending(c => c.CreatedAt)
+            .AsNoTracking()
+            .ToListAsync();
+
+    public async Task<string> GetNextClaimNumberAsync()
+    {
+        var prefix = $"CLM-{DateTime.UtcNow:yyyyMM}-";
+        var lastClaim = await _dbSet
+            .Where(c => c.ClaimNumber.StartsWith(prefix))
+            .OrderByDescending(c => c.ClaimNumber)
+            .Select(c => c.ClaimNumber)
+            .FirstOrDefaultAsync();
+
+        var seq = 1;
+        if (!string.IsNullOrEmpty(lastClaim) && lastClaim.Length >= prefix.Length + 4)
+        {
+            var seqStr = lastClaim.Substring(prefix.Length);
+            if (int.TryParse(seqStr, out var parsed))
+                seq = parsed + 1;
+        }
+
+        return $"{prefix}{seq:D4}";
+    }
+}
+

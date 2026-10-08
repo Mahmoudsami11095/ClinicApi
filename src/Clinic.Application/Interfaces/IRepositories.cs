@@ -94,3 +94,11 @@ public interface IStockTransferRequisitionRepository : IGenericRepository<StockT
     Task<string> GetNextRequisitionNumberAsync();
 }
 
+public interface IInsuranceClaimRepository : IGenericRepository<InsuranceClaim>
+{
+    Task<InsuranceClaim?> GetByClaimNumberAsync(string claimNumber);
+    Task<List<InsuranceClaim>> GetByClinicAsync(string clinicId, string? status = null);
+    Task<List<InsuranceClaim>> GetByPatientAsync(string patientId);
+    Task<string> GetNextClaimNumberAsync();
+}
+
