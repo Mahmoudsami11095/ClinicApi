@@ -72,6 +72,62 @@ public class WhatsAppNotificationService : IWhatsAppNotificationService
         return await SendTemplateMessageAsync(phoneNumber, "appointment_reminder", parameters);
     }
 
+    public async Task<bool> SendNotificationAsync(string phoneNumber, string message)
+    {
+        if (string.IsNullOrWhiteSpace(phoneNumber))
+        {
+            _logger.LogWarning("Cannot send WhatsApp notification. Phone number is empty.");
+            return false;
+        }
+
+        try
+        {
+            var requestUrl = $"{_metaApiUrl.TrimEnd('/')}/{_phoneNumberId}/messages";
+            var toPhoneNumber = phoneNumber.TrimStart('+');
+
+            var requestBody = new
+            {
+                messaging_product = "whatsapp",
+                to = toPhoneNumber,
+                type = "text",
+                text = new
+                {
+                    preview_url = false,
+                    body = message
+                }
+            };
+
+            var jsonContent = JsonSerializer.Serialize(requestBody);
+            var httpContent = new StringContent(jsonContent, Encoding.UTF8, "application/json");
+
+            var request = new HttpRequestMessage(HttpMethod.Post, requestUrl)
+            {
+                Content = httpContent
+            };
+            request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", _accessToken);
+
+            _logger.LogInformation("Sending WhatsApp custom text notification to {PhoneNumber}", phoneNumber);
+            var response = await _httpClient.SendAsync(request);
+
+            if (response.IsSuccessStatusCode)
+            {
+                _logger.LogInformation("Successfully sent WhatsApp notification to {PhoneNumber}", phoneNumber);
+                return true;
+            }
+            else
+            {
+                var responseError = await response.Content.ReadAsStringAsync();
+                _logger.LogWarning("Failed to send WhatsApp notification. Status: {StatusCode}, Error: {Error}", response.StatusCode, responseError);
+                return false;
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Unexpected error occurred while sending WhatsApp notification to {PhoneNumber}", phoneNumber);
+            return false;
+        }
+    }
+
     private async Task<bool> SendTemplateMessageAsync(string phoneNumber, string templateName, object[] parameters)
     {
         if (string.IsNullOrWhiteSpace(phoneNumber))

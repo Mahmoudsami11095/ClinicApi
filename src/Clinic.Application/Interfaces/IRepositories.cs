@@ -110,3 +110,11 @@ public interface IInformedConsentRepository : IGenericRepository<InformedConsent
     Task<string> GetNextDocumentNumberAsync();
 }
 
+public interface IPatientRecallRepository : IGenericRepository<PatientRecall>
+{
+    Task<PatientRecall?> GetByRecallNumberAsync(string recallNumber);
+    Task<List<PatientRecall>> GetByClinicAsync(string clinicId, string? status = null);
+    Task<List<PatientRecall>> GetDueRecallsAsync(string clinicId, DateTime asOfDate);
+    Task<string> GetNextRecallNumberAsync();
+}
+

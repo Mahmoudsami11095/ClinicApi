@@ -760,3 +760,73 @@ public class InformedConsentRepository : GenericRepository<InformedConsentDocume
     }
 }
 
+public class PatientRecallRepository : GenericRepository<PatientRecall>, IPatientRecallRepository
+{
+    public PatientRecallRepository(ClinicDbContext context) : base(context) { }
+
+    public override async Task<PatientRecall?> GetByIdAsync(string id)
+        => await _dbSet
+            .Include(r => r.Clinic)
+            .Include(r => r.Patient)
+            .Include(r => r.Doctor)
+            .Include(r => r.SourceAppointment)
+            .Include(r => r.BookedAppointment)
+            .FirstOrDefaultAsync(r => r.Id == id && !r.IsDeleted);
+
+    public async Task<PatientRecall?> GetByRecallNumberAsync(string recallNumber)
+        => await _dbSet
+            .Include(r => r.Clinic)
+            .Include(r => r.Patient)
+            .Include(r => r.Doctor)
+            .FirstOrDefaultAsync(r => r.RecallNumber == recallNumber && !r.IsDeleted);
+
+    public async Task<List<PatientRecall>> GetByClinicAsync(string clinicId, string? status = null)
+    {
+        var query = _dbSet
+            .Include(r => r.Patient)
+            .Include(r => r.Doctor)
+            .Where(r => r.ClinicId == clinicId && !r.IsDeleted);
+
+        if (!string.IsNullOrEmpty(status) && status != "all")
+            query = query.Where(r => r.Status == status);
+
+        return await query
+            .OrderBy(r => r.DueDate)
+            .AsNoTracking()
+            .ToListAsync();
+    }
+
+    public async Task<List<PatientRecall>> GetDueRecallsAsync(string clinicId, DateTime asOfDate)
+    {
+        return await _dbSet
+            .Include(r => r.Patient)
+            .Include(r => r.Doctor)
+            .Where(r => r.ClinicId == clinicId && !r.IsDeleted &&
+                        r.DueDate <= asOfDate &&
+                        r.Status != "Completed" && r.Status != "Cancelled")
+            .OrderBy(r => r.DueDate)
+            .AsNoTracking()
+            .ToListAsync();
+    }
+
+    public async Task<string> GetNextRecallNumberAsync()
+    {
+        var prefix = $"RCL-{DateTime.UtcNow:yyyyMM}-";
+        var last = await _dbSet
+            .Where(r => r.RecallNumber.StartsWith(prefix))
+            .OrderByDescending(r => r.RecallNumber)
+            .Select(r => r.RecallNumber)
+            .FirstOrDefaultAsync();
+
+        var seq = 1;
+        if (!string.IsNullOrEmpty(last) && last.Length >= prefix.Length + 4)
+        {
+            var seqStr = last.Substring(prefix.Length);
+            if (int.TryParse(seqStr, out var parsed))
+                seq = parsed + 1;
+        }
+
+        return $"{prefix}{seq:D4}";
+    }
+}
+
