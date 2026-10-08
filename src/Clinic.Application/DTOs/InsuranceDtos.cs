@@ -127,3 +127,71 @@ public class InsuranceClaimsSummaryDto
     public int PendingPreAuthCount { get; set; }
     public int RejectionCount { get; set; }
 }
+
+// ── AI Insurance Pre-Authorization & Claim Package Generator (Release v4.2.0) ──
+public class GenerateAiClaimDto
+{
+    [Required]
+    public string RadiologyRecordId { get; set; } = string.Empty;
+
+    public string? ClinicId { get; set; }
+    public string? PatientId { get; set; }
+    public string? DoctorId { get; set; }
+
+    [Required]
+    public string InsuranceProviderId { get; set; } = string.Empty;
+
+    public string PolicyNumber { get; set; } = "POL-AI-9942";
+    public string MemberId { get; set; } = "MEM-7731";
+
+    public List<string> AcceptedFindingIds { get; set; } = new();
+    public string? DoctorClinicalNotes { get; set; }
+}
+
+public class RealtimeEligibilityResponseDto
+{
+    public string ClaimId { get; set; } = string.Empty;
+    public string PayerName { get; set; } = string.Empty;
+    public string PayerCode { get; set; } = string.Empty;
+    public string MemberId { get; set; } = string.Empty;
+    public bool IsEligible { get; set; } = true;
+    public string EligibilityStatus { get; set; } = "Active - Full In-Network Dental Coverage";
+    public decimal CopayPercentage { get; set; } = 20.0m;
+    public decimal PatientDeductibleRemaining { get; set; } = 50.0m;
+    public bool PreAuthRequired { get; set; } = true;
+    public string PreAuthStatus { get; set; } = "Pre-Authorized";
+    public string AuthorizationToken { get; set; } = string.Empty;
+    public DateTime InquiryTimestamp { get; set; } = DateTime.UtcNow;
+}
+
+public class ClaimPacketProcedureDto
+{
+    public string CdtCode { get; set; } = string.Empty;
+    public string Description { get; set; } = string.Empty;
+    public string ToothNumber { get; set; } = string.Empty;
+    public string DiagnosisCode { get; set; } = string.Empty; // ICD-10
+    public decimal Fee { get; set; }
+}
+
+public class ClaimPacketPdfResponseDto
+{
+    public string ClaimId { get; set; } = string.Empty;
+    public string ClaimNumber { get; set; } = string.Empty;
+    public string VerificationHash { get; set; } = string.Empty;
+    public string PayerName { get; set; } = string.Empty;
+    public string PayerCode { get; set; } = string.Empty;
+    public string PatientName { get; set; } = string.Empty;
+    public string PolicyNumber { get; set; } = string.Empty;
+    public string MemberId { get; set; } = string.Empty;
+    public string DoctorName { get; set; } = string.Empty;
+    public string DoctorLicenseNumber { get; set; } = "EGY-DEN-44910";
+    public decimal TotalGrossAmount { get; set; }
+    public decimal PatientCopayAmount { get; set; }
+    public decimal InsurancePayableAmount { get; set; }
+    public string RadiographUrl { get; set; } = string.Empty;
+    public int AiFindingsCount { get; set; }
+    public List<ClaimPacketProcedureDto> Procedures { get; set; } = new();
+    public string QrVerificationPayload { get; set; } = string.Empty;
+    public DateTime SignedAtUtc { get; set; } = DateTime.UtcNow;
+    public string PreAuthStatus { get; set; } = "PreAuthorized";
+}

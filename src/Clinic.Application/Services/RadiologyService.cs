@@ -333,4 +333,130 @@ public class RadiologyService : IRadiologyService
 
         return true;
     }
+
+    public async Task<DicomMetadataDto> GetDicomMetadataAsync(string recordId)
+    {
+        var record = await _recordRepo.GetByIdAsync(recordId);
+        var patientName = "Demo Patient";
+        if (record?.Patient != null)
+        {
+            patientName = $"{record.Patient.FirstName} {record.Patient.LastName}".Trim();
+        }
+
+        var presets = new List<HuPresetDto>
+        {
+            new()
+            {
+                Id = "soft-tissue",
+                Name = "Soft Tissue (Window: 350 / Level: 40)",
+                NameAr = "الأنسجة الرخوة واللثة",
+                WindowWidth = 350.0,
+                WindowCenter = 40.0,
+                ClinicalDescription = "Optimized for gingiva, pulp vascularity, mucosa, and soft tissue tumor margins."
+            },
+            new()
+            {
+                Id = "enamel-dentin",
+                Name = "Enamel & Dentin (Window: 1000 / Level: 500)",
+                NameAr = "الميناء والعاج السني",
+                WindowWidth = 1000.0,
+                WindowCenter = 500.0,
+                ClinicalDescription = "High-contrast differentiation between enamel mineralization, dentin, and secondary caries."
+            },
+            new()
+            {
+                Id = "trabecular-bone",
+                Name = "Trabecular Bone (Window: 2000 / Level: 600)",
+                NameAr = "العظم الإسفنجي السنخي",
+                WindowWidth = 2000.0,
+                WindowCenter = 600.0,
+                ClinicalDescription = "Alveolar crest trabecular architecture, periapical osteolysis, and Misch D2-D3 bone quality."
+            },
+            new()
+            {
+                Id = "cortical-implant",
+                Name = "Cortical Bone & Implant Bed (Window: 3000 / Level: 1000)",
+                NameAr = "العظم القشري وموقع الغرسة",
+                WindowWidth = 3000.0,
+                WindowCenter = 1000.0,
+                ClinicalDescription = "Mandibular cortical plate, mental foramen, inferior alveolar canal, and titanium implant bed density."
+            }
+        };
+
+        return new DicomMetadataDto
+        {
+            RecordId = recordId,
+            PatientName = patientName,
+            PatientId = record?.PatientId ?? "patient-1",
+            StudyInstanceUid = $"1.2.840.113619.2.55.3.{recordId.GetHashCode():X8}.101",
+            SeriesInstanceUid = $"1.2.840.113619.2.55.3.{recordId.GetHashCode():X8}.201",
+            SopInstanceUid = $"1.2.840.113619.2.55.3.{recordId.GetHashCode():X8}.301",
+            Modality = record?.ProcedureName?.ToUpperInvariant().Contains("CBCT") == true ? "CBCT" : "CBCT",
+            StudyDescription = record?.ProcedureName ?? "Maxillofacial Volumetric CBCT & Multi-Planar Study",
+            Manufacturer = "Carestream Dental / CS 9600 3D Extraoral System",
+            Rows = 512,
+            Columns = 512,
+            BitsAllocated = 16,
+            BitsStored = 12,
+            HighBit = 11,
+            RescaleIntercept = -1024.0,
+            RescaleSlope = 1.0,
+            WindowCenter = 600.0,
+            WindowWidth = 2000.0,
+            NumberOfFrames = 48,
+            SliceThicknessMm = 0.5,
+            PixelSpacingMm = 0.15,
+            Kvp = 90.0,
+            TubeCurrentMa = 8.0,
+            ExposureTimeMs = 12000.0,
+            PatientOrientation = "L/P",
+            HuPresets = presets
+        };
+    }
+
+    public async Task<DicomSeriesDto> GetDicomSlicesAsync(string recordId, string orientation = "Axial")
+    {
+        var record = await _recordRepo.GetByIdAsync(recordId);
+        var baseImageUrl = "https://images.unsplash.com/photo-1588776814546-1ffcf47267a5?auto=format&fit=crop&q=80&w=1200";
+
+        var totalSlices = 48;
+        var slices = new List<DicomSliceDto>();
+
+        var landmarks = new[]
+        {
+            "Maxillary Sinus Floor & Zygomatic Buttress",
+            "Naso-palatine Canal & Anterior Nasal Spine",
+            "Maxillary Alveolar Crest & Tooth Roots #14-#17",
+            "Interocclusal Crown Level",
+            "Mandibular Alveolar Ridge Crest & Furcations",
+            "Mandibular Canal / Inferior Alveolar Nerve Proximity",
+            "Mental Foramen & Cortical Border",
+            "Inferior Border of Mandible"
+        };
+
+        for (int i = 1; i <= totalSlices; i++)
+        {
+            var landmarkIndex = (i - 1) / (totalSlices / landmarks.Length);
+            if (landmarkIndex >= landmarks.Length) landmarkIndex = landmarks.Length - 1;
+
+            var locationMm = -24.0 + (i * 1.0);
+
+            slices.Add(new DicomSliceDto
+            {
+                SliceIndex = i,
+                Orientation = orientation,
+                SliceLocationMm = Math.Round(locationMm, 2),
+                ImageUrl = baseImageUrl,
+                AnatomicalLandmark = $"{landmarks[landmarkIndex]} (Slice {i}/{totalSlices})"
+            });
+        }
+
+        return new DicomSeriesDto
+        {
+            RecordId = recordId,
+            Modality = "CBCT",
+            TotalSlices = totalSlices,
+            Slices = slices
+        };
+    }
 }
