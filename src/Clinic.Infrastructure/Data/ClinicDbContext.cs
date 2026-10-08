@@ -37,6 +37,7 @@ public class ClinicDbContext : DbContext
     public DbSet<InsuranceProvider> InsuranceProviders => Set<InsuranceProvider>();
     public DbSet<InsuranceClaim> InsuranceClaims => Set<InsuranceClaim>();
     public DbSet<InformedConsentDocument> InformedConsents => Set<InformedConsentDocument>();
+    public DbSet<DrugInteractionRule> DrugInteractionRules => Set<DrugInteractionRule>();
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
@@ -818,6 +819,21 @@ public class ClinicDbContext : DbContext
 
             entity.HasIndex(e => new { e.ClinicId, e.Status });
             entity.HasIndex(e => new { e.PatientId });
+        });
+
+        // ── DrugInteractionRule ──
+        modelBuilder.Entity<DrugInteractionRule>(entity =>
+        {
+            entity.ToTable("DrugInteractionRules");
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.DrugA).HasMaxLength(100).IsRequired();
+            entity.Property(e => e.DrugB).HasMaxLength(100).IsRequired();
+            entity.Property(e => e.Severity).HasMaxLength(50).HasDefaultValue("Critical");
+            entity.Property(e => e.ClinicalEffect).HasMaxLength(500).IsRequired();
+            entity.Property(e => e.Mechanism).HasMaxLength(500);
+            entity.Property(e => e.SuggestedAlternative).HasMaxLength(500);
+            entity.Property(e => e.ReferenceAuthority).HasMaxLength(100).HasDefaultValue("FDA / BNF");
+            entity.HasIndex(e => new { e.DrugA, e.DrugB });
         });
     }
 }
