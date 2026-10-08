@@ -36,6 +36,7 @@ public class ClinicDbContext : DbContext
     public DbSet<StockTransferRequisition> StockTransferRequisitions => Set<StockTransferRequisition>();
     public DbSet<InsuranceProvider> InsuranceProviders => Set<InsuranceProvider>();
     public DbSet<InsuranceClaim> InsuranceClaims => Set<InsuranceClaim>();
+    public DbSet<InformedConsentDocument> InformedConsents => Set<InformedConsentDocument>();
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
@@ -776,6 +777,44 @@ public class ClinicDbContext : DbContext
                   .WithMany(p => p.Claims)
                   .HasForeignKey(e => e.InsuranceProviderId)
                   .OnDelete(DeleteBehavior.Restrict);
+
+            entity.HasIndex(e => new { e.ClinicId, e.Status });
+            entity.HasIndex(e => new { e.PatientId });
+        });
+
+        // ── InformedConsentDocument ──
+        modelBuilder.Entity<InformedConsentDocument>(entity =>
+        {
+            entity.ToTable("InformedConsents");
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.DocumentNumber).HasMaxLength(100).IsRequired();
+            entity.HasIndex(e => e.DocumentNumber).IsUnique();
+            entity.Property(e => e.ProcedureType).HasMaxLength(100).IsRequired();
+            entity.Property(e => e.ProcedureName).HasMaxLength(250).IsRequired();
+            entity.Property(e => e.SignatoryName).HasMaxLength(200);
+            entity.Property(e => e.SignatoryRelationship).HasMaxLength(50).HasDefaultValue("Self");
+            entity.Property(e => e.Status).HasMaxLength(50).HasDefaultValue("Draft");
+            entity.Property(e => e.DocumentSha256Checksum).HasMaxLength(100);
+
+            entity.HasOne(e => e.Clinic)
+                  .WithMany()
+                  .HasForeignKey(e => e.ClinicId)
+                  .OnDelete(DeleteBehavior.Restrict);
+
+            entity.HasOne(e => e.Patient)
+                  .WithMany()
+                  .HasForeignKey(e => e.PatientId)
+                  .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne(e => e.Doctor)
+                  .WithMany()
+                  .HasForeignKey(e => e.DoctorId)
+                  .OnDelete(DeleteBehavior.Restrict);
+
+            entity.HasOne(e => e.Appointment)
+                  .WithMany()
+                  .HasForeignKey(e => e.AppointmentId)
+                  .OnDelete(DeleteBehavior.SetNull);
 
             entity.HasIndex(e => new { e.ClinicId, e.Status });
             entity.HasIndex(e => new { e.PatientId });

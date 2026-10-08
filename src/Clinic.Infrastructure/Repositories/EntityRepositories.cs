@@ -694,3 +694,69 @@ public class InsuranceClaimRepository : GenericRepository<InsuranceClaim>, IInsu
     }
 }
 
+public class InformedConsentRepository : GenericRepository<InformedConsentDocument>, IInformedConsentRepository
+{
+    public InformedConsentRepository(ClinicDbContext context) : base(context) { }
+
+    public override async Task<InformedConsentDocument?> GetByIdAsync(string id)
+        => await _dbSet
+            .Include(c => c.Clinic)
+            .Include(c => c.Patient)
+            .Include(c => c.Doctor)
+            .Include(c => c.Appointment)
+            .FirstOrDefaultAsync(c => c.Id == id && !c.IsDeleted);
+
+    public async Task<InformedConsentDocument?> GetByDocumentNumberAsync(string documentNumber)
+        => await _dbSet
+            .Include(c => c.Clinic)
+            .Include(c => c.Patient)
+            .Include(c => c.Doctor)
+            .Include(c => c.Appointment)
+            .FirstOrDefaultAsync(c => c.DocumentNumber == documentNumber && !c.IsDeleted);
+
+    public async Task<List<InformedConsentDocument>> GetByPatientIdAsync(string patientId)
+        => await _dbSet
+            .Include(c => c.Clinic)
+            .Include(c => c.Doctor)
+            .Where(c => c.PatientId == patientId && !c.IsDeleted)
+            .OrderByDescending(c => c.CreatedAt)
+            .AsNoTracking()
+            .ToListAsync();
+
+    public async Task<List<InformedConsentDocument>> GetByClinicIdAsync(string clinicId, string? status = null)
+    {
+        var query = _dbSet
+            .Include(c => c.Patient)
+            .Include(c => c.Doctor)
+            .Where(c => c.ClinicId == clinicId && !c.IsDeleted);
+
+        if (!string.IsNullOrEmpty(status) && status != "all")
+            query = query.Where(c => c.Status == status);
+
+        return await query
+            .OrderByDescending(c => c.CreatedAt)
+            .AsNoTracking()
+            .ToListAsync();
+    }
+
+    public async Task<string> GetNextDocumentNumberAsync()
+    {
+        var prefix = $"CNS-{DateTime.UtcNow:yyyyMM}-";
+        var lastDoc = await _dbSet
+            .Where(c => c.DocumentNumber.StartsWith(prefix))
+            .OrderByDescending(c => c.DocumentNumber)
+            .Select(c => c.DocumentNumber)
+            .FirstOrDefaultAsync();
+
+        var seq = 1;
+        if (!string.IsNullOrEmpty(lastDoc) && lastDoc.Length >= prefix.Length + 4)
+        {
+            var seqStr = lastDoc.Substring(prefix.Length);
+            if (int.TryParse(seqStr, out var parsed))
+                seq = parsed + 1;
+        }
+
+        return $"{prefix}{seq:D4}";
+    }
+}
+

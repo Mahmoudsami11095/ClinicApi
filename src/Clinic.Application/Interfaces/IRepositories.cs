@@ -102,3 +102,11 @@ public interface IInsuranceClaimRepository : IGenericRepository<InsuranceClaim>
     Task<string> GetNextClaimNumberAsync();
 }
 
+public interface IInformedConsentRepository : IGenericRepository<InformedConsentDocument>
+{
+    Task<InformedConsentDocument?> GetByDocumentNumberAsync(string documentNumber);
+    Task<List<InformedConsentDocument>> GetByPatientIdAsync(string patientId);
+    Task<List<InformedConsentDocument>> GetByClinicIdAsync(string clinicId, string? status = null);
+    Task<string> GetNextDocumentNumberAsync();
+}
+

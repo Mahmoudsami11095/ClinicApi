@@ -45,7 +45,7 @@ public class ExecutiveAnalyticsService : IExecutiveAnalyticsService
         var totalCommissions = await _context.CommissionPayouts
             .AsNoTracking()
             .Where(c => c.Status == "Paid")
-            .SumAsync(c => c.NetPayoutAmount);
+            .SumAsync(c => c.TotalNetCommission);
 
         var grossOperatingMargin = Math.Max(0, totalCollected - totalCommissions);
         var marginPct = totalCollected > 0 ? (double)(grossOperatingMargin / totalCollected) * 100 : 0;
@@ -170,7 +170,7 @@ public class ExecutiveAnalyticsService : IExecutiveAnalyticsService
 
         var payouts = await _context.CommissionPayouts
             .AsNoTracking()
-            .Select(p => new { p.DoctorId, p.GrossCommissionAmount, p.NetPayoutAmount })
+            .Select(p => new { p.DoctorId, GrossCommissionAmount = p.TotalGrossRevenue, NetPayoutAmount = p.TotalNetCommission })
             .ToListAsync();
 
         var list = new List<DoctorProductivityDto>();
