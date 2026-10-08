@@ -57,6 +57,7 @@ public static class DependencyInjection
         services.AddTransient<IEmailService, EmailService>();
         services.AddTransient<ISocialAuthService, SocialAuthService>();
         services.AddScoped<ICommissionService, CommissionService>();
+        services.AddScoped<IExecutiveAnalyticsService, ExecutiveAnalyticsService>();
 
         // ── JWT Authentication ──
         services.AddAuthentication(options =>
