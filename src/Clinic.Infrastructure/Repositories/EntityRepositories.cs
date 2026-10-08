@@ -562,3 +562,66 @@ public class DiagnosticRequisitionRepository : GenericRepository<DiagnosticRequi
             .ToListAsync();
 }
 
+public class StockTransferRequisitionRepository : GenericRepository<StockTransferRequisition>, IStockTransferRequisitionRepository
+{
+    public StockTransferRequisitionRepository(ClinicDbContext context) : base(context) { }
+
+    public override async Task<StockTransferRequisition?> GetByIdAsync(string id)
+        => await _dbSet
+            .Include(t => t.SourceClinic)
+            .Include(t => t.DestinationClinic)
+            .Include(t => t.Material)
+            .FirstOrDefaultAsync(t => t.Id == id && !t.IsDeleted);
+
+    public async Task<StockTransferRequisition?> GetByRequisitionNumberAsync(string requisitionNumber)
+        => await _dbSet
+            .Include(t => t.SourceClinic)
+            .Include(t => t.DestinationClinic)
+            .Include(t => t.Material)
+            .FirstOrDefaultAsync(t => t.RequisitionNumber == requisitionNumber && !t.IsDeleted);
+
+    public async Task<List<StockTransferRequisition>> GetByClinicAsync(string clinicId, string? status = null, string? direction = "all")
+    {
+        var query = _dbSet
+            .Include(t => t.SourceClinic)
+            .Include(t => t.DestinationClinic)
+            .Include(t => t.Material)
+            .Where(t => !t.IsDeleted);
+
+        if (direction == "inbound")
+            query = query.Where(t => t.DestinationClinicId == clinicId);
+        else if (direction == "outbound")
+            query = query.Where(t => t.SourceClinicId == clinicId);
+        else
+            query = query.Where(t => t.SourceClinicId == clinicId || t.DestinationClinicId == clinicId);
+
+        if (!string.IsNullOrEmpty(status) && status != "all")
+            query = query.Where(t => t.Status == status);
+
+        return await query
+            .OrderByDescending(t => t.RequestedAt)
+            .AsNoTracking()
+            .ToListAsync();
+    }
+
+    public async Task<string> GetNextRequisitionNumberAsync()
+    {
+        var prefix = $"TRF-{DateTime.UtcNow:yyyyMM}-";
+        var lastOrder = await _dbSet
+            .Where(t => t.RequisitionNumber.StartsWith(prefix))
+            .OrderByDescending(t => t.RequisitionNumber)
+            .Select(t => t.RequisitionNumber)
+            .FirstOrDefaultAsync();
+
+        var seq = 1;
+        if (!string.IsNullOrEmpty(lastOrder) && lastOrder.Length >= prefix.Length + 4)
+        {
+            var seqStr = lastOrder.Substring(prefix.Length);
+            if (int.TryParse(seqStr, out var parsed))
+                seq = parsed + 1;
+        }
+
+        return $"{prefix}{seq:D4}";
+    }
+}
+

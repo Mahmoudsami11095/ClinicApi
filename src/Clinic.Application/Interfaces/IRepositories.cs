@@ -87,3 +87,10 @@ public interface IDiagnosticRequisitionRepository : IGenericRepository<Diagnosti
     Task<List<DiagnosticRequisitionOrder>> GetByDoctorIdAsync(string doctorId);
 }
 
+public interface IStockTransferRequisitionRepository : IGenericRepository<StockTransferRequisition>
+{
+    Task<StockTransferRequisition?> GetByRequisitionNumberAsync(string requisitionNumber);
+    Task<List<StockTransferRequisition>> GetByClinicAsync(string clinicId, string? status = null, string? direction = "all");
+    Task<string> GetNextRequisitionNumberAsync();
+}
+

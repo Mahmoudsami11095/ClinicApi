@@ -33,6 +33,7 @@ public class ClinicDbContext : DbContext
     public DbSet<CommissionPayout> CommissionPayouts => Set<CommissionPayout>();
     public DbSet<CommissionPayoutItem> CommissionPayoutItems => Set<CommissionPayoutItem>();
     public DbSet<DiagnosticRequisitionOrder> DiagnosticRequisitions => Set<DiagnosticRequisitionOrder>();
+    public DbSet<StockTransferRequisition> StockTransferRequisitions => Set<StockTransferRequisition>();
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
@@ -687,6 +688,41 @@ public class ClinicDbContext : DbContext
             entity.HasIndex(e => new { e.ClinicId, e.Status });
             entity.HasIndex(e => new { e.DoctorId, e.Status });
             entity.HasIndex(e => new { e.PatientId });
+        });
+
+        // ── StockTransferRequisition ──
+        modelBuilder.Entity<StockTransferRequisition>(entity =>
+        {
+            entity.ToTable("StockTransferRequisitions");
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.RequisitionNumber).HasMaxLength(100).IsRequired();
+            entity.HasIndex(e => e.RequisitionNumber).IsUnique();
+            entity.Property(e => e.SourceClinicId).HasMaxLength(100).IsRequired();
+            entity.Property(e => e.DestinationClinicId).HasMaxLength(100).IsRequired();
+            entity.Property(e => e.MaterialId).HasMaxLength(100).IsRequired();
+            entity.Property(e => e.Status).HasMaxLength(50).HasDefaultValue("Requested");
+            entity.Property(e => e.Priority).HasMaxLength(50).HasDefaultValue("Normal");
+            entity.Property(e => e.BatchNumber).HasMaxLength(100);
+            entity.Property(e => e.Notes).HasMaxLength(1000);
+            entity.Property(e => e.DamageReason).HasMaxLength(500);
+
+            entity.HasOne(e => e.SourceClinic)
+                  .WithMany()
+                  .HasForeignKey(e => e.SourceClinicId)
+                  .OnDelete(DeleteBehavior.Restrict);
+
+            entity.HasOne(e => e.DestinationClinic)
+                  .WithMany()
+                  .HasForeignKey(e => e.DestinationClinicId)
+                  .OnDelete(DeleteBehavior.Restrict);
+
+            entity.HasOne(e => e.Material)
+                  .WithMany()
+                  .HasForeignKey(e => e.MaterialId)
+                  .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasIndex(e => new { e.SourceClinicId, e.Status });
+            entity.HasIndex(e => new { e.DestinationClinicId, e.Status });
         });
     }
 }
