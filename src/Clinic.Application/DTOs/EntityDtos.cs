@@ -22,6 +22,11 @@ public class ClinicDto
     // REQ-CLI-03: Multi-Branch & Multi-Room Management
     public string? BranchCode { get; set; }
     public string? Rooms { get; set; }
+
+    // REQ-QR-01 & REQ-SAAS-01: Public Booking & Clinic QR Landing
+    public string? Slug { get; set; }
+    public bool PublicBookingEnabled { get; set; } = true;
+    public string? QrPosterAssetUrl { get; set; }
 }
 
 public class PatientDto

@@ -35,6 +35,17 @@ public class ClinicRepository : GenericRepository<ClinicEntity>, IClinicReposito
                            (c.CreatorDoctorId == doctorId ||
                             c.DoctorClinics.Any(dc => dc.DoctorId == doctorId && dc.Status == "Accepted")));
     }
+
+    public async Task<ClinicEntity?> GetBySlugAsync(string slug)
+    {
+        return await _dbSet
+            .Include(c => c.DoctorClinics)
+                .ThenInclude(dc => dc.Doctor)
+            .Include(c => c.UserClinics)
+                .ThenInclude(uc => uc.User)
+            .AsNoTracking()
+            .FirstOrDefaultAsync(c => c.Slug == slug);
+    }
 }
 
 public class PatientRepository : GenericRepository<Patient>, IPatientRepository
@@ -511,3 +522,241 @@ public class ClinicalNoteRepository : GenericRepository<ClinicalNote>, IClinical
         throw new InvalidOperationException("BR-RX-03 / BR-MED-01: Clinical encounter notes cannot be deleted from the database. Medical records are permanent and immutable.");
     }
 }
+
+public class DiagnosticRequisitionRepository : GenericRepository<DiagnosticRequisitionOrder>, IDiagnosticRequisitionRepository
+{
+    public DiagnosticRequisitionRepository(ClinicDbContext context) : base(context) { }
+
+    public async Task<DiagnosticRequisitionOrder?> GetByTokenAsync(string token)
+        => await _dbSet
+            .Include(d => d.Clinic)
+            .Include(d => d.Doctor)
+            .Include(d => d.Patient)
+            .FirstOrDefaultAsync(d => d.RequisitionToken == token && !d.IsDeleted);
+
+    public async Task<List<DiagnosticRequisitionOrder>> GetByClinicIdAsync(string clinicId)
+        => await _dbSet
+            .Include(d => d.Doctor)
+            .Include(d => d.Patient)
+            .Where(d => d.ClinicId == clinicId && !d.IsDeleted)
+            .OrderByDescending(d => d.CreatedAt)
+            .AsNoTracking()
+            .ToListAsync();
+
+    public async Task<List<DiagnosticRequisitionOrder>> GetByPatientIdAsync(string patientId)
+        => await _dbSet
+            .Include(d => d.Clinic)
+            .Include(d => d.Doctor)
+            .Where(d => d.PatientId == patientId && !d.IsDeleted)
+            .OrderByDescending(d => d.CreatedAt)
+            .AsNoTracking()
+            .ToListAsync();
+
+    public async Task<List<DiagnosticRequisitionOrder>> GetByDoctorIdAsync(string doctorId)
+        => await _dbSet
+            .Include(d => d.Clinic)
+            .Include(d => d.Patient)
+            .Where(d => d.DoctorId == doctorId && !d.IsDeleted)
+            .OrderByDescending(d => d.CreatedAt)
+            .AsNoTracking()
+            .ToListAsync();
+}
+
+public class StockTransferRequisitionRepository : GenericRepository<StockTransferRequisition>, IStockTransferRequisitionRepository
+{
+    public StockTransferRequisitionRepository(ClinicDbContext context) : base(context) { }
+
+    public override async Task<StockTransferRequisition?> GetByIdAsync(string id)
+        => await _dbSet
+            .Include(t => t.SourceClinic)
+            .Include(t => t.DestinationClinic)
+            .Include(t => t.Material)
+            .FirstOrDefaultAsync(t => t.Id == id && !t.IsDeleted);
+
+    public async Task<StockTransferRequisition?> GetByRequisitionNumberAsync(string requisitionNumber)
+        => await _dbSet
+            .Include(t => t.SourceClinic)
+            .Include(t => t.DestinationClinic)
+            .Include(t => t.Material)
+            .FirstOrDefaultAsync(t => t.RequisitionNumber == requisitionNumber && !t.IsDeleted);
+
+    public async Task<List<StockTransferRequisition>> GetByClinicAsync(string clinicId, string? status = null, string? direction = "all")
+    {
+        var query = _dbSet
+            .Include(t => t.SourceClinic)
+            .Include(t => t.DestinationClinic)
+            .Include(t => t.Material)
+            .Where(t => !t.IsDeleted);
+
+        if (direction == "inbound")
+            query = query.Where(t => t.DestinationClinicId == clinicId);
+        else if (direction == "outbound")
+            query = query.Where(t => t.SourceClinicId == clinicId);
+        else
+            query = query.Where(t => t.SourceClinicId == clinicId || t.DestinationClinicId == clinicId);
+
+        if (!string.IsNullOrEmpty(status) && status != "all")
+            query = query.Where(t => t.Status == status);
+
+        return await query
+            .OrderByDescending(t => t.RequestedAt)
+            .AsNoTracking()
+            .ToListAsync();
+    }
+
+    public async Task<string> GetNextRequisitionNumberAsync()
+    {
+        var prefix = $"TRF-{DateTime.UtcNow:yyyyMM}-";
+        var lastOrder = await _dbSet
+            .Where(t => t.RequisitionNumber.StartsWith(prefix))
+            .OrderByDescending(t => t.RequisitionNumber)
+            .Select(t => t.RequisitionNumber)
+            .FirstOrDefaultAsync();
+
+        var seq = 1;
+        if (!string.IsNullOrEmpty(lastOrder) && lastOrder.Length >= prefix.Length + 4)
+        {
+            var seqStr = lastOrder.Substring(prefix.Length);
+            if (int.TryParse(seqStr, out var parsed))
+                seq = parsed + 1;
+        }
+
+        return $"{prefix}{seq:D4}";
+    }
+}
+
+public class InsuranceClaimRepository : GenericRepository<InsuranceClaim>, IInsuranceClaimRepository
+{
+    public InsuranceClaimRepository(ClinicDbContext context) : base(context) { }
+
+    public override async Task<InsuranceClaim?> GetByIdAsync(string id)
+        => await _dbSet
+            .Include(c => c.Clinic)
+            .Include(c => c.Patient)
+            .Include(c => c.Doctor)
+            .Include(c => c.InsuranceProvider)
+            .FirstOrDefaultAsync(c => c.Id == id && !c.IsDeleted);
+
+    public async Task<InsuranceClaim?> GetByClaimNumberAsync(string claimNumber)
+        => await _dbSet
+            .Include(c => c.Clinic)
+            .Include(c => c.Patient)
+            .Include(c => c.Doctor)
+            .Include(c => c.InsuranceProvider)
+            .FirstOrDefaultAsync(c => c.ClaimNumber == claimNumber && !c.IsDeleted);
+
+    public async Task<List<InsuranceClaim>> GetByClinicAsync(string clinicId, string? status = null)
+    {
+        var query = _dbSet
+            .Include(c => c.Clinic)
+            .Include(c => c.Patient)
+            .Include(c => c.Doctor)
+            .Include(c => c.InsuranceProvider)
+            .Where(c => c.ClinicId == clinicId && !c.IsDeleted);
+
+        if (!string.IsNullOrEmpty(status) && status != "all")
+            query = query.Where(c => c.Status == status);
+
+        return await query
+            .OrderByDescending(c => c.CreatedAt)
+            .AsNoTracking()
+            .ToListAsync();
+    }
+
+    public async Task<List<InsuranceClaim>> GetByPatientAsync(string patientId)
+        => await _dbSet
+            .Include(c => c.Clinic)
+            .Include(c => c.Doctor)
+            .Include(c => c.InsuranceProvider)
+            .Where(c => c.PatientId == patientId && !c.IsDeleted)
+            .OrderByDescending(c => c.CreatedAt)
+            .AsNoTracking()
+            .ToListAsync();
+
+    public async Task<string> GetNextClaimNumberAsync()
+    {
+        var prefix = $"CLM-{DateTime.UtcNow:yyyyMM}-";
+        var lastClaim = await _dbSet
+            .Where(c => c.ClaimNumber.StartsWith(prefix))
+            .OrderByDescending(c => c.ClaimNumber)
+            .Select(c => c.ClaimNumber)
+            .FirstOrDefaultAsync();
+
+        var seq = 1;
+        if (!string.IsNullOrEmpty(lastClaim) && lastClaim.Length >= prefix.Length + 4)
+        {
+            var seqStr = lastClaim.Substring(prefix.Length);
+            if (int.TryParse(seqStr, out var parsed))
+                seq = parsed + 1;
+        }
+
+        return $"{prefix}{seq:D4}";
+    }
+}
+
+public class InformedConsentRepository : GenericRepository<InformedConsentDocument>, IInformedConsentRepository
+{
+    public InformedConsentRepository(ClinicDbContext context) : base(context) { }
+
+    public override async Task<InformedConsentDocument?> GetByIdAsync(string id)
+        => await _dbSet
+            .Include(c => c.Clinic)
+            .Include(c => c.Patient)
+            .Include(c => c.Doctor)
+            .Include(c => c.Appointment)
+            .FirstOrDefaultAsync(c => c.Id == id && !c.IsDeleted);
+
+    public async Task<InformedConsentDocument?> GetByDocumentNumberAsync(string documentNumber)
+        => await _dbSet
+            .Include(c => c.Clinic)
+            .Include(c => c.Patient)
+            .Include(c => c.Doctor)
+            .Include(c => c.Appointment)
+            .FirstOrDefaultAsync(c => c.DocumentNumber == documentNumber && !c.IsDeleted);
+
+    public async Task<List<InformedConsentDocument>> GetByPatientIdAsync(string patientId)
+        => await _dbSet
+            .Include(c => c.Clinic)
+            .Include(c => c.Doctor)
+            .Where(c => c.PatientId == patientId && !c.IsDeleted)
+            .OrderByDescending(c => c.CreatedAt)
+            .AsNoTracking()
+            .ToListAsync();
+
+    public async Task<List<InformedConsentDocument>> GetByClinicIdAsync(string clinicId, string? status = null)
+    {
+        var query = _dbSet
+            .Include(c => c.Patient)
+            .Include(c => c.Doctor)
+            .Where(c => c.ClinicId == clinicId && !c.IsDeleted);
+
+        if (!string.IsNullOrEmpty(status) && status != "all")
+            query = query.Where(c => c.Status == status);
+
+        return await query
+            .OrderByDescending(c => c.CreatedAt)
+            .AsNoTracking()
+            .ToListAsync();
+    }
+
+    public async Task<string> GetNextDocumentNumberAsync()
+    {
+        var prefix = $"CNS-{DateTime.UtcNow:yyyyMM}-";
+        var lastDoc = await _dbSet
+            .Where(c => c.DocumentNumber.StartsWith(prefix))
+            .OrderByDescending(c => c.DocumentNumber)
+            .Select(c => c.DocumentNumber)
+            .FirstOrDefaultAsync();
+
+        var seq = 1;
+        if (!string.IsNullOrEmpty(lastDoc) && lastDoc.Length >= prefix.Length + 4)
+        {
+            var seqStr = lastDoc.Substring(prefix.Length);
+            if (int.TryParse(seqStr, out var parsed))
+                seq = parsed + 1;
+        }
+
+        return $"{prefix}{seq:D4}";
+    }
+}
+

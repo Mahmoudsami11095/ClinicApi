@@ -32,6 +32,11 @@ public class ClinicDbContext : DbContext
     public DbSet<DoctorCommissionPlan> DoctorCommissionPlans => Set<DoctorCommissionPlan>();
     public DbSet<CommissionPayout> CommissionPayouts => Set<CommissionPayout>();
     public DbSet<CommissionPayoutItem> CommissionPayoutItems => Set<CommissionPayoutItem>();
+    public DbSet<DiagnosticRequisitionOrder> DiagnosticRequisitions => Set<DiagnosticRequisitionOrder>();
+    public DbSet<StockTransferRequisition> StockTransferRequisitions => Set<StockTransferRequisition>();
+    public DbSet<InsuranceProvider> InsuranceProviders => Set<InsuranceProvider>();
+    public DbSet<InsuranceClaim> InsuranceClaims => Set<InsuranceClaim>();
+    public DbSet<InformedConsentDocument> InformedConsents => Set<InformedConsentDocument>();
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
@@ -48,6 +53,9 @@ public class ClinicDbContext : DbContext
             entity.Property(e => e.AvailabilityDays).HasMaxLength(500);
             entity.Property(e => e.BranchCode).HasMaxLength(50);
             entity.Property(e => e.Rooms).HasMaxLength(500);
+            entity.Property(e => e.Slug).HasMaxLength(200);
+            entity.HasIndex(e => e.Slug).IsUnique();
+            entity.Property(e => e.QrPosterAssetUrl).HasMaxLength(500);
         });
 
         // ── User ──
@@ -646,6 +654,170 @@ public class ClinicDbContext : DbContext
             entity.Property(e => e.CommissionRate).HasColumnType("decimal(18,2)");
             entity.Property(e => e.CommissionAmount).HasColumnType("decimal(18,2)");
             entity.HasIndex(e => e.CommissionPayoutId);
+        });
+
+        // ── DiagnosticRequisitionOrder ──
+        modelBuilder.Entity<DiagnosticRequisitionOrder>(entity =>
+        {
+            entity.ToTable("DiagnosticRequisitions");
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.RequisitionToken).HasMaxLength(100).IsRequired();
+            entity.HasIndex(e => e.RequisitionToken).IsUnique();
+            entity.Property(e => e.ClinicId).HasMaxLength(100).IsRequired();
+            entity.Property(e => e.DoctorId).HasMaxLength(100).IsRequired();
+            entity.Property(e => e.PatientId).HasMaxLength(100).IsRequired();
+            entity.Property(e => e.ServiceType).HasMaxLength(50).IsRequired();
+            entity.Property(e => e.Indications).HasMaxLength(1000);
+            entity.Property(e => e.Status).HasMaxLength(50).HasDefaultValue("Pending");
+            entity.Property(e => e.PartnerName).HasMaxLength(200);
+            entity.Property(e => e.PartnerNotes).HasMaxLength(2000);
+            entity.Property(e => e.TechnicianName).HasMaxLength(200);
+
+            entity.HasOne(e => e.Clinic)
+                  .WithMany(c => c.DiagnosticRequisitions)
+                  .HasForeignKey(e => e.ClinicId)
+                  .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne(e => e.Doctor)
+                  .WithMany()
+                  .HasForeignKey(e => e.DoctorId)
+                  .OnDelete(DeleteBehavior.Restrict);
+
+            entity.HasOne(e => e.Patient)
+                  .WithMany()
+                  .HasForeignKey(e => e.PatientId)
+                  .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasIndex(e => new { e.ClinicId, e.Status });
+            entity.HasIndex(e => new { e.DoctorId, e.Status });
+            entity.HasIndex(e => new { e.PatientId });
+        });
+
+        // ── StockTransferRequisition ──
+        modelBuilder.Entity<StockTransferRequisition>(entity =>
+        {
+            entity.ToTable("StockTransferRequisitions");
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.RequisitionNumber).HasMaxLength(100).IsRequired();
+            entity.HasIndex(e => e.RequisitionNumber).IsUnique();
+            entity.Property(e => e.SourceClinicId).HasMaxLength(100).IsRequired();
+            entity.Property(e => e.DestinationClinicId).HasMaxLength(100).IsRequired();
+            entity.Property(e => e.MaterialId).HasMaxLength(100).IsRequired();
+            entity.Property(e => e.Status).HasMaxLength(50).HasDefaultValue("Requested");
+            entity.Property(e => e.Priority).HasMaxLength(50).HasDefaultValue("Normal");
+            entity.Property(e => e.BatchNumber).HasMaxLength(100);
+            entity.Property(e => e.Notes).HasMaxLength(1000);
+            entity.Property(e => e.DamageReason).HasMaxLength(500);
+
+            entity.HasOne(e => e.SourceClinic)
+                  .WithMany()
+                  .HasForeignKey(e => e.SourceClinicId)
+                  .OnDelete(DeleteBehavior.Restrict);
+
+            entity.HasOne(e => e.DestinationClinic)
+                  .WithMany()
+                  .HasForeignKey(e => e.DestinationClinicId)
+                  .OnDelete(DeleteBehavior.Restrict);
+
+            entity.HasOne(e => e.Material)
+                  .WithMany()
+                  .HasForeignKey(e => e.MaterialId)
+                  .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasIndex(e => new { e.SourceClinicId, e.Status });
+            entity.HasIndex(e => new { e.DestinationClinicId, e.Status });
+        });
+
+        // ── InsuranceProvider ──
+        modelBuilder.Entity<InsuranceProvider>(entity =>
+        {
+            entity.ToTable("InsuranceProviders");
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.Name).HasMaxLength(200).IsRequired();
+            entity.Property(e => e.PayerCode).HasMaxLength(100).IsRequired();
+            entity.HasIndex(e => e.PayerCode).IsUnique();
+            entity.Property(e => e.PreAuthThreshold).HasColumnType("decimal(18,2)").HasDefaultValue(1500m);
+        });
+
+        // ── InsuranceClaim ──
+        modelBuilder.Entity<InsuranceClaim>(entity =>
+        {
+            entity.ToTable("InsuranceClaims");
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.ClaimNumber).HasMaxLength(100).IsRequired();
+            entity.HasIndex(e => e.ClaimNumber).IsUnique();
+            entity.Property(e => e.PolicyNumber).HasMaxLength(100).IsRequired();
+            entity.Property(e => e.MemberId).HasMaxLength(100).IsRequired();
+            entity.Property(e => e.DiagnosisCode).HasMaxLength(50).IsRequired();
+            entity.Property(e => e.ProcedureDescription).HasMaxLength(500).IsRequired();
+            entity.Property(e => e.Status).HasMaxLength(50).HasDefaultValue("Draft");
+
+            entity.Property(e => e.TotalGrossAmount).HasColumnType("decimal(18,2)");
+            entity.Property(e => e.CopayPercentage).HasColumnType("decimal(5,2)").HasDefaultValue(20m);
+            entity.Property(e => e.PatientCopayAmount).HasColumnType("decimal(18,2)");
+            entity.Property(e => e.ClaimedAmount).HasColumnType("decimal(18,2)");
+            entity.Property(e => e.ApprovedAmount).HasColumnType("decimal(18,2)");
+
+            entity.HasOne(e => e.Clinic)
+                  .WithMany()
+                  .HasForeignKey(e => e.ClinicId)
+                  .OnDelete(DeleteBehavior.Restrict);
+
+            entity.HasOne(e => e.Patient)
+                  .WithMany()
+                  .HasForeignKey(e => e.PatientId)
+                  .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne(e => e.Doctor)
+                  .WithMany()
+                  .HasForeignKey(e => e.DoctorId)
+                  .OnDelete(DeleteBehavior.Restrict);
+
+            entity.HasOne(e => e.InsuranceProvider)
+                  .WithMany(p => p.Claims)
+                  .HasForeignKey(e => e.InsuranceProviderId)
+                  .OnDelete(DeleteBehavior.Restrict);
+
+            entity.HasIndex(e => new { e.ClinicId, e.Status });
+            entity.HasIndex(e => new { e.PatientId });
+        });
+
+        // ── InformedConsentDocument ──
+        modelBuilder.Entity<InformedConsentDocument>(entity =>
+        {
+            entity.ToTable("InformedConsents");
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.DocumentNumber).HasMaxLength(100).IsRequired();
+            entity.HasIndex(e => e.DocumentNumber).IsUnique();
+            entity.Property(e => e.ProcedureType).HasMaxLength(100).IsRequired();
+            entity.Property(e => e.ProcedureName).HasMaxLength(250).IsRequired();
+            entity.Property(e => e.SignatoryName).HasMaxLength(200);
+            entity.Property(e => e.SignatoryRelationship).HasMaxLength(50).HasDefaultValue("Self");
+            entity.Property(e => e.Status).HasMaxLength(50).HasDefaultValue("Draft");
+            entity.Property(e => e.DocumentSha256Checksum).HasMaxLength(100);
+
+            entity.HasOne(e => e.Clinic)
+                  .WithMany()
+                  .HasForeignKey(e => e.ClinicId)
+                  .OnDelete(DeleteBehavior.Restrict);
+
+            entity.HasOne(e => e.Patient)
+                  .WithMany()
+                  .HasForeignKey(e => e.PatientId)
+                  .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne(e => e.Doctor)
+                  .WithMany()
+                  .HasForeignKey(e => e.DoctorId)
+                  .OnDelete(DeleteBehavior.Restrict);
+
+            entity.HasOne(e => e.Appointment)
+                  .WithMany()
+                  .HasForeignKey(e => e.AppointmentId)
+                  .OnDelete(DeleteBehavior.SetNull);
+
+            entity.HasIndex(e => new { e.ClinicId, e.Status });
+            entity.HasIndex(e => new { e.PatientId });
         });
     }
 }

@@ -30,6 +30,8 @@ public interface IClinicRepository : IGenericRepository<ClinicEntity>
                                 (c.CreatorDoctorId == doctorId ||
                                  c.DoctorClinics.Any(dc => dc.DoctorId == doctorId && dc.Status == "Accepted")));
     }
+
+    Task<ClinicEntity?> GetBySlugAsync(string slug);
 }
 
 public interface IPatientRepository : IGenericRepository<Patient> { }
@@ -76,3 +78,35 @@ public interface IClinicalNoteRepository : IGenericRepository<ClinicalNote>
 {
     Task<List<ClinicalNote>> GetByPatientIdAsync(string patientId);
 }
+
+public interface IDiagnosticRequisitionRepository : IGenericRepository<DiagnosticRequisitionOrder>
+{
+    Task<DiagnosticRequisitionOrder?> GetByTokenAsync(string token);
+    Task<List<DiagnosticRequisitionOrder>> GetByClinicIdAsync(string clinicId);
+    Task<List<DiagnosticRequisitionOrder>> GetByPatientIdAsync(string patientId);
+    Task<List<DiagnosticRequisitionOrder>> GetByDoctorIdAsync(string doctorId);
+}
+
+public interface IStockTransferRequisitionRepository : IGenericRepository<StockTransferRequisition>
+{
+    Task<StockTransferRequisition?> GetByRequisitionNumberAsync(string requisitionNumber);
+    Task<List<StockTransferRequisition>> GetByClinicAsync(string clinicId, string? status = null, string? direction = "all");
+    Task<string> GetNextRequisitionNumberAsync();
+}
+
+public interface IInsuranceClaimRepository : IGenericRepository<InsuranceClaim>
+{
+    Task<InsuranceClaim?> GetByClaimNumberAsync(string claimNumber);
+    Task<List<InsuranceClaim>> GetByClinicAsync(string clinicId, string? status = null);
+    Task<List<InsuranceClaim>> GetByPatientAsync(string patientId);
+    Task<string> GetNextClaimNumberAsync();
+}
+
+public interface IInformedConsentRepository : IGenericRepository<InformedConsentDocument>
+{
+    Task<InformedConsentDocument?> GetByDocumentNumberAsync(string documentNumber);
+    Task<List<InformedConsentDocument>> GetByPatientIdAsync(string patientId);
+    Task<List<InformedConsentDocument>> GetByClinicIdAsync(string clinicId, string? status = null);
+    Task<string> GetNextDocumentNumberAsync();
+}
+

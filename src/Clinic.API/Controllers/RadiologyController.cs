@@ -102,4 +102,19 @@ public class RadiologyController : ControllerBase
         var success = await _radiologyService.SyncFindingsToOdontogramAsync(id, request);
         return Ok(new { success, message = "AI radiographic diagnostic findings successfully synchronized to patient dental chart." });
     }
+
+    // ── PACS DICOM Web Modality & HU Presets (Release v4.1.0) ──
+    [HttpGet("records/{id}/dicom-metadata")]
+    public async Task<IActionResult> GetDicomMetadata(string id)
+    {
+        var metadata = await _radiologyService.GetDicomMetadataAsync(id);
+        return Ok(metadata);
+    }
+
+    [HttpGet("records/{id}/dicom-slices")]
+    public async Task<IActionResult> GetDicomSlices(string id, [FromQuery] string orientation = "Axial")
+    {
+        var series = await _radiologyService.GetDicomSlicesAsync(id, orientation);
+        return Ok(series);
+    }
 }

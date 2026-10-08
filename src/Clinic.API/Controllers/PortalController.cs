@@ -262,6 +262,7 @@ public class PortalController : ControllerBase
             return Ok(new List<object>());
 
         var prescriptions = await _context.Prescriptions
+            .AsNoTracking()
             .Include(p => p.Doctor)
             .Where(p => p.PatientId == targetPatientId)
             .OrderByDescending(p => p.Date)
@@ -292,6 +293,7 @@ public class PortalController : ControllerBase
     public async Task<IActionResult> GetPrescriptionPrint(string id)
     {
         var rx = await _context.Prescriptions
+            .AsNoTracking()
             .Include(p => p.Doctor)
             .Include(p => p.Patient)
             .Include(p => p.Appointment)
@@ -301,7 +303,7 @@ public class PortalController : ControllerBase
         if (rx == null)
             return NotFound(new { message = "Prescription not found." });
 
-        var clinic = rx.Appointment?.Clinic ?? await _context.Clinics.FirstOrDefaultAsync();
+        var clinic = rx.Appointment?.Clinic ?? await _context.Clinics.AsNoTracking().FirstOrDefaultAsync();
 
         var document = new
         {
@@ -351,7 +353,7 @@ public class PortalController : ControllerBase
         var targetPatientId = patientId;
         if (string.IsNullOrWhiteSpace(targetPatientId))
         {
-            var pat = await _context.Patients.FirstOrDefaultAsync();
+            var pat = await _context.Patients.AsNoTracking().FirstOrDefaultAsync();
             targetPatientId = pat?.Id;
         }
 
@@ -359,6 +361,7 @@ public class PortalController : ControllerBase
             return Ok(new List<object>());
 
         var invoices = await _context.BillingRecords
+            .AsNoTracking()
             .Where(b => b.PatientId == targetPatientId)
             .OrderByDescending(b => b.DateIssued)
             .Take(20)
@@ -385,6 +388,7 @@ public class PortalController : ControllerBase
     public async Task<IActionResult> GetInvoiceReceipt(string id)
     {
         var inv = await _context.BillingRecords
+            .AsNoTracking()
             .Include(b => b.Patient)
             .Include(b => b.Clinic)
             .FirstOrDefaultAsync(b => b.Id == id);

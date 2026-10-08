@@ -20,4 +20,8 @@ public interface IRadiologyService
     // AI Computer Vision Diagnostics (Release v4.0.0)
     Task<AiRadiologyAnalysisResultDto> AnalyzeScanAsync(string recordId);
     Task<bool> SyncFindingsToOdontogramAsync(string recordId, SyncAiFindingsRequestDto request);
+
+    // PACS DICOM Modality & Multi-Slice CBCT (Release v4.1.0)
+    Task<DicomMetadataDto> GetDicomMetadataAsync(string recordId);
+    Task<DicomSeriesDto> GetDicomSlicesAsync(string recordId, string orientation = "Axial");
 }
