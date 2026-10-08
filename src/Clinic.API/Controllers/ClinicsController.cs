@@ -76,7 +76,10 @@ public class ClinicsController : ControllerBase
                 Longitude = c.Longitude,
                 City = c.City,
                 State = c.State,
-                Country = c.Country
+                Country = c.Country,
+                Slug = c.Slug ?? c.Id,
+                PublicBookingEnabled = c.PublicBookingEnabled,
+                QrPosterAssetUrl = c.QrPosterAssetUrl
             };
         }).ToList();
 
@@ -96,6 +99,10 @@ public class ClinicsController : ControllerBase
             }
         }
 
+        var slug = string.IsNullOrWhiteSpace(dto.Slug)
+            ? System.Text.RegularExpressions.Regex.Replace(dto.Name.ToLower().Trim(), @"[^a-z0-9]+", "-").Trim('-')
+            : dto.Slug.ToLower().Trim();
+
         var entity = new ClinicEntity
         {
             Id = string.IsNullOrEmpty(dto.Id) ? Guid.NewGuid().ToString() : dto.Id,
@@ -109,7 +116,10 @@ public class ClinicsController : ControllerBase
             Longitude = dto.Longitude,
             City = dto.City,
             State = dto.State,
-            Country = dto.Country
+            Country = dto.Country,
+            Slug = slug,
+            PublicBookingEnabled = dto.PublicBookingEnabled,
+            QrPosterAssetUrl = dto.QrPosterAssetUrl
         };
         await _repo.AddAsync(entity);
 
@@ -341,10 +351,58 @@ public class ClinicsController : ControllerBase
         entity.City = dto.City;
         entity.State = dto.State;
         entity.Country = dto.Country;
+        if (!string.IsNullOrWhiteSpace(dto.Slug))
+        {
+            entity.Slug = System.Text.RegularExpressions.Regex.Replace(dto.Slug.ToLower().Trim(), @"[^a-z0-9]+", "-").Trim('-');
+        }
+        entity.PublicBookingEnabled = dto.PublicBookingEnabled;
+        if (!string.IsNullOrWhiteSpace(dto.QrPosterAssetUrl))
+        {
+            entity.QrPosterAssetUrl = dto.QrPosterAssetUrl;
+        }
         await _repo.UpdateAsync(entity);
 
-        var result = new ClinicDto { Id = entity.Id, Name = entity.Name, Address = entity.Address, Phone = entity.Phone, CreatorDoctorId = entity.CreatorDoctorId, AvailabilityHours = entity.AvailabilityHours, AvailabilityDays = entity.AvailabilityDays, Latitude = entity.Latitude, Longitude = entity.Longitude, City = entity.City, State = entity.State, Country = entity.Country };
+        var result = new ClinicDto 
+        { 
+            Id = entity.Id, 
+            Name = entity.Name, 
+            Address = entity.Address, 
+            Phone = entity.Phone, 
+            CreatorDoctorId = entity.CreatorDoctorId, 
+            AvailabilityHours = entity.AvailabilityHours, 
+            AvailabilityDays = entity.AvailabilityDays, 
+            Latitude = entity.Latitude, 
+            Longitude = entity.Longitude, 
+            City = entity.City, 
+            State = entity.State, 
+            Country = entity.Country,
+            Slug = entity.Slug ?? entity.Id,
+            PublicBookingEnabled = entity.PublicBookingEnabled,
+            QrPosterAssetUrl = entity.QrPosterAssetUrl
+        };
         return Ok(new { message = "Success", data = result });
+    }
+
+    [HttpGet("{id}/qr-code-kit")]
+    public async Task<IActionResult> GetQrCodeKit(string id)
+    {
+        var entity = await _repo.GetByIdAsync(id);
+        if (entity == null) return NotFound(new { message = "Clinic not found" });
+
+        var slug = string.IsNullOrWhiteSpace(entity.Slug) ? entity.Id : entity.Slug;
+        var bookingUrl = $"https://clinic-app-ten-topaz.vercel.app/book/{slug}";
+        
+        // Simple SVG QR code placeholder / data representation
+        var qrData = new ClinicQrKitDto
+        {
+            ClinicId = entity.Id,
+            ClinicName = entity.Name,
+            Slug = slug,
+            BookingUrl = bookingUrl,
+            QrCodeDataUrl = $"https://api.qrserver.com/v1/create-qr-code/?size=300x300&data={Uri.EscapeDataString(bookingUrl)}"
+        };
+
+        return Ok(new { message = "Success", data = qrData });
     }
 
     [HttpDelete("{id}")]

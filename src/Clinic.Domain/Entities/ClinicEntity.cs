@@ -21,6 +21,11 @@ public class ClinicEntity
     public string? BranchCode { get; set; }
     public string? Rooms { get; set; }
 
+    // REQ-QR-01 & REQ-SAAS-01: Public Booking & Clinic QR Landing
+    public string? Slug { get; set; }
+    public bool PublicBookingEnabled { get; set; } = true;
+    public string? QrPosterAssetUrl { get; set; }
+
     // Navigation properties
     public ICollection<DoctorClinic> DoctorClinics { get; set; } = new List<DoctorClinic>();
     public ICollection<Patient> Patients { get; set; } = new List<Patient>();
@@ -28,4 +33,5 @@ public class ClinicEntity
     public ICollection<BillingRecord> BillingRecords { get; set; } = new List<BillingRecord>();
     public ICollection<User> Users { get; set; } = new List<User>();
     public ICollection<UserClinic> UserClinics { get; set; } = new List<UserClinic>();
+    public ICollection<DiagnosticRequisitionOrder> DiagnosticRequisitions { get; set; } = new List<DiagnosticRequisitionOrder>();
 }

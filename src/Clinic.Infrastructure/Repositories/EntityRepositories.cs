@@ -35,6 +35,17 @@ public class ClinicRepository : GenericRepository<ClinicEntity>, IClinicReposito
                            (c.CreatorDoctorId == doctorId ||
                             c.DoctorClinics.Any(dc => dc.DoctorId == doctorId && dc.Status == "Accepted")));
     }
+
+    public async Task<ClinicEntity?> GetBySlugAsync(string slug)
+    {
+        return await _dbSet
+            .Include(c => c.DoctorClinics)
+                .ThenInclude(dc => dc.Doctor)
+            .Include(c => c.UserClinics)
+                .ThenInclude(uc => uc.User)
+            .AsNoTracking()
+            .FirstOrDefaultAsync(c => c.Slug == slug);
+    }
 }
 
 public class PatientRepository : GenericRepository<Patient>, IPatientRepository
@@ -511,3 +522,43 @@ public class ClinicalNoteRepository : GenericRepository<ClinicalNote>, IClinical
         throw new InvalidOperationException("BR-RX-03 / BR-MED-01: Clinical encounter notes cannot be deleted from the database. Medical records are permanent and immutable.");
     }
 }
+
+public class DiagnosticRequisitionRepository : GenericRepository<DiagnosticRequisitionOrder>, IDiagnosticRequisitionRepository
+{
+    public DiagnosticRequisitionRepository(ClinicDbContext context) : base(context) { }
+
+    public async Task<DiagnosticRequisitionOrder?> GetByTokenAsync(string token)
+        => await _dbSet
+            .Include(d => d.Clinic)
+            .Include(d => d.Doctor)
+            .Include(d => d.Patient)
+            .FirstOrDefaultAsync(d => d.RequisitionToken == token && !d.IsDeleted);
+
+    public async Task<List<DiagnosticRequisitionOrder>> GetByClinicIdAsync(string clinicId)
+        => await _dbSet
+            .Include(d => d.Doctor)
+            .Include(d => d.Patient)
+            .Where(d => d.ClinicId == clinicId && !d.IsDeleted)
+            .OrderByDescending(d => d.CreatedAt)
+            .AsNoTracking()
+            .ToListAsync();
+
+    public async Task<List<DiagnosticRequisitionOrder>> GetByPatientIdAsync(string patientId)
+        => await _dbSet
+            .Include(d => d.Clinic)
+            .Include(d => d.Doctor)
+            .Where(d => d.PatientId == patientId && !d.IsDeleted)
+            .OrderByDescending(d => d.CreatedAt)
+            .AsNoTracking()
+            .ToListAsync();
+
+    public async Task<List<DiagnosticRequisitionOrder>> GetByDoctorIdAsync(string doctorId)
+        => await _dbSet
+            .Include(d => d.Clinic)
+            .Include(d => d.Patient)
+            .Where(d => d.DoctorId == doctorId && !d.IsDeleted)
+            .OrderByDescending(d => d.CreatedAt)
+            .AsNoTracking()
+            .ToListAsync();
+}
+

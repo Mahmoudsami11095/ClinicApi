@@ -32,6 +32,7 @@ public class ClinicDbContext : DbContext
     public DbSet<DoctorCommissionPlan> DoctorCommissionPlans => Set<DoctorCommissionPlan>();
     public DbSet<CommissionPayout> CommissionPayouts => Set<CommissionPayout>();
     public DbSet<CommissionPayoutItem> CommissionPayoutItems => Set<CommissionPayoutItem>();
+    public DbSet<DiagnosticRequisitionOrder> DiagnosticRequisitions => Set<DiagnosticRequisitionOrder>();
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
@@ -48,6 +49,9 @@ public class ClinicDbContext : DbContext
             entity.Property(e => e.AvailabilityDays).HasMaxLength(500);
             entity.Property(e => e.BranchCode).HasMaxLength(50);
             entity.Property(e => e.Rooms).HasMaxLength(500);
+            entity.Property(e => e.Slug).HasMaxLength(200);
+            entity.HasIndex(e => e.Slug).IsUnique();
+            entity.Property(e => e.QrPosterAssetUrl).HasMaxLength(500);
         });
 
         // ── User ──
@@ -646,6 +650,43 @@ public class ClinicDbContext : DbContext
             entity.Property(e => e.CommissionRate).HasColumnType("decimal(18,2)");
             entity.Property(e => e.CommissionAmount).HasColumnType("decimal(18,2)");
             entity.HasIndex(e => e.CommissionPayoutId);
+        });
+
+        // ── DiagnosticRequisitionOrder ──
+        modelBuilder.Entity<DiagnosticRequisitionOrder>(entity =>
+        {
+            entity.ToTable("DiagnosticRequisitions");
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.RequisitionToken).HasMaxLength(100).IsRequired();
+            entity.HasIndex(e => e.RequisitionToken).IsUnique();
+            entity.Property(e => e.ClinicId).HasMaxLength(100).IsRequired();
+            entity.Property(e => e.DoctorId).HasMaxLength(100).IsRequired();
+            entity.Property(e => e.PatientId).HasMaxLength(100).IsRequired();
+            entity.Property(e => e.ServiceType).HasMaxLength(50).IsRequired();
+            entity.Property(e => e.Indications).HasMaxLength(1000);
+            entity.Property(e => e.Status).HasMaxLength(50).HasDefaultValue("Pending");
+            entity.Property(e => e.PartnerName).HasMaxLength(200);
+            entity.Property(e => e.PartnerNotes).HasMaxLength(2000);
+            entity.Property(e => e.TechnicianName).HasMaxLength(200);
+
+            entity.HasOne(e => e.Clinic)
+                  .WithMany(c => c.DiagnosticRequisitions)
+                  .HasForeignKey(e => e.ClinicId)
+                  .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne(e => e.Doctor)
+                  .WithMany()
+                  .HasForeignKey(e => e.DoctorId)
+                  .OnDelete(DeleteBehavior.Restrict);
+
+            entity.HasOne(e => e.Patient)
+                  .WithMany()
+                  .HasForeignKey(e => e.PatientId)
+                  .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasIndex(e => new { e.ClinicId, e.Status });
+            entity.HasIndex(e => new { e.DoctorId, e.Status });
+            entity.HasIndex(e => new { e.PatientId });
         });
     }
 }

@@ -30,6 +30,8 @@ public interface IClinicRepository : IGenericRepository<ClinicEntity>
                                 (c.CreatorDoctorId == doctorId ||
                                  c.DoctorClinics.Any(dc => dc.DoctorId == doctorId && dc.Status == "Accepted")));
     }
+
+    Task<ClinicEntity?> GetBySlugAsync(string slug);
 }
 
 public interface IPatientRepository : IGenericRepository<Patient> { }
@@ -76,3 +78,12 @@ public interface IClinicalNoteRepository : IGenericRepository<ClinicalNote>
 {
     Task<List<ClinicalNote>> GetByPatientIdAsync(string patientId);
 }
+
+public interface IDiagnosticRequisitionRepository : IGenericRepository<DiagnosticRequisitionOrder>
+{
+    Task<DiagnosticRequisitionOrder?> GetByTokenAsync(string token);
+    Task<List<DiagnosticRequisitionOrder>> GetByClinicIdAsync(string clinicId);
+    Task<List<DiagnosticRequisitionOrder>> GetByPatientIdAsync(string patientId);
+    Task<List<DiagnosticRequisitionOrder>> GetByDoctorIdAsync(string doctorId);
+}
+
