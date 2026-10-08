@@ -38,6 +38,7 @@ public class ClinicDbContext : DbContext
     public DbSet<InsuranceClaim> InsuranceClaims => Set<InsuranceClaim>();
     public DbSet<InformedConsentDocument> InformedConsents => Set<InformedConsentDocument>();
     public DbSet<DrugInteractionRule> DrugInteractionRules => Set<DrugInteractionRule>();
+    public DbSet<PatientRecall> PatientRecalls => Set<PatientRecall>();
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
@@ -834,6 +835,46 @@ public class ClinicDbContext : DbContext
             entity.Property(e => e.SuggestedAlternative).HasMaxLength(500);
             entity.Property(e => e.ReferenceAuthority).HasMaxLength(100).HasDefaultValue("FDA / BNF");
             entity.HasIndex(e => new { e.DrugA, e.DrugB });
+        });
+
+        // ── PatientRecall ──
+        modelBuilder.Entity<PatientRecall>(entity =>
+        {
+            entity.ToTable("PatientRecalls");
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.RecallNumber).HasMaxLength(100).IsRequired();
+            entity.HasIndex(e => e.RecallNumber).IsUnique();
+            entity.Property(e => e.RecallType).HasMaxLength(100).IsRequired();
+            entity.Property(e => e.Status).HasMaxLength(50).HasDefaultValue("Scheduled");
+            entity.Property(e => e.NotificationChannel).HasMaxLength(50).HasDefaultValue("WhatsApp");
+
+            entity.HasOne(e => e.Clinic)
+                  .WithMany()
+                  .HasForeignKey(e => e.ClinicId)
+                  .OnDelete(DeleteBehavior.Restrict);
+
+            entity.HasOne(e => e.Patient)
+                  .WithMany()
+                  .HasForeignKey(e => e.PatientId)
+                  .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne(e => e.Doctor)
+                  .WithMany()
+                  .HasForeignKey(e => e.DoctorId)
+                  .OnDelete(DeleteBehavior.Restrict);
+
+            entity.HasOne(e => e.SourceAppointment)
+                  .WithMany()
+                  .HasForeignKey(e => e.SourceAppointmentId)
+                  .OnDelete(DeleteBehavior.SetNull);
+
+            entity.HasOne(e => e.BookedAppointment)
+                  .WithMany()
+                  .HasForeignKey(e => e.BookedAppointmentId)
+                  .OnDelete(DeleteBehavior.SetNull);
+
+            entity.HasIndex(e => new { e.ClinicId, e.Status, e.DueDate });
+            entity.HasIndex(e => new { e.PatientId });
         });
     }
 }
