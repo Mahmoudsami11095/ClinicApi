@@ -46,6 +46,7 @@ public class ClinicDbContext : DbContext
     public DbSet<PurchaseOrder> PurchaseOrders => Set<PurchaseOrder>();
     public DbSet<PurchaseOrderItem> PurchaseOrderItems => Set<PurchaseOrderItem>();
     public DbSet<StandbyQueueEntry> StandbyQueue => Set<StandbyQueueEntry>();
+    public DbSet<WebAuthnCredential> WebAuthnCredentials => Set<WebAuthnCredential>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -1002,6 +1003,18 @@ public class ClinicDbContext : DbContext
                   .OnDelete(DeleteBehavior.Restrict);
 
             entity.HasIndex(e => new { e.ClinicId, e.DoctorId, e.RequestedDate, e.Status });
+        });
+
+        // ── WebAuthn ──
+        modelBuilder.Entity<WebAuthnCredential>(entity =>
+        {
+            entity.ToTable("WebAuthnCredentials");
+            entity.HasKey(e => e.Id);
+
+            entity.HasOne(e => e.User)
+                  .WithMany()
+                  .HasForeignKey(e => e.UserId)
+                  .OnDelete(DeleteBehavior.Cascade);
         });
     }
 }
