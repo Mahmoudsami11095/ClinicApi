@@ -45,6 +45,7 @@ public class ClinicDbContext : DbContext
     public DbSet<Supplier> Suppliers => Set<Supplier>();
     public DbSet<PurchaseOrder> PurchaseOrders => Set<PurchaseOrder>();
     public DbSet<PurchaseOrderItem> PurchaseOrderItems => Set<PurchaseOrderItem>();
+    public DbSet<StandbyQueueEntry> StandbyQueue => Set<StandbyQueueEntry>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -975,6 +976,32 @@ public class ClinicDbContext : DbContext
                   .WithMany()
                   .HasForeignKey(e => e.MaterialId)
                   .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        // ── Standby Queue ──
+        modelBuilder.Entity<StandbyQueueEntry>(entity =>
+        {
+            entity.ToTable("StandbyQueue");
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.Status).HasMaxLength(50).HasDefaultValue("Waiting");
+            entity.Property(e => e.RequestedDate).HasMaxLength(20).IsRequired();
+
+            entity.HasOne(e => e.Clinic)
+                  .WithMany()
+                  .HasForeignKey(e => e.ClinicId)
+                  .OnDelete(DeleteBehavior.Restrict);
+
+            entity.HasOne(e => e.Patient)
+                  .WithMany()
+                  .HasForeignKey(e => e.PatientId)
+                  .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne(e => e.Doctor)
+                  .WithMany()
+                  .HasForeignKey(e => e.DoctorId)
+                  .OnDelete(DeleteBehavior.Restrict);
+
+            entity.HasIndex(e => new { e.ClinicId, e.DoctorId, e.RequestedDate, e.Status });
         });
     }
 }

@@ -30,6 +30,12 @@ public class Appointment
     /// </summary>
     public string? RoomNumber { get; set; }
 
+    /// <summary>
+    /// BR-AI-NOSHOW-01: AI Predictive No-Show
+    /// </summary>
+    public double? NoShowPredictionScore { get; set; }
+    public bool IsHighRiskNoShow { get; set; } = false;
+
     // Navigation properties
     public Patient Patient { get; set; } = null!;
     public Doctor Doctor { get; set; } = null!;
