@@ -11,6 +11,14 @@ public class User
     public UserRole Role { get; set; }
     public string Title { get; set; } = string.Empty;
 
+    /// <summary>
+    /// BR-SAAS-01: Multi-Tenant Data Isolation
+    /// </summary>
+    public string? TenantId { get; set; }
+    public Tenant? Tenant { get; set; }
+
+    public bool BiometricEnabled { get; set; } = false;
+
     // Optional FK – set for clinic-bound admins, assistants, patients
     public string? ClinicId { get; set; }
     public ClinicEntity? Clinic { get; set; }

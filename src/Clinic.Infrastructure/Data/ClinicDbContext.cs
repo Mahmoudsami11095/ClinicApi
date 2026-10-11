@@ -47,6 +47,7 @@ public class ClinicDbContext : DbContext
     public DbSet<PurchaseOrderItem> PurchaseOrderItems => Set<PurchaseOrderItem>();
     public DbSet<StandbyQueueEntry> StandbyQueue => Set<StandbyQueueEntry>();
     public DbSet<WebAuthnCredential> WebAuthnCredentials => Set<WebAuthnCredential>();
+    public DbSet<Tenant> Tenants => Set<Tenant>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -1015,6 +1016,25 @@ public class ClinicDbContext : DbContext
                   .WithMany()
                   .HasForeignKey(e => e.UserId)
                   .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        // ── SaaS Multi-Tenant ──
+        modelBuilder.Entity<Tenant>(entity =>
+        {
+            entity.ToTable("Tenants");
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.Subdomain).HasMaxLength(100).IsRequired();
+            entity.HasIndex(e => e.Subdomain).IsUnique();
+
+            entity.HasMany(e => e.Clinics)
+                  .WithOne(c => c.Tenant)
+                  .HasForeignKey(c => c.TenantId)
+                  .OnDelete(DeleteBehavior.Restrict);
+
+            entity.HasMany(e => e.Users)
+                  .WithOne(u => u.Tenant)
+                  .HasForeignKey(u => u.TenantId)
+                  .OnDelete(DeleteBehavior.Restrict);
         });
     }
 }

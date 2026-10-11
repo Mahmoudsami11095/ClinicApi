@@ -5,7 +5,13 @@ public class ClinicEntity
     public string Id { get; set; } = string.Empty;
     public string Name { get; set; } = string.Empty;
     public string Address { get; set; } = string.Empty;
-    public string Phone { get; set; } = string.Empty;
+    public string PhoneNumber { get; set; } = string.Empty;
+
+    /// <summary>
+    /// BR-SAAS-01: Multi-Tenant Data Isolation
+    /// </summary>
+    public string? TenantId { get; set; }
+    public Tenant? Tenant { get; set; }
     public string? CreatorDoctorId { get; set; }
     public string? AvailabilityHours { get; set; }
     public string? AvailabilityDays { get; set; }
