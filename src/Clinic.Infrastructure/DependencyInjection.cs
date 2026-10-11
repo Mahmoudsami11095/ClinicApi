@@ -50,6 +50,7 @@ public static class DependencyInjection
         services.AddScoped<IInsuranceClaimRepository, InsuranceClaimRepository>();
         services.AddScoped<IInformedConsentRepository, InformedConsentRepository>();
         services.AddScoped<IPatientRecallRepository, PatientRecallRepository>();
+        services.AddScoped<IPaymentPlanRepository, PaymentPlanRepository>();
         services.AddScoped(typeof(IGenericRepository<>), typeof(GenericRepository<>));
 
         // ── Services ──

@@ -830,3 +830,78 @@ public class PatientRecallRepository : GenericRepository<PatientRecall>, IPatien
     }
 }
 
+public class PaymentPlanRepository : GenericRepository<PaymentPlan>, IPaymentPlanRepository
+{
+    public PaymentPlanRepository(ClinicDbContext context) : base(context) { }
+
+    public override async Task<PaymentPlan?> GetByIdAsync(string id)
+    {
+        return await _dbSet
+            .Include(p => p.Patient)
+            .Include(p => p.Doctor)
+            .Include(p => p.Clinic)
+            .Include(p => p.Installments.OrderBy(i => i.InstallmentNumber))
+            .FirstOrDefaultAsync(p => p.Id == id && !p.IsDeleted);
+    }
+
+    public async Task<PaymentPlan?> GetByPlanNumberAsync(string planNumber)
+    {
+        return await _dbSet
+            .Include(p => p.Patient)
+            .Include(p => p.Doctor)
+            .Include(p => p.Clinic)
+            .Include(p => p.Installments.OrderBy(i => i.InstallmentNumber))
+            .FirstOrDefaultAsync(p => p.PlanNumber == planNumber && !p.IsDeleted);
+    }
+
+    public async Task<List<PaymentPlan>> GetByClinicAsync(string clinicId, string? status = null)
+    {
+        var query = _dbSet
+            .Include(p => p.Patient)
+            .Include(p => p.Doctor)
+            .Include(p => p.Installments.OrderBy(i => i.InstallmentNumber))
+            .Where(p => p.ClinicId == clinicId && !p.IsDeleted);
+
+        if (!string.IsNullOrEmpty(status) && status != "all")
+            query = query.Where(p => p.Status == status);
+
+        return await query
+            .OrderByDescending(p => p.CreatedAt)
+            .AsNoTracking()
+            .ToListAsync();
+    }
+
+    public async Task<List<PaymentPlan>> GetByPatientAsync(string patientId)
+    {
+        return await _dbSet
+            .Include(p => p.Doctor)
+            .Include(p => p.Clinic)
+            .Include(p => p.Installments.OrderBy(i => i.InstallmentNumber))
+            .Where(p => p.PatientId == patientId && !p.IsDeleted)
+            .OrderByDescending(p => p.CreatedAt)
+            .AsNoTracking()
+            .ToListAsync();
+    }
+
+    public async Task<string> GetNextPlanNumberAsync()
+    {
+        var prefix = $"PLAN-{DateTime.UtcNow:yyyyMM}-";
+        var last = await _dbSet
+            .Where(p => p.PlanNumber.StartsWith(prefix))
+            .OrderByDescending(p => p.PlanNumber)
+            .Select(p => p.PlanNumber)
+            .FirstOrDefaultAsync();
+
+        var seq = 1;
+        if (!string.IsNullOrEmpty(last) && last.Length >= prefix.Length + 4)
+        {
+            var seqStr = last.Substring(prefix.Length);
+            if (int.TryParse(seqStr, out var parsed))
+                seq = parsed + 1;
+        }
+
+        return $"{prefix}{seq:D4}";
+    }
+}
+
+
