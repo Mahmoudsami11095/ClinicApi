@@ -41,6 +41,11 @@ public class ClinicDbContext : DbContext
     public DbSet<PatientRecall> PatientRecalls => Set<PatientRecall>();
     public DbSet<PaymentPlan> PaymentPlans => Set<PaymentPlan>();
     public DbSet<PaymentPlanInstallment> PaymentPlanInstallments => Set<PaymentPlanInstallment>();
+    
+    public DbSet<Supplier> Suppliers => Set<Supplier>();
+    public DbSet<PurchaseOrder> PurchaseOrders => Set<PurchaseOrder>();
+    public DbSet<PurchaseOrderItem> PurchaseOrderItems => Set<PurchaseOrderItem>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
@@ -933,6 +938,43 @@ public class ClinicDbContext : DbContext
 
             entity.HasIndex(e => new { e.PaymentPlanId, e.InstallmentNumber });
             entity.HasIndex(e => new { e.Status, e.DueDate });
+        });
+
+        // ── Procurement ──
+        modelBuilder.Entity<PurchaseOrder>(entity =>
+        {
+            entity.ToTable("PurchaseOrders");
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.PONumber).HasMaxLength(100).IsRequired();
+            entity.Property(e => e.Status).HasMaxLength(50).HasDefaultValue("Draft");
+            entity.Property(e => e.TotalAmount).HasColumnType("decimal(18,2)");
+            
+            entity.HasOne(e => e.Clinic)
+                  .WithMany()
+                  .HasForeignKey(e => e.ClinicId)
+                  .OnDelete(DeleteBehavior.Restrict);
+                  
+            entity.HasOne(e => e.Supplier)
+                  .WithMany()
+                  .HasForeignKey(e => e.SupplierId)
+                  .OnDelete(DeleteBehavior.Restrict);
+                  
+            entity.HasMany(e => e.Items)
+                  .WithOne(i => i.PurchaseOrder)
+                  .HasForeignKey(i => i.PurchaseOrderId)
+                  .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<PurchaseOrderItem>(entity =>
+        {
+            entity.ToTable("PurchaseOrderItems");
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.UnitPrice).HasColumnType("decimal(18,2)");
+            
+            entity.HasOne(e => e.Material)
+                  .WithMany()
+                  .HasForeignKey(e => e.MaterialId)
+                  .OnDelete(DeleteBehavior.Restrict);
         });
     }
 }
