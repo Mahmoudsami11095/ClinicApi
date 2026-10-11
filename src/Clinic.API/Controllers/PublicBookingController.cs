@@ -41,6 +41,7 @@ public class PublicBookingController : ControllerBase
     {
         var clinic = await _clinicRepo.GetBySlugAsync(slug) 
                      ?? await _context.Clinics
+                         .AsNoTracking()
                          .Include(c => c.DoctorClinics)
                              .ThenInclude(dc => dc.Doctor)
                          .FirstOrDefaultAsync(c => c.Id == slug);
@@ -60,7 +61,7 @@ public class PublicBookingController : ControllerBase
         // Include creator doctor if not in DoctorClinics
         if (!string.IsNullOrEmpty(clinic.CreatorDoctorId))
         {
-            var creatorDoctor = await _context.Doctors.FirstOrDefaultAsync(d => d.Id == clinic.CreatorDoctorId);
+            var creatorDoctor = await _context.Doctors.AsNoTracking().FirstOrDefaultAsync(d => d.Id == clinic.CreatorDoctorId);
             if (creatorDoctor != null)
             {
                 var rel = clinic.DoctorClinics.FirstOrDefault(dc => dc.DoctorId == creatorDoctor.Id);
@@ -83,7 +84,7 @@ public class PublicBookingController : ControllerBase
         foreach (var dc in clinic.DoctorClinics.Where(dc => dc.Status == "Accepted"))
         {
             if (doctors.Any(d => d.Id == dc.DoctorId)) continue;
-            var doc = dc.Doctor ?? await _context.Doctors.FirstOrDefaultAsync(d => d.Id == dc.DoctorId);
+            var doc = dc.Doctor ?? await _context.Doctors.AsNoTracking().FirstOrDefaultAsync(d => d.Id == dc.DoctorId);
             if (doc != null)
             {
                 var days = ParseDays(dc.AvailabilityDays ?? clinic.AvailabilityDays);
@@ -130,11 +131,11 @@ public class PublicBookingController : ControllerBase
         }
 
         var clinic = await _clinicRepo.GetBySlugAsync(slug) 
-                     ?? await _context.Clinics.FirstOrDefaultAsync(c => c.Id == slug);
+                     ?? await _context.Clinics.AsNoTracking().FirstOrDefaultAsync(c => c.Id == slug);
 
         if (clinic == null) return NotFound(new { message = "Clinic not found" });
 
-        var doctor = await _context.Doctors.FirstOrDefaultAsync(d => d.Id == doctorId);
+        var doctor = await _context.Doctors.AsNoTracking().FirstOrDefaultAsync(d => d.Id == doctorId);
         if (doctor == null) return NotFound(new { message = "Doctor not found" });
 
         // Parse date to day of week
@@ -147,6 +148,7 @@ public class PublicBookingController : ControllerBase
 
         // Check availability relationship
         var rel = await _context.DoctorClinics
+            .AsNoTracking()
             .FirstOrDefaultAsync(dc => dc.ClinicId == clinic.Id && dc.DoctorId == doctorId);
 
         var days = ParseDays(rel?.AvailabilityDays ?? clinic.AvailabilityDays);
@@ -188,12 +190,12 @@ public class PublicBookingController : ControllerBase
         }
 
         var clinic = await _clinicRepo.GetBySlugAsync(slug) 
-                     ?? await _context.Clinics.FirstOrDefaultAsync(c => c.Id == slug);
+                     ?? await _context.Clinics.AsNoTracking().FirstOrDefaultAsync(c => c.Id == slug);
 
         if (clinic == null) return NotFound(new { message = "Clinic not found" });
         if (!clinic.PublicBookingEnabled) return BadRequest(new { message = "Public online booking is disabled for this clinic." });
 
-        var doctor = await _context.Doctors.FirstOrDefaultAsync(d => d.Id == request.DoctorId);
+        var doctor = await _context.Doctors.AsNoTracking().FirstOrDefaultAsync(d => d.Id == request.DoctorId);
         if (doctor == null) return NotFound(new { message = "Doctor not found" });
 
         var apptDateTime = $"{request.Date} {request.Time}";
