@@ -63,6 +63,7 @@ public static class DependencyInjection
         services.AddScoped<ICommissionService, CommissionService>();
         services.AddScoped<IExecutiveAnalyticsService, ExecutiveAnalyticsService>();
         services.AddScoped<ICdsEngineService, CdsEngineService>();
+        services.AddScoped<IAiVoiceScribeService, AiVoiceScribeService>();
 
         // ── JWT Authentication ──
         services.AddAuthentication(options =>
