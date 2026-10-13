@@ -5,7 +5,10 @@ public class ClinicEntity
     public string Id { get; set; } = string.Empty;
     public string Name { get; set; } = string.Empty;
     public string Address { get; set; } = string.Empty;
-    public string PhoneNumber { get; set; } = string.Empty;
+    public string Phone { get; set; } = string.Empty;
+
+    [System.ComponentModel.DataAnnotations.Schema.NotMapped]
+    public string PhoneNumber { get => Phone; set => Phone = value; }
 
     /// <summary>
     /// BR-SAAS-01: Multi-Tenant Data Isolation

@@ -10,12 +10,42 @@ public class ClinicRepository : GenericRepository<ClinicEntity>, IClinicReposito
     public ClinicRepository(ClinicDbContext context) : base(context) { }
 
     public override async Task<List<ClinicEntity>> GetAllAsync()
-        => await _dbSet
-            .Include(c => c.DoctorClinics)
-            .Include(c => c.UserClinics)
-                .ThenInclude(uc => uc.User)
-            .AsNoTracking()
-            .ToListAsync();
+    {
+        try
+        {
+            return await _dbSet
+                .Include(c => c.DoctorClinics)
+                .Include(c => c.UserClinics)
+                    .ThenInclude(uc => uc.User)
+                .AsNoTracking()
+                .ToListAsync();
+        }
+        catch (Exception ex) when (ex.Message.Contains("Invalid column name") || ex.InnerException?.Message.Contains("Invalid column name") == true)
+        {
+            return await _context.Clinics
+                .FromSqlRaw("SELECT Id, Name, Address, Phone, CreatorDoctorId, AvailabilityHours, AvailabilityDays, Latitude, Longitude, City, State, Country, BranchCode, Rooms, NULL AS Slug, CAST(1 AS bit) AS PublicBookingEnabled, NULL AS QrPosterAssetUrl, NULL AS TenantId FROM Clinics")
+                .Include(c => c.DoctorClinics)
+                .Include(c => c.UserClinics)
+                    .ThenInclude(uc => uc.User)
+                .AsNoTracking()
+                .ToListAsync();
+        }
+    }
+
+    public override async Task<ClinicEntity?> GetByIdAsync(string id)
+    {
+        try
+        {
+            return await base.GetByIdAsync(id);
+        }
+        catch (Exception ex) when (ex.Message.Contains("Invalid column name") || ex.InnerException?.Message.Contains("Invalid column name") == true)
+        {
+            return await _context.Clinics
+                .FromSqlRaw("SELECT Id, Name, Address, Phone, CreatorDoctorId, AvailabilityHours, AvailabilityDays, Latitude, Longitude, City, State, Country, BranchCode, Rooms, NULL AS Slug, CAST(1 AS bit) AS PublicBookingEnabled, NULL AS QrPosterAssetUrl, NULL AS TenantId FROM Clinics")
+                .AsNoTracking()
+                .FirstOrDefaultAsync(c => c.Id == id);
+        }
+    }
 
     public async Task<List<string>> GetAllowedClinicIdsForDoctorAsync(string doctorId)
     {

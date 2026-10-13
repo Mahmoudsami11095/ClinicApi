@@ -121,7 +121,20 @@ public class ClinicsController : ControllerBase
             PublicBookingEnabled = dto.PublicBookingEnabled,
             QrPosterAssetUrl = dto.QrPosterAssetUrl
         };
-        await _repo.AddAsync(entity);
+
+        try
+        {
+            await _repo.AddAsync(entity);
+        }
+        catch (Exception ex) when (ex.Message.Contains("Invalid column name") || ex.InnerException?.Message.Contains("Invalid column name") == true)
+        {
+            await _context.Database.ExecuteSqlRawAsync(
+                @"INSERT INTO Clinics (Id, Name, Address, Phone, CreatorDoctorId, AvailabilityHours, AvailabilityDays, Latitude, Longitude, City, State, Country, BranchCode, Rooms)
+                  VALUES ({0}, {1}, {2}, {3}, {4}, {5}, {6}, {7}, {8}, {9}, {10}, {11}, {12}, {13})",
+                entity.Id, entity.Name, entity.Address, entity.Phone, entity.CreatorDoctorId,
+                entity.AvailabilityHours, entity.AvailabilityDays, entity.Latitude, entity.Longitude,
+                entity.City, entity.State, entity.Country, entity.BranchCode, entity.Rooms);
+        }
 
         // Auto-assign the creating doctor if applicable
         if (!string.IsNullOrEmpty(doctorIdClaim))
