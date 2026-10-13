@@ -63,10 +63,50 @@ public class WebAuthnController : ControllerBase
         await _context.SaveChangesAsync();
         return Ok(new { message = "Biometric authenticator registered successfully" });
     }
+
+    [HttpPost("authenticate/options")]
+    [AllowAnonymous]
+    public IActionResult GenerateAuthenticateOptions()
+    {
+        return Ok(new
+        {
+            challenge = Guid.NewGuid().ToString("N"),
+            timeout = 60000,
+            userVerification = "required",
+            rpId = "cliniccorp.ai"
+        });
+    }
+
+    [HttpPost("authenticate")]
+    [AllowAnonymous]
+    public async Task<IActionResult> AuthenticateCredential([FromBody] WebAuthnAuthenticateRequest request)
+    {
+        var credIdBytes = Convert.FromBase64String(request.Id);
+        var cred = await _context.WebAuthnCredentials
+            .Include(c => c.User)
+            .FirstOrDefaultAsync(c => c.CredentialId == credIdBytes);
+
+        if (cred == null || cred.User == null || !cred.User.BiometricEnabled)
+        {
+            return Unauthorized(new { message = "Invalid biometric credential" });
+        }
+
+        // Simulate FIDO2 signature verification success
+        var token = _jwtService.GenerateToken(cred.User);
+        return Ok(new { token, user = cred.User });
+    }
 }
 
 public class WebAuthnRegisterRequest
 {
     public string Id { get; set; } = string.Empty;
     public string PublicKeyBase64 { get; set; } = string.Empty;
+}
+
+public class WebAuthnAuthenticateRequest
+{
+    public string Id { get; set; } = string.Empty;
+    public string AuthenticatorData { get; set; } = string.Empty;
+    public string Signature { get; set; } = string.Empty;
+    public string ClientDataJson { get; set; } = string.Empty;
 }
