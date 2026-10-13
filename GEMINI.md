@@ -21,3 +21,4 @@ Before finishing any backend task:
 1. Ensure the solution compiles cleanly with no warnings treated as errors: `dotnet build ClinicApi.sln`.
 2. Run all unit and integration tests: `dotnet test ClinicApi.sln`.
 3. If database entities were modified, verify that an EF Core migration is generated and applied cleanly.
+4. **Schema Evolution (STD-ARCH-007)**: Never rename existing entity properties mapped to database columns; use `[NotMapped]` property aliases. Always generate both a C# migration and an idempotent SQL script with `IF NOT EXISTS` guards. Provide resilient repository fallbacks for unmigrated schema instances.

@@ -118,3 +118,12 @@ public interface IPatientRecallRepository : IGenericRepository<PatientRecall>
     Task<string> GetNextRecallNumberAsync();
 }
 
+public interface IPaymentPlanRepository : IGenericRepository<PaymentPlan>
+{
+    Task<PaymentPlan?> GetByPlanNumberAsync(string planNumber);
+    Task<List<PaymentPlan>> GetByClinicAsync(string clinicId, string? status = null);
+    Task<List<PaymentPlan>> GetByPatientAsync(string patientId);
+    Task<string> GetNextPlanNumberAsync();
+}
+
+

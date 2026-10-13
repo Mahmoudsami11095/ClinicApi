@@ -33,7 +33,7 @@ public class ChairsController : ControllerBase
         var targetClinicId = clinicId;
         if (string.IsNullOrEmpty(targetClinicId) || targetClinicId == "all")
         {
-            var firstClinic = await _context.Clinics.FirstOrDefaultAsync();
+            var firstClinic = await _context.Clinics.AsNoTracking().FirstOrDefaultAsync();
             targetClinicId = firstClinic?.Id ?? "default-clinic";
         }
 

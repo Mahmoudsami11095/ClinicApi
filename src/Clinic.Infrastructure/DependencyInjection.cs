@@ -50,6 +50,7 @@ public static class DependencyInjection
         services.AddScoped<IInsuranceClaimRepository, InsuranceClaimRepository>();
         services.AddScoped<IInformedConsentRepository, InformedConsentRepository>();
         services.AddScoped<IPatientRecallRepository, PatientRecallRepository>();
+        services.AddScoped<IPaymentPlanRepository, PaymentPlanRepository>();
         services.AddScoped(typeof(IGenericRepository<>), typeof(GenericRepository<>));
 
         // ── Services ──
@@ -62,6 +63,7 @@ public static class DependencyInjection
         services.AddScoped<ICommissionService, CommissionService>();
         services.AddScoped<IExecutiveAnalyticsService, ExecutiveAnalyticsService>();
         services.AddScoped<ICdsEngineService, CdsEngineService>();
+        services.AddScoped<IAiVoiceScribeService, AiVoiceScribeService>();
 
         // ── JWT Authentication ──
         services.AddAuthentication(options =>

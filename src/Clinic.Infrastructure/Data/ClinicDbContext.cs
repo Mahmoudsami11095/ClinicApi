@@ -39,6 +39,16 @@ public class ClinicDbContext : DbContext
     public DbSet<InformedConsentDocument> InformedConsents => Set<InformedConsentDocument>();
     public DbSet<DrugInteractionRule> DrugInteractionRules => Set<DrugInteractionRule>();
     public DbSet<PatientRecall> PatientRecalls => Set<PatientRecall>();
+    public DbSet<PaymentPlan> PaymentPlans => Set<PaymentPlan>();
+    public DbSet<PaymentPlanInstallment> PaymentPlanInstallments => Set<PaymentPlanInstallment>();
+    
+    public DbSet<Supplier> Suppliers => Set<Supplier>();
+    public DbSet<PurchaseOrder> PurchaseOrders => Set<PurchaseOrder>();
+    public DbSet<PurchaseOrderItem> PurchaseOrderItems => Set<PurchaseOrderItem>();
+    public DbSet<StandbyQueueEntry> StandbyQueue => Set<StandbyQueueEntry>();
+    public DbSet<WebAuthnCredential> WebAuthnCredentials => Set<WebAuthnCredential>();
+    public DbSet<Tenant> Tenants => Set<Tenant>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
@@ -875,6 +885,156 @@ public class ClinicDbContext : DbContext
 
             entity.HasIndex(e => new { e.ClinicId, e.Status, e.DueDate });
             entity.HasIndex(e => new { e.PatientId });
+        });
+
+        // ── PaymentPlan ──
+        modelBuilder.Entity<PaymentPlan>(entity =>
+        {
+            entity.ToTable("PaymentPlans");
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.PlanNumber).HasMaxLength(100).IsRequired();
+            entity.HasIndex(e => e.PlanNumber).IsUnique();
+            entity.Property(e => e.Title).HasMaxLength(250).IsRequired();
+            entity.Property(e => e.Status).HasMaxLength(50).HasDefaultValue("Active");
+            entity.Property(e => e.InstallmentFrequency).HasMaxLength(50).HasDefaultValue("Monthly");
+            entity.Property(e => e.StartDate).HasMaxLength(20).IsRequired();
+
+            entity.Property(e => e.TotalAmount).HasColumnType("decimal(18,2)");
+            entity.Property(e => e.DownPayment).HasColumnType("decimal(18,2)");
+            entity.Property(e => e.FinancedAmount).HasColumnType("decimal(18,2)");
+            entity.Property(e => e.InterestRate).HasColumnType("decimal(18,2)");
+            entity.Property(e => e.TotalPayable).HasColumnType("decimal(18,2)");
+
+            entity.HasOne(e => e.Clinic)
+                  .WithMany()
+                  .HasForeignKey(e => e.ClinicId)
+                  .OnDelete(DeleteBehavior.Restrict);
+
+            entity.HasOne(e => e.Patient)
+                  .WithMany()
+                  .HasForeignKey(e => e.PatientId)
+                  .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne(e => e.Doctor)
+                  .WithMany()
+                  .HasForeignKey(e => e.DoctorId)
+                  .OnDelete(DeleteBehavior.Restrict);
+
+            entity.HasMany(e => e.Installments)
+                  .WithOne(i => i.PaymentPlan)
+                  .HasForeignKey(i => i.PaymentPlanId)
+                  .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasIndex(e => new { e.ClinicId, e.Status });
+            entity.HasIndex(e => new { e.PatientId });
+        });
+
+        // ── PaymentPlanInstallment ──
+        modelBuilder.Entity<PaymentPlanInstallment>(entity =>
+        {
+            entity.ToTable("PaymentPlanInstallments");
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.DueDate).HasMaxLength(20).IsRequired();
+            entity.Property(e => e.Status).HasMaxLength(50).HasDefaultValue("Pending");
+            entity.Property(e => e.AmountDue).HasColumnType("decimal(18,2)");
+            entity.Property(e => e.AmountPaid).HasColumnType("decimal(18,2)");
+
+            entity.HasIndex(e => new { e.PaymentPlanId, e.InstallmentNumber });
+            entity.HasIndex(e => new { e.Status, e.DueDate });
+        });
+
+        // ── Procurement ──
+        modelBuilder.Entity<PurchaseOrder>(entity =>
+        {
+            entity.ToTable("PurchaseOrders");
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.PONumber).HasMaxLength(100).IsRequired();
+            entity.Property(e => e.Status).HasMaxLength(50).HasDefaultValue("Draft");
+            entity.Property(e => e.TotalAmount).HasColumnType("decimal(18,2)");
+            
+            entity.HasOne(e => e.Clinic)
+                  .WithMany()
+                  .HasForeignKey(e => e.ClinicId)
+                  .OnDelete(DeleteBehavior.Restrict);
+                  
+            entity.HasOne(e => e.Supplier)
+                  .WithMany()
+                  .HasForeignKey(e => e.SupplierId)
+                  .OnDelete(DeleteBehavior.Restrict);
+                  
+            entity.HasMany(e => e.Items)
+                  .WithOne(i => i.PurchaseOrder)
+                  .HasForeignKey(i => i.PurchaseOrderId)
+                  .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<PurchaseOrderItem>(entity =>
+        {
+            entity.ToTable("PurchaseOrderItems");
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.UnitPrice).HasColumnType("decimal(18,2)");
+            
+            entity.HasOne(e => e.Material)
+                  .WithMany()
+                  .HasForeignKey(e => e.MaterialId)
+                  .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        // ── Standby Queue ──
+        modelBuilder.Entity<StandbyQueueEntry>(entity =>
+        {
+            entity.ToTable("StandbyQueue");
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.Status).HasMaxLength(50).HasDefaultValue("Waiting");
+            entity.Property(e => e.RequestedDate).HasMaxLength(20).IsRequired();
+
+            entity.HasOne(e => e.Clinic)
+                  .WithMany()
+                  .HasForeignKey(e => e.ClinicId)
+                  .OnDelete(DeleteBehavior.Restrict);
+
+            entity.HasOne(e => e.Patient)
+                  .WithMany()
+                  .HasForeignKey(e => e.PatientId)
+                  .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne(e => e.Doctor)
+                  .WithMany()
+                  .HasForeignKey(e => e.DoctorId)
+                  .OnDelete(DeleteBehavior.Restrict);
+
+            entity.HasIndex(e => new { e.ClinicId, e.DoctorId, e.RequestedDate, e.Status });
+        });
+
+        // ── WebAuthn ──
+        modelBuilder.Entity<WebAuthnCredential>(entity =>
+        {
+            entity.ToTable("WebAuthnCredentials");
+            entity.HasKey(e => e.Id);
+
+            entity.HasOne(e => e.User)
+                  .WithMany()
+                  .HasForeignKey(e => e.UserId)
+                  .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        // ── SaaS Multi-Tenant ──
+        modelBuilder.Entity<Tenant>(entity =>
+        {
+            entity.ToTable("Tenants");
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.Subdomain).HasMaxLength(100).IsRequired();
+            entity.HasIndex(e => e.Subdomain).IsUnique();
+
+            entity.HasMany(e => e.Clinics)
+                  .WithOne(c => c.Tenant)
+                  .HasForeignKey(c => c.TenantId)
+                  .OnDelete(DeleteBehavior.Restrict);
+
+            entity.HasMany(e => e.Users)
+                  .WithOne(u => u.Tenant)
+                  .HasForeignKey(u => u.TenantId)
+                  .OnDelete(DeleteBehavior.Restrict);
         });
     }
 }

@@ -396,7 +396,7 @@ public class PortalController : ControllerBase
         if (inv == null)
             return NotFound(new { message = "Invoice record not found." });
 
-        var clinic = inv.Clinic ?? await _context.Clinics.FirstOrDefaultAsync();
+        var clinic = inv.Clinic ?? await _context.Clinics.AsNoTracking().FirstOrDefaultAsync();
 
         var receipt = new
         {
@@ -434,6 +434,7 @@ public class PortalController : ControllerBase
     public async Task<IActionResult> VerifyPrescription(string id)
     {
         var rx = await _context.Prescriptions
+            .AsNoTracking()
             .Include(p => p.Doctor)
             .Include(p => p.Patient)
             .Include(p => p.Appointment)
@@ -450,7 +451,7 @@ public class PortalController : ControllerBase
             });
         }
 
-        var clinic = rx.Appointment?.Clinic ?? await _context.Clinics.FirstOrDefaultAsync();
+        var clinic = rx.Appointment?.Clinic ?? await _context.Clinics.AsNoTracking().FirstOrDefaultAsync();
         var patientName = rx.Patient != null ? $"{rx.Patient.FirstName} {rx.Patient.LastName}".Trim() : "Patient";
         var maskedPatientName = MaskName(patientName);
 
@@ -497,6 +498,7 @@ public class PortalController : ControllerBase
     public async Task<IActionResult> VerifyInvoiceReceipt(string id)
     {
         var inv = await _context.BillingRecords
+            .AsNoTracking()
             .Include(b => b.Patient)
             .Include(b => b.Clinic)
             .FirstOrDefaultAsync(b => b.Id == id);
@@ -511,7 +513,7 @@ public class PortalController : ControllerBase
             });
         }
 
-        var clinic = inv.Clinic ?? await _context.Clinics.FirstOrDefaultAsync();
+        var clinic = inv.Clinic ?? await _context.Clinics.AsNoTracking().FirstOrDefaultAsync();
         var patientName = inv.Patient != null ? $"{inv.Patient.FirstName} {inv.Patient.LastName}".Trim() : "Patient";
         var maskedPatientName = MaskName(patientName);
 
