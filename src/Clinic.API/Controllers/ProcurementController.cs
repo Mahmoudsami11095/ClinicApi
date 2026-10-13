@@ -127,8 +127,8 @@ public class ProcurementController : ControllerBase
             var mat = await _context.Materials.FirstOrDefaultAsync(m => m.Id == item.MaterialId);
             if (mat != null)
             {
-                mat.CurrentStock += item.Quantity;
-                mat.LastRestockDate = DateTime.UtcNow.ToString("yyyy-MM-dd");
+                mat.Quantity += item.Quantity;
+                mat.LastRestockedAt = DateTime.UtcNow.ToString("yyyy-MM-dd");
             }
         }
 

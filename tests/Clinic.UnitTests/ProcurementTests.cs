@@ -58,7 +58,7 @@ public class ProcurementTests
         // Arrange
         var context = GetMemoryContext();
         
-        var material = new Material { Id = "mat-1", Name = "Implants", CurrentStock = 5 };
+        var material = new Material { Id = "mat-1", Name = "Implants", Quantity = 5 };
         context.Materials.Add(material);
         
         var po = new PurchaseOrder { Id = "po-1", Status = "Sent" };

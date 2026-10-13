@@ -38,10 +38,15 @@ public class AiNoShowController : ControllerBase
         var leadTimeDays = (DateTime.Parse(appt.Date) - DateTime.UtcNow).TotalDays;
         
         if (leadTimeDays > 14) score += 20; // Long lead time = higher risk
-        if (appt.Patient.TotalAppointments > 0)
+        if (appt.Patient != null)
         {
-            var cancelRate = (double)appt.Patient.CancelledAppointments / appt.Patient.TotalAppointments;
-            score += (cancelRate * 50); // Historical cancellation rate weight
+            var totalAppts = await _context.Appointments.CountAsync(a => a.PatientId == appt.PatientId);
+            var cancelledAppts = await _context.Appointments.CountAsync(a => a.PatientId == appt.PatientId && a.Status == "cancelled");
+            if (totalAppts > 0)
+            {
+                var cancelRate = (double)cancelledAppts / totalAppts;
+                score += (cancelRate * 50); // Historical cancellation rate weight
+            }
         }
 
         appt.NoShowPredictionScore = Math.Min(100, Math.Max(0, score));
