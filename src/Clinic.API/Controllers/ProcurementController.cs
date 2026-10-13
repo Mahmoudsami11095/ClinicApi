@@ -29,6 +29,23 @@ public class ProcurementController : ControllerBase
         return Ok(new { data = suppliers });
     }
 
+    [HttpGet("orders")]
+    public async Task<IActionResult> GetOrders([FromQuery] string? clinicId = null)
+    {
+        var query = _context.PurchaseOrders
+            .Include(p => p.Items)
+            .Include(p => p.Supplier)
+            .AsNoTracking();
+
+        if (!string.IsNullOrEmpty(clinicId))
+        {
+            query = query.Where(p => p.ClinicId == clinicId);
+        }
+
+        var orders = await query.OrderByDescending(p => p.CreatedAt).ToListAsync();
+        return Ok(new { data = orders });
+    }
+
     [HttpPost("orders")]
     public async Task<IActionResult> CreateDraftPO([FromBody] CreatePurchaseOrderDto dto)
     {
