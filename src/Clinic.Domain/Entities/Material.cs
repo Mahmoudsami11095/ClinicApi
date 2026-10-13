@@ -21,6 +21,20 @@ public class Material
     public string? PurchaseOrderRef { get; set; }
     public string? ImageUrl { get; set; }
 
+    [System.ComponentModel.DataAnnotations.Schema.NotMapped]
+    public int CurrentStock
+    {
+        get => Quantity;
+        set => Quantity = value;
+    }
+
+    [System.ComponentModel.DataAnnotations.Schema.NotMapped]
+    public string? LastRestockDate
+    {
+        get => LastRestockedAt;
+        set => LastRestockedAt = value;
+    }
+
     public bool IsExpired => ExpirationDate.HasValue && ExpirationDate.Value.Date < DateTime.UtcNow.Date;
 
     // Navigation properties

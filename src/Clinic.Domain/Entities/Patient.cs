@@ -40,6 +40,15 @@ public class Patient
     public string? ConsentSignature { get; set; }
     public string? ConsentSignedAt { get; set; }
 
+    [System.ComponentModel.DataAnnotations.Schema.NotMapped]
+    public string? Notes { get; set; }
+
+    [System.ComponentModel.DataAnnotations.Schema.NotMapped]
+    public int TotalAppointments { get; set; }
+
+    [System.ComponentModel.DataAnnotations.Schema.NotMapped]
+    public int CancelledAppointments { get; set; }
+
     // FK
     public string? ClinicId { get; set; }
     public ClinicEntity? Clinic { get; set; }

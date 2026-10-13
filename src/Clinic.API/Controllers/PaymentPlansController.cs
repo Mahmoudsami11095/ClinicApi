@@ -381,14 +381,7 @@ public class PaymentPlansController : ControllerBase
 
         try
         {
-            await _whatsAppService.SendAppointmentReminderAsync(
-                patientPhone,
-                patientName,
-                clinicName,
-                $"Installment #{installment.InstallmentNumber} ({plan.Title})",
-                installment.DueDate,
-                $"{remaining:N2} EGP"
-            );
+            await _whatsAppService.SendNotificationAsync(patientPhone, message);
         }
         catch
         {

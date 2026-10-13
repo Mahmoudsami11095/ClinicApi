@@ -26,12 +26,12 @@ public class WebAuthnController : ControllerBase
     [Authorize]
     public IActionResult GenerateRegisterOptions()
     {
-        // Simulated FIDO2 attestation options generation (BR-PWA-02)
+        var userId = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value ?? "";
         return Ok(new
         {
             challenge = Guid.NewGuid().ToString("N"),
             rp = new { name = "Smart Clinic Management System", id = "cliniccorp.ai" },
-            user = new { id = User.GetUserId(), name = User.Identity?.Name, displayName = User.Identity?.Name },
+            user = new { id = userId, name = User.Identity?.Name, displayName = User.Identity?.Name },
             pubKeyCredParams = new[] { new { type = "public-key", alg = -7 }, new { type = "public-key", alg = -257 } },
             authenticatorSelection = new { authenticatorAttachment = "platform", userVerification = "required" },
             timeout = 60000,
@@ -43,10 +43,9 @@ public class WebAuthnController : ControllerBase
     [Authorize]
     public async Task<IActionResult> RegisterCredential([FromBody] WebAuthnRegisterRequest request)
     {
-        var userId = User.GetUserId();
+        var userId = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value ?? "";
         var user = await _context.Users.FirstOrDefaultAsync(u => u.Id == userId);
         if (user == null) return Unauthorized();
-
         var cred = new WebAuthnCredential
         {
             UserId = userId,
