@@ -203,6 +203,21 @@ public class DoctorRepository : GenericRepository<Doctor>, IDoctorRepository
 public class AppointmentRepository : GenericRepository<Appointment>, IAppointmentRepository
 {
     public AppointmentRepository(ClinicDbContext context) : base(context) { }
+
+    public override async Task<List<Appointment>> GetAllAsync()
+    {
+        try
+        {
+            return await base.GetAllAsync();
+        }
+        catch (Exception ex) when (ex.Message.Contains("Invalid column name") || ex.InnerException?.Message.Contains("Invalid column name") == true)
+        {
+            return await _context.Appointments
+                .FromSqlRaw(@"SELECT Id, PatientId, DoctorId, Date, Status, Type, Notes, ClinicId, ArrivedAt, ConsultationStartedAt, ConsultationEndedAt, QueueNumber, LastReminderSentAt, ReminderCount, RoomNumber FROM Appointments")
+                .AsNoTracking()
+                .ToListAsync();
+        }
+    }
 }
 
 public class BillingRepository : GenericRepository<BillingRecord>, IBillingRepository
