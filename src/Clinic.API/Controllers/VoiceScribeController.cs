@@ -23,8 +23,8 @@ public class VoiceScribeController : ControllerBase
     {
         // In reality, this endpoint would stream the audio chunk or IFormFile to the AI Service.
         // For development/simulation, we accept it (even if null) and return the mock structure.
-        
-        var result = await _aiScribeService.AnalyzeConsultationAudioAsync(audio!);
+        using var stream = audio?.OpenReadStream();
+        var result = await _aiScribeService.AnalyzeConsultationAudioAsync(stream, audio?.FileName);
 
         return Ok(new { data = result });
     }

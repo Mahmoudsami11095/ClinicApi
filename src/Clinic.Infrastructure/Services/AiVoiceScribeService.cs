@@ -1,14 +1,14 @@
 using System.Collections.Generic;
+using System.IO;
 using System.Threading.Tasks;
 using Clinic.Application.DTOs;
 using Clinic.Application.Interfaces;
-using Microsoft.AspNetCore.Http;
 
 namespace Clinic.Infrastructure.Services;
 
 public class AiVoiceScribeService : IAiVoiceScribeService
 {
-    public async Task<ClinicalSoapNoteDto> AnalyzeConsultationAudioAsync(IFormFile audioFile)
+    public async Task<ClinicalSoapNoteDto> AnalyzeConsultationAudioAsync(Stream? audioStream = null, string? fileName = null)
     {
         // Simulate processing delay
         await Task.Delay(1500);
