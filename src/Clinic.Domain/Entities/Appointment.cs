@@ -33,7 +33,10 @@ public class Appointment
     /// <summary>
     /// BR-AI-NOSHOW-01: AI Predictive No-Show
     /// </summary>
+    [System.ComponentModel.DataAnnotations.Schema.NotMapped]
     public double? NoShowPredictionScore { get; set; }
+
+    [System.ComponentModel.DataAnnotations.Schema.NotMapped]
     public bool IsHighRiskNoShow { get; set; } = false;
 
     // Navigation properties
