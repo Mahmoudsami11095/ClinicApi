@@ -48,6 +48,7 @@ public class ClinicDbContext : DbContext
     public DbSet<StandbyQueueEntry> StandbyQueue => Set<StandbyQueueEntry>();
     public DbSet<WebAuthnCredential> WebAuthnCredentials => Set<WebAuthnCredential>();
     public DbSet<Tenant> Tenants => Set<Tenant>();
+    public DbSet<MobileDevice> MobileDevices => Set<MobileDevice>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -1035,6 +1036,23 @@ public class ClinicDbContext : DbContext
                   .WithOne(u => u.Tenant)
                   .HasForeignKey(u => u.TenantId)
                   .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        // ── Mobile Devices ──
+        modelBuilder.Entity<MobileDevice>(entity =>
+        {
+            entity.ToTable("MobileDevices");
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.DeviceToken).HasMaxLength(500).IsRequired();
+            entity.Property(e => e.Platform).HasMaxLength(50);
+            entity.Property(e => e.AppVersion).HasMaxLength(50);
+
+            entity.HasOne(e => e.User)
+                  .WithMany()
+                  .HasForeignKey(e => e.UserId)
+                  .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasIndex(e => new { e.UserId, e.DeviceToken });
         });
     }
 }
