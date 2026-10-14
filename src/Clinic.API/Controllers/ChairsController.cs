@@ -20,11 +20,13 @@ public class ChairsController : ControllerBase
 {
     private readonly ClinicDbContext _context;
     private readonly IHubContext<NotificationHub> _hubContext;
+    private readonly IMobilePushDispatcher _pushDispatcher;
 
-    public ChairsController(ClinicDbContext context, IHubContext<NotificationHub> hubContext)
+    public ChairsController(ClinicDbContext context, IHubContext<NotificationHub> hubContext, IMobilePushDispatcher pushDispatcher)
     {
         _context = context;
         _hubContext = hubContext;
+        _pushDispatcher = pushDispatcher;
     }
 
     [HttpGet]
@@ -131,6 +133,13 @@ public class ChairsController : ControllerBase
         await _context.SaveChangesAsync();
         await BroadcastChairUpdate(chair);
 
+        if (!string.IsNullOrEmpty(chair.CurrentDoctorId))
+        {
+            await _pushDispatcher.SendPushToUserAsync(chair.CurrentDoctorId, 
+                "Patient Seated", 
+                $"{chair.CurrentPatientName} is seated in {chair.ChairName} for {chair.ProcedureName ?? "Consultation"}.");
+        }
+
         return Ok(chair);
     }
 
@@ -154,6 +163,11 @@ public class ChairsController : ControllerBase
         await _context.SaveChangesAsync();
         await BroadcastChairUpdate(chair);
 
+        await _pushDispatcher.SendPushToRoleAsync("assistant", 
+            "Sanitization Required", 
+            $"{chair.ChairName} in Room {chair.RoomNumber} was vacated. Please begin the 5-minute sterilization protocol.", 
+            chair.ClinicId);
+
         return Ok(chair);
     }
 
@@ -176,6 +190,11 @@ public class ChairsController : ControllerBase
 
         await _context.SaveChangesAsync();
         await BroadcastChairUpdate(chair);
+
+        await _pushDispatcher.SendPushToRoleAsync("doctor", 
+            "Operatory Ready", 
+            $"{chair.ChairName} in Room {chair.RoomNumber} is sterilized and available.", 
+            chair.ClinicId);
 
         return Ok(chair);
     }

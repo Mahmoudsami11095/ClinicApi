@@ -84,10 +84,9 @@ public class MaterialUnitTests
 
         mockUserRepo.Setup(r => r.GetAllAsync()).ReturnsAsync(new List<User> { doctorUser, assistantUser, unrelatedUser });
 
+        var mockPushDispatcher = new Mock<Clinic.Application.Interfaces.IMobilePushDispatcher>();
         var alertService = new Clinic.Application.Services.MaterialAlertService(
-            mockNotificationService.Object,
-            mockUserRepo.Object
-        );
+            mockNotificationService.Object, mockUserRepo.Object, mockPushDispatcher.Object);
 
         var lowStockMaterial = new Material
         {
@@ -144,10 +143,9 @@ public class MaterialUnitTests
 
         mockUserRepo.Setup(r => r.GetAllAsync()).ReturnsAsync(new List<User> { doctorUser });
 
+        var mockPushDispatcher = new Mock<Clinic.Application.Interfaces.IMobilePushDispatcher>();
         var alertService = new Clinic.Application.Services.MaterialAlertService(
-            mockNotificationService.Object,
-            mockUserRepo.Object
-        );
+            mockNotificationService.Object, mockUserRepo.Object, mockPushDispatcher.Object);
 
         var exactThresholdMaterial = new Material
         {
@@ -179,10 +177,9 @@ public class MaterialUnitTests
         var mockNotificationService = new Moq.Mock<Clinic.Application.Interfaces.INotificationService>();
         var mockUserRepo = new Moq.Mock<Clinic.Application.Interfaces.IUserRepository>();
 
+        var mockPushDispatcher = new Mock<Clinic.Application.Interfaces.IMobilePushDispatcher>();
         var alertService = new Clinic.Application.Services.MaterialAlertService(
-            mockNotificationService.Object,
-            mockUserRepo.Object
-        );
+            mockNotificationService.Object, mockUserRepo.Object, mockPushDispatcher.Object);
 
         var healthyStockMaterial = new Material
         {
@@ -225,10 +222,9 @@ public class MaterialUnitTests
 
         mockUserRepo.Setup(r => r.GetAllAsync()).ReturnsAsync(new List<User> { multiClinicAssistant });
 
+        var mockPushDispatcher = new Mock<Clinic.Application.Interfaces.IMobilePushDispatcher>();
         var alertService = new Clinic.Application.Services.MaterialAlertService(
-            mockNotificationService.Object,
-            mockUserRepo.Object
-        );
+            mockNotificationService.Object, mockUserRepo.Object, mockPushDispatcher.Object);
 
         var lowStockMaterial = new Material
         {

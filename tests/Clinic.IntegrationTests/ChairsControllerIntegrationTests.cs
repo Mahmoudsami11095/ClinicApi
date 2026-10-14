@@ -31,7 +31,8 @@ public class ChairsControllerIntegrationTests
         // Arrange
         using var context = CreateInMemoryDbContext();
         var mockHubContext = new Mock<IHubContext<NotificationHub>>();
-        var controller = new ChairsController(context, mockHubContext.Object);
+        var mockPushDispatcher = new Mock<Clinic.Application.Interfaces.IMobilePushDispatcher>();
+        var controller = new ChairsController(context, mockHubContext.Object, mockPushDispatcher.Object);
 
         // Act
         var result = await controller.GetChairs("clinic-101");
@@ -68,7 +69,8 @@ public class ChairsControllerIntegrationTests
         await context.ClinicChairs.AddAsync(chair);
         await context.SaveChangesAsync();
 
-        var controller = new ChairsController(context, mockHubContext.Object);
+        var mockPushDispatcher = new Mock<Clinic.Application.Interfaces.IMobilePushDispatcher>();
+        var controller = new ChairsController(context, mockHubContext.Object, mockPushDispatcher.Object);
 
         var assignDto = new AssignChairDto
         {
@@ -123,7 +125,8 @@ public class ChairsControllerIntegrationTests
         await context.ClinicChairs.AddAsync(chair);
         await context.SaveChangesAsync();
 
-        var controller = new ChairsController(context, mockHubContext.Object);
+        var mockPushDispatcher = new Mock<Clinic.Application.Interfaces.IMobilePushDispatcher>();
+        var controller = new ChairsController(context, mockHubContext.Object, mockPushDispatcher.Object);
 
         // Act
         var result = await controller.ReleaseChair("chair-2");
@@ -163,7 +166,8 @@ public class ChairsControllerIntegrationTests
         await context.ClinicChairs.AddAsync(chair);
         await context.SaveChangesAsync();
 
-        var controller = new ChairsController(context, mockHubContext.Object);
+        var mockPushDispatcher = new Mock<Clinic.Application.Interfaces.IMobilePushDispatcher>();
+        var controller = new ChairsController(context, mockHubContext.Object, mockPushDispatcher.Object);
 
         // Act
         var result = await controller.CompleteCleaning("chair-3");
@@ -192,7 +196,8 @@ public class ChairsControllerIntegrationTests
         await context.ClinicChairs.AddAsync(chair);
         await context.SaveChangesAsync();
 
-        var controller = new ChairsController(context, mockHubContext.Object);
+        var mockPushDispatcher = new Mock<Clinic.Application.Interfaces.IMobilePushDispatcher>();
+        var controller = new ChairsController(context, mockHubContext.Object, mockPushDispatcher.Object);
 
         // Act
         var result = await controller.UpdateStatus("chair-4", new UpdateChairStatusDto { Status = "invalid-status" });
