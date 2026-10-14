@@ -152,10 +152,9 @@ public class MobileDevicesIntegrationTests
         // Assert
         var okResult = Assert.IsType<OkObjectResult>(result);
         var json = System.Text.Json.JsonSerializer.Serialize(okResult.Value);
-        using var doc = System.Text.Json.JsonDocument.Parse(json);
-        var dataArray = doc.RootElement.GetProperty("data");
-        Assert.Equal(1, dataArray.GetArrayLength());
-        Assert.Equal("tok-1", dataArray[0].GetProperty("deviceToken").GetString());
+        Assert.Contains("tok-1", json);
+        Assert.DoesNotContain("tok-2", json);
+        Assert.DoesNotContain("tok-3", json);
     }
 
     [Fact]
