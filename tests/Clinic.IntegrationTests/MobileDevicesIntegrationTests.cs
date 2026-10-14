@@ -151,10 +151,11 @@ public class MobileDevicesIntegrationTests
 
         // Assert
         var okResult = Assert.IsType<OkObjectResult>(result);
-        dynamic data = okResult.Value!;
-        var list = (IEnumerable<MobileDeviceResponseDto>)data.data;
-        Assert.Single(list);
-        Assert.Equal("tok-1", list.First().DeviceToken);
+        var json = System.Text.Json.JsonSerializer.Serialize(okResult.Value);
+        using var doc = System.Text.Json.JsonDocument.Parse(json);
+        var dataArray = doc.RootElement.GetProperty("data");
+        Assert.Equal(1, dataArray.GetArrayLength());
+        Assert.Equal("tok-1", dataArray[0].GetProperty("deviceToken").GetString());
     }
 
     [Fact]
@@ -175,8 +176,9 @@ public class MobileDevicesIntegrationTests
 
         // Assert
         var okResult = Assert.IsType<OkObjectResult>(result);
-        dynamic data = okResult.Value!;
-        Assert.True((bool)data.success);
-        Assert.Equal("Doctor Call Alert", (string)data.title);
+        var json = System.Text.Json.JsonSerializer.Serialize(okResult.Value);
+        using var doc = System.Text.Json.JsonDocument.Parse(json);
+        Assert.True(doc.RootElement.GetProperty("success").GetBoolean());
+        Assert.Equal("Doctor Call Alert", doc.RootElement.GetProperty("title").GetString());
     }
 }
