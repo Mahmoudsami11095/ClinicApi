@@ -4,6 +4,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using Clinic.Application.DTOs;
 using Clinic.Application.Interfaces;
+using Clinic.Domain.Entities;
 using Clinic.Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Memory;
