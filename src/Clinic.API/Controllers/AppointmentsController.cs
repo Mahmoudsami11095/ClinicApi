@@ -19,6 +19,7 @@ public class AppointmentsController : ControllerBase
     private readonly IUserRepository _userRepo;
     private readonly IPatientRepository _patientRepo;
     private readonly IWhatsAppNotificationService _whatsAppNotificationService;
+    private readonly IMobilePushDispatcher _pushDispatcher;
 
     public AppointmentsController(
         IAppointmentRepository repo, 
@@ -27,7 +28,8 @@ public class AppointmentsController : ControllerBase
         INotificationService notificationService,
         IUserRepository userRepo,
         IPatientRepository patientRepo,
-        IWhatsAppNotificationService whatsAppNotificationService)
+        IWhatsAppNotificationService whatsAppNotificationService,
+        IMobilePushDispatcher pushDispatcher)
     {
         _repo = repo;
         _clinicRepo = clinicRepo;
@@ -36,6 +38,7 @@ public class AppointmentsController : ControllerBase
         _userRepo = userRepo;
         _patientRepo = patientRepo;
         _whatsAppNotificationService = whatsAppNotificationService;
+        _pushDispatcher = pushDispatcher;
     }
 
     private async Task<string?> ValidateDoctorAvailability(string doctorId, string clinicId, string appointmentDateStr)
@@ -377,6 +380,12 @@ public class AppointmentsController : ControllerBase
                 $"{patientName} has arrived and is in the waiting room (Queue #{entity.QueueNumber}).",
                 "Queue"
             );
+            
+            // Dispatch mobile push notification to doctor's devices
+            await _pushDispatcher.SendPushToUserAsync(doctorUser.Id, 
+                "Patient Arrived & Waiting", 
+                $"{patientName} has arrived and is in the waiting room (Queue #{entity.QueueNumber}).",
+                new Dictionary<string, string> { { "appointmentId", entity.Id } });
         }
 
         return Ok(new { 

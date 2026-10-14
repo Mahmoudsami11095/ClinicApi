@@ -64,6 +64,8 @@ public static class DependencyInjection
         services.AddScoped<IExecutiveAnalyticsService, ExecutiveAnalyticsService>();
         services.AddScoped<ICdsEngineService, CdsEngineService>();
         services.AddScoped<IAiVoiceScribeService, AiVoiceScribeService>();
+        services.AddScoped<IMobilePushDispatcher, MobilePushDispatcher>();
+        services.AddScoped<IMobilePushDispatcher, MobilePushDispatcher>();
 
         // ── JWT Authentication ──
         services.AddAuthentication(options =>

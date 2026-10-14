@@ -18,17 +18,20 @@ public class MaterialsController : ControllerBase
     private readonly IMaterialAlertService? _alertService;
     private readonly IMaterialSeedingService? _seedingService;
     private readonly ClinicDbContext? _context;
+    private readonly IMobilePushDispatcher _pushDispatcher;
 
     public MaterialsController(
         IMaterialRepository repo, 
-        IMaterialAlertService? alertService = null,
-        IMaterialSeedingService? seedingService = null,
-        ClinicDbContext? context = null)
+        IMaterialAlertService alertService, 
+        IMaterialSeedingService seedingService,
+        ClinicDbContext context,
+        IMobilePushDispatcher pushDispatcher)
     {
         _repo = repo;
         _alertService = alertService;
         _seedingService = seedingService;
         _context = context;
+        _pushDispatcher = pushDispatcher;
     }
 
     [HttpGet("low-stock")]

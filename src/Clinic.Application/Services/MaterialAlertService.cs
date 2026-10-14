@@ -8,11 +8,13 @@ public class MaterialAlertService : IMaterialAlertService
 {
     private readonly INotificationService _notificationService;
     private readonly IUserRepository _userRepo;
+    private readonly IMobilePushDispatcher _pushDispatcher;
 
-    public MaterialAlertService(INotificationService notificationService, IUserRepository userRepo)
+    public MaterialAlertService(INotificationService notificationService, IUserRepository userRepo, IMobilePushDispatcher pushDispatcher)
     {
         _notificationService = notificationService;
         _userRepo = userRepo;
+        _pushDispatcher = pushDispatcher;
     }
 
     public async Task CheckAndTriggerLowStockAlertAsync(Material material)
@@ -66,6 +68,7 @@ public class MaterialAlertService : IMaterialAlertService
             foreach (var recipientId in recipientIds)
             {
                 await _notificationService.CreateNotificationAsync(recipientId, title, message, type);
+                await _pushDispatcher.SendPushToUserAsync(recipientId, title, message);
             }
         }
         catch
