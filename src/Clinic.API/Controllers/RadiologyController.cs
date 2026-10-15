@@ -117,4 +117,33 @@ public class RadiologyController : ControllerBase
         var series = await _radiologyService.GetDicomSlicesAsync(id, orientation);
         return Ok(series);
     }
+
+    // ── AI Cephalometric Landmark Tracing & Orthodontic Analysis (Release v8.2.0) ──
+    [HttpGet("records/{id}/ceph-analysis")]
+    [Authorize(Roles = "admin,doctor,assistant")]
+    public async Task<IActionResult> GetCephalometricAnalysis(string id)
+    {
+        var result = await _radiologyService.GetCephalometricAnalysisAsync(id);
+        return Ok(result);
+    }
+
+    [HttpPost("records/{id}/ceph-report")]
+    [Authorize(Roles = "admin,doctor,assistant")]
+    public async Task<IActionResult> SaveCephalometricReport(string id, [FromBody] SaveCephalometricReportDto dto)
+    {
+        var doctorId = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value ?? "doc-rad-1";
+        var doctorName = User.Identity?.Name ?? "Attending Orthodontist";
+        var report = await _radiologyService.SaveCephalometricReportAsync(id, dto, doctorId, doctorName);
+        return Ok(report);
+    }
+
+    [HttpGet("records/{id}/ceph-report")]
+    [Authorize(Roles = "admin,doctor,assistant")]
+    public async Task<IActionResult> GetCephalometricReport(string id)
+    {
+        var report = await _radiologyService.GetCephalometricReportAsync(id);
+        if (report == null)
+            return NotFound(new { message = "No cephalometric report found for this record." });
+        return Ok(report);
+    }
 }
