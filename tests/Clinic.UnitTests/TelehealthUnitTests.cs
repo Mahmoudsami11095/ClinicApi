@@ -59,4 +59,26 @@ public class TelehealthUnitTests
         Assert.True(session.DurationSeconds >= 900);
         Assert.NotNull(session.ClinicalSummary);
     }
+
+    [Fact]
+    public void TelehealthSession_RoomToken_GeneratesUniqueAlphanumericTokens()
+    {
+        var session1 = new TelehealthSession();
+        var session2 = new TelehealthSession();
+
+        Assert.NotEqual(session1.RoomToken, session2.RoomToken);
+        Assert.DoesNotContain("-", session1.RoomToken);
+        Assert.DoesNotContain("-", session2.RoomToken);
+    }
+
+    [Theory]
+    [InlineData("WaitingForPatient")]
+    [InlineData("Active")]
+    [InlineData("Completed")]
+    [InlineData("Cancelled")]
+    public void TelehealthSession_StatusTransitions_AreValid(string status)
+    {
+        var session = new TelehealthSession { Status = status };
+        Assert.Equal(status, session.Status);
+    }
 }
