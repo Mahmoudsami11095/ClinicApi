@@ -11,4 +11,5 @@ public interface INotificationService
     Task<IEnumerable<Notification>> GetUserNotificationsAsync(string userId, int count = 20);
     Task MarkAsReadAsync(Guid notificationId, string userId);
     Task MarkAllAsReadAsync(string userId);
+    Task DeleteNotificationAsync(Guid notificationId, string userId);
 }

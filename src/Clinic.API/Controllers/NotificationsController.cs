@@ -46,4 +46,14 @@ public class NotificationsController : ControllerBase
         await _notificationService.MarkAllAsReadAsync(userId);
         return NoContent();
     }
+
+    [HttpDelete("{id}")]
+    public async Task<IActionResult> DeleteNotification(Guid id)
+    {
+        var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+        if (userId == null) return Unauthorized();
+
+        await _notificationService.DeleteNotificationAsync(id, userId);
+        return NoContent();
+    }
 }
