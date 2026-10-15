@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using Clinic.Application.Interfaces;
+using Clinic.Domain.Enums;
 using Clinic.Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
@@ -59,7 +60,12 @@ public class MobilePushDispatcher : IMobilePushDispatcher
 
         try
         {
-            var userQuery = _context.Users.AsNoTracking().Where(u => u.Role == role && u.IsActive);
+            if (!Enum.TryParse<UserRole>(role, true, out var userRole))
+            {
+                return 0;
+            }
+
+            var userQuery = _context.Users.AsNoTracking().Where(u => u.Role == userRole && !u.IsDeleted);
             if (!string.IsNullOrEmpty(clinicId))
             {
                 userQuery = userQuery.Where(u => u.ClinicId == clinicId);

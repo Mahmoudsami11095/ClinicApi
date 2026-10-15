@@ -118,6 +118,33 @@ public class LabWorkOrderController : ControllerBase
         DateTime? EstimatedDeliveryDate
     );
 
+    public record FittingEligibilityResponse(
+        bool CanSchedule,
+        string? OrderStatus,
+        string? OrderToken,
+        string Reason
+    );
+
+    public record LabOrderPublicViewResponse(
+        string Id,
+        string OrderToken,
+        string ClinicId,
+        string DoctorName,
+        string PatientName,
+        int ToothNumber,
+        string RestorationType,
+        string Material,
+        string Shade,
+        string? StumpShade,
+        string? StlScanUrl,
+        string Status,
+        string LabPartnerName,
+        string? LabTrackingNumber,
+        string? LabTechnicianNotes,
+        DateTime? EstimatedDeliveryDate,
+        DateTime CreatedAtUtc
+    );
+
     [HttpGet]
     [Authorize]
     public IActionResult GetLabOrders([FromQuery] string? status, [FromQuery] string? patientId)
@@ -152,13 +179,12 @@ public class LabWorkOrderController : ControllerBase
         // Return HIPAA privacy-masked patient name for external lab view
         var maskedPatient = MaskName(order.PatientName);
 
-        return Ok(new
-        {
+        return Ok(new LabOrderPublicViewResponse(
             order.Id,
             order.OrderToken,
             order.ClinicId,
             order.DoctorName,
-            PatientName = maskedPatient,
+            maskedPatient,
             order.ToothNumber,
             order.RestorationType,
             order.Material,
@@ -171,7 +197,7 @@ public class LabWorkOrderController : ControllerBase
             order.LabTechnicianNotes,
             order.EstimatedDeliveryDate,
             order.CreatedAtUtc
-        });
+        ));
     }
 
     [HttpPost]
@@ -242,21 +268,21 @@ public class LabWorkOrderController : ControllerBase
 
         if (order == null)
         {
-            return Ok(new
-            {
-                canSchedule = true,
-                reason = "No active lab work-order attached to this tooth. Standard scheduling applies."
-            });
+            return Ok(new FittingEligibilityResponse(
+                true,
+                null,
+                null,
+                "No active lab work-order attached to this tooth. Standard scheduling applies."
+            ));
         }
 
         var canSchedule = order.CanScheduleFittingAppointment(out var reason);
-        return Ok(new
-        {
+        return Ok(new FittingEligibilityResponse(
             canSchedule,
-            orderStatus = order.Status,
-            orderToken = order.OrderToken,
+            order.Status,
+            order.OrderToken,
             reason
-        });
+        ));
     }
 
     private static string MaskName(string name)
