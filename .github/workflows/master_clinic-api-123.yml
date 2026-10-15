@@ -23,11 +23,11 @@ jobs:
         with:
           dotnet-version: '9.x'
 
-      - name: Build with dotnet
-        run: dotnet build src/Clinic.API/Clinic.API.csproj --configuration Release
+      - name: Build with dotnet (Zero-Warning Gate)
+        run: dotnet build src/Clinic.API/Clinic.API.csproj --configuration Release /warnaserror
 
-      - name: Run Automated Test Gate (340 Tests)
-        run: dotnet test --configuration Release --verbosity normal
+      - name: Run Automated Test Gate (Full Suite)
+        run: dotnet test --configuration Release --verbosity normal --collect:"XPlat Code Coverage"
 
       - name: dotnet publish
         run: dotnet publish src/Clinic.API/Clinic.API.csproj -c Release -r win-x86 --self-contained true -o "${{env.DOTNET_ROOT}}/myapp"
@@ -65,3 +65,56 @@ jobs:
           app-name: 'clinic-api-123'
           slot-name: 'Production'
           package: .
+
+      - name: Verify Live Production Health (Synthetic Post-Deploy Smoke Gate)
+        shell: pwsh
+        run: |
+          Write-Host "Waiting 25 seconds for Azure App Service warmup and auto-migrations..."
+          Start-Sleep -Seconds 25
+
+          $baseUrl = "https://clinic-api-123-a0ghf9aeb5ccawha.swedencentral-01.azurewebsites.net"
+
+          # 1. Health Probe
+          Write-Host "Probing $baseUrl/api/health..."
+          $health = Invoke-RestMethod -Uri "$baseUrl/api/health" -Method Get -TimeoutSec 30
+          Write-Host "Health Probe Output: $($health | ConvertTo-Json -Compress)"
+          if ($health.status -ne "awake" -and $health.database -ne "connected") {
+            throw "Health probe failed! Database connection is unhealthy."
+          }
+
+          # 2. Login & Token Validation
+          Write-Host "Verifying Authentication & Token Issuance..."
+          $loginBody = @{
+            email = "msami11095@gmail.com"
+            password = "Sami@11095"
+          } | ConvertTo-Json
+          $authRes = Invoke-RestMethod -Uri "$baseUrl/api/auth/login" -Method Post -Body $loginBody -ContentType "application/json" -TimeoutSec 30
+          $token = $authRes.token
+          if ([string]::IsNullOrEmpty($token)) {
+            throw "Authentication failed! No JWT token returned."
+          }
+          Write-Host "Authentication succeeded. User: $($authRes.user.name)"
+
+          $headers = @{
+            Authorization = "Bearer $token"
+          }
+
+          # 3. Critical Business Endpoints Verification
+          $endpoints = @(
+            "/api/clinics",
+            "/api/patients",
+            "/api/appointments",
+            "/api/doctors",
+            "/api/billing",
+            "/api/executive/analytics/summary",
+            "/api/executive/analytics/branches",
+            "/api/mobile/devices/my-devices"
+          )
+
+          foreach ($ep in $endpoints) {
+            Write-Host "Probing $baseUrl$ep..."
+            $res = Invoke-RestMethod -Uri "$baseUrl$ep" -Method Get -Headers $headers -TimeoutSec 30
+            Write-Host "SUCCESS: $ep responded 200 OK"
+          }
+
+          Write-Host "All post-deployment production smoke tests passed with 100% success!"
