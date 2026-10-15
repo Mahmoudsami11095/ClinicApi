@@ -139,6 +139,7 @@ public class MobileDevicesController : ControllerBase
     [HttpPost("test-notification")]
     public async Task<IActionResult> SendTestNotification([FromBody] SendTestPushNotificationDto dto)
     {
+        await Task.CompletedTask;
         var targetId = dto.TargetUserId ?? User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
         if (string.IsNullOrEmpty(targetId))
         {

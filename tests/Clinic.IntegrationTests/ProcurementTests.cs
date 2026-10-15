@@ -45,7 +45,7 @@ public class ProcurementTests
         // Assert
         var createdResult = Assert.IsType<CreatedAtActionResult>(result);
         var responseObj = createdResult.Value;
-        var po = (PurchaseOrder)responseObj.GetType().GetProperty("data")!.GetValue(responseObj, null)!;
+        var po = (PurchaseOrder)responseObj!.GetType().GetProperty("data")!.GetValue(responseObj, null)!;
 
         Assert.Equal("Draft", po.Status);
         Assert.Equal(250.0m, po.TotalAmount); // 10*5 + 2*100 = 50 + 200 = 250

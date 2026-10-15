@@ -223,7 +223,7 @@ public class ExecutiveAnalyticsService : IExecutiveAnalyticsService
                 .Select(m => new { m.ClinicId, m.Quantity, m.MinStockAlert })
                 .ToListAsync();
 
-            materials = rawMats.Select(m => (m.ClinicId, m.Quantity, m.MinStockAlert)).ToList();
+            materials = rawMats.Select(m => ((string?)m.ClinicId, m.Quantity, m.MinStockAlert)).ToList();
         }
         catch
         {
@@ -324,7 +324,7 @@ public class ExecutiveAnalyticsService : IExecutiveAnalyticsService
                 .Select(a => new { a.DoctorId, a.Status })
                 .ToListAsync();
 
-            appointments = rawAppts.Select(a => (a.DoctorId, a.Status)).ToList();
+            appointments = rawAppts.Select(a => ((string?)a.DoctorId, a.Status)).ToList();
         }
         catch
         {

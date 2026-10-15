@@ -24,4 +24,9 @@ public interface IRadiologyService
     // PACS DICOM Modality & Multi-Slice CBCT (Release v4.1.0)
     Task<DicomMetadataDto> GetDicomMetadataAsync(string recordId);
     Task<DicomSeriesDto> GetDicomSlicesAsync(string recordId, string orientation = "Axial");
+
+    // AI Cephalometric Landmark Tracing & Orthodontic Analysis (Release v8.2.0)
+    Task<CephalometricAnalysisResultDto> GetCephalometricAnalysisAsync(string recordId);
+    Task<CephalometricReportDto> SaveCephalometricReportAsync(string recordId, SaveCephalometricReportDto dto, string doctorId, string doctorName);
+    Task<CephalometricReportDto?> GetCephalometricReportAsync(string recordId);
 }

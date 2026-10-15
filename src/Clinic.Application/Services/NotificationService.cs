@@ -10,13 +10,16 @@ public class NotificationService : INotificationService
 {
     private readonly INotificationRepository _notificationRepository;
     private readonly INotificationDispatcher _notificationDispatcher;
+    private readonly IMobilePushDispatcher? _mobilePushDispatcher;
 
     public NotificationService(
         INotificationRepository notificationRepository,
-        INotificationDispatcher notificationDispatcher)
+        INotificationDispatcher notificationDispatcher,
+        IMobilePushDispatcher? mobilePushDispatcher = null)
     {
         _notificationRepository = notificationRepository;
         _notificationDispatcher = notificationDispatcher;
+        _mobilePushDispatcher = mobilePushDispatcher;
     }
 
     public async Task<Notification> CreateNotificationAsync(string userId, string title, string message, string type)
@@ -35,6 +38,23 @@ public class NotificationService : INotificationService
 
         // Dispatch via SignalR
         await _notificationDispatcher.SendNotificationAsync(userId, created);
+
+        // Bridge to native mobile push notification
+        if (_mobilePushDispatcher != null)
+        {
+            try
+            {
+                await _mobilePushDispatcher.SendPushToUserAsync(userId, title, message, new Dictionary<string, string>
+                {
+                    ["type"] = type,
+                    ["notificationId"] = created.Id.ToString()
+                });
+            }
+            catch
+            {
+                // Suppress push delivery failure so in-app creation succeeds
+            }
+        }
 
         return created;
     }
@@ -64,6 +84,15 @@ public class NotificationService : INotificationService
                 notif.IsRead = true;
                 await _notificationRepository.UpdateAsync(notif);
             }
+        }
+    }
+
+    public async Task DeleteNotificationAsync(Guid notificationId, string userId)
+    {
+        var notif = await _notificationRepository.GetByIdAsync(notificationId.ToString());
+        if (notif != null && notif.UserId == userId)
+        {
+            await _notificationRepository.DeleteAsync(notificationId.ToString());
         }
     }
 }

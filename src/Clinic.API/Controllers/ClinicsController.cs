@@ -128,12 +128,27 @@ public class ClinicsController : ControllerBase
         }
         catch (Exception ex) when (ex.Message.Contains("Invalid column name") || ex.InnerException?.Message.Contains("Invalid column name") == true)
         {
+            object[] sqlParams =
+            [
+                entity.Id,
+                entity.Name,
+                entity.Address,
+                entity.Phone,
+                (object?)entity.CreatorDoctorId ?? DBNull.Value,
+                (object?)entity.AvailabilityHours ?? DBNull.Value,
+                (object?)entity.AvailabilityDays ?? DBNull.Value,
+                (object?)entity.Latitude ?? DBNull.Value,
+                (object?)entity.Longitude ?? DBNull.Value,
+                (object?)entity.City ?? DBNull.Value,
+                (object?)entity.State ?? DBNull.Value,
+                (object?)entity.Country ?? DBNull.Value,
+                (object?)entity.BranchCode ?? DBNull.Value,
+                (object?)entity.Rooms ?? DBNull.Value
+            ];
             await _context.Database.ExecuteSqlRawAsync(
                 @"INSERT INTO Clinics (Id, Name, Address, Phone, CreatorDoctorId, AvailabilityHours, AvailabilityDays, Latitude, Longitude, City, State, Country, BranchCode, Rooms)
                   VALUES ({0}, {1}, {2}, {3}, {4}, {5}, {6}, {7}, {8}, {9}, {10}, {11}, {12}, {13})",
-                entity.Id, entity.Name, entity.Address, entity.Phone, entity.CreatorDoctorId,
-                entity.AvailabilityHours, entity.AvailabilityDays, entity.Latitude, entity.Longitude,
-                entity.City, entity.State, entity.Country, entity.BranchCode, entity.Rooms);
+                sqlParams);
         }
 
         // Auto-assign the creating doctor if applicable

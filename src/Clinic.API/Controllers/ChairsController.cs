@@ -1,5 +1,6 @@
 using Clinic.API.Hubs;
 using Clinic.Application.DTOs;
+using Clinic.Application.Interfaces;
 using Clinic.Domain.Entities;
 using Clinic.Infrastructure.Data;
 using Microsoft.AspNetCore.Authorization;

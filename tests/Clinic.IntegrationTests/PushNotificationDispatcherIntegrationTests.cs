@@ -1,6 +1,7 @@
 using System;
 using System.Threading.Tasks;
 using Clinic.Domain.Entities;
+using Clinic.Domain.Enums;
 using Clinic.Infrastructure.Data;
 using Clinic.Infrastructure.Services;
 using Microsoft.EntityFrameworkCore;
@@ -52,9 +53,9 @@ public class PushNotificationDispatcherIntegrationTests
         var dispatcher = new MobilePushDispatcher(context, new NullLogger<MobilePushDispatcher>());
 
         context.Users.AddRange(
-            new User { Id = "doc-1", Role = "doctor", IsActive = true },
-            new User { Id = "asst-1", Role = "assistant", IsActive = true, ClinicId = "clinic-x" },
-            new User { Id = "asst-2", Role = "assistant", IsActive = true, ClinicId = "clinic-y" }
+            new User { Id = "doc-1", Role = UserRole.Doctor, IsDeleted = false },
+            new User { Id = "asst-1", Role = UserRole.Assistant, IsDeleted = false, ClinicId = "clinic-x" },
+            new User { Id = "asst-2", Role = UserRole.Assistant, IsDeleted = false, ClinicId = "clinic-y" }
         );
         
         context.MobileDevices.AddRange(
