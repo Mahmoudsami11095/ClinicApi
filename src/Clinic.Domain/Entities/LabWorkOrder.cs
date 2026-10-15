@@ -17,6 +17,10 @@ public class LabWorkOrder
     public string Shade { get; set; } = "A2";
     public string? StumpShade { get; set; }
     public string? StlScanUrl { get; set; }
+    public string ModelFileFormat { get; set; } = "STL";
+    public int MeshPolyCount { get; set; } = 48250;
+    public long ScanFileSize { get; set; } = 2457600;
+    public string? ModelBoundingBoxMm { get; set; } = "42.5 x 31.8 x 18.2 mm";
     public string Status { get; set; } = "Dispatched"; // Dispatched, ReceivedByLab, Milling, QualityControl, Shipped, ReceivedByClinic
     public string LabPartnerName { get; set; } = "Apex Precision Dental Milling Lab";
     public string? LabTrackingNumber { get; set; }

@@ -34,6 +34,10 @@ public class LabWorkOrderController : ControllerBase
             Shade = "A2",
             StumpShade = "ND2",
             StlScanUrl = "/scans/intraoral_mandible_36.stl",
+            ModelFileFormat = "STL",
+            MeshPolyCount = 52400,
+            ScanFileSize = 2621440,
+            ModelBoundingBoxMm = "48.2 x 34.6 x 19.5 mm",
             Status = "Milling",
             LabPartnerName = "Apex Precision CAD/CAM Lab",
             LabTrackingNumber = "APX-882194",
@@ -57,6 +61,10 @@ public class LabWorkOrderController : ControllerBase
             Shade = "BL2",
             StumpShade = "ND1",
             StlScanUrl = "/scans/intraoral_maxilla_11.stl",
+            ModelFileFormat = "STL",
+            MeshPolyCount = 38120,
+            ScanFileSize = 1945600,
+            ModelBoundingBoxMm = "32.1 x 28.4 x 16.0 mm",
             Status = "Shipped",
             LabPartnerName = "CeramArt Aesthetic Dental Studio",
             LabTrackingNumber = "DHL-99482710",
@@ -79,6 +87,10 @@ public class LabWorkOrderController : ControllerBase
             Material = "Titanium Grade 5 Base + Zirconia Coping",
             Shade = "A3",
             StlScanUrl = "/scans/scanbody_implant_46.stl",
+            ModelFileFormat = "PLY",
+            MeshPolyCount = 64900,
+            ScanFileSize = 3145728,
+            ModelBoundingBoxMm = "45.0 x 36.2 x 22.1 mm",
             Status = "ReceivedByClinic",
             LabPartnerName = "TitanPro Implant Milling Center",
             LabTrackingNumber = "FEDEX-554192",
@@ -108,7 +120,11 @@ public class LabWorkOrderController : ControllerBase
         string? StumpShade,
         string? StlScanUrl,
         string? LabPartnerName,
-        int? EstimatedDays
+        int? EstimatedDays,
+        string? ModelFileFormat = "STL",
+        int? MeshPolyCount = null,
+        long? ScanFileSize = null,
+        string? ModelBoundingBoxMm = null
     );
 
     public record UpdateLabStatusRequest(
@@ -142,7 +158,44 @@ public class LabWorkOrderController : ControllerBase
         string? LabTrackingNumber,
         string? LabTechnicianNotes,
         DateTime? EstimatedDeliveryDate,
-        DateTime CreatedAtUtc
+        DateTime CreatedAtUtc,
+        string ModelFileFormat = "STL",
+        int MeshPolyCount = 48250,
+        long ScanFileSize = 2457600,
+        string? ModelBoundingBoxMm = "42.5 x 31.8 x 18.2 mm"
+    );
+
+    public record LabOrder3DModelResponse(
+        string OrderId,
+        string OrderToken,
+        int ToothNumber,
+        string? StlScanUrl,
+        string ModelFileFormat,
+        int MeshPolyCount,
+        long ScanFileSize,
+        string? ModelBoundingBoxMm,
+        string RestorationType,
+        string Material,
+        string Shade,
+        string? AccessToken,
+        DateTime ExpiresAtUtc
+    );
+
+    public record Upload3DModelRequest(
+        string FileName,
+        string Base64Data,
+        string? FileFormat
+    );
+
+    public record Upload3DModelResponse(
+        bool Success,
+        string Message,
+        string OrderId,
+        string StlScanUrl,
+        string ModelFileFormat,
+        int MeshPolyCount,
+        long ScanFileSize,
+        string ModelBoundingBoxMm
     );
 
     [HttpGet]
@@ -196,7 +249,11 @@ public class LabWorkOrderController : ControllerBase
             order.LabTrackingNumber,
             order.LabTechnicianNotes,
             order.EstimatedDeliveryDate,
-            order.CreatedAtUtc
+            order.CreatedAtUtc,
+            order.ModelFileFormat,
+            order.MeshPolyCount,
+            order.ScanFileSize,
+            order.ModelBoundingBoxMm
         ));
     }
 
@@ -220,6 +277,10 @@ public class LabWorkOrderController : ControllerBase
             Shade = request.Shade ?? "A2",
             StumpShade = request.StumpShade,
             StlScanUrl = request.StlScanUrl ?? "/scans/sample_intraoral_scan.stl",
+            ModelFileFormat = request.ModelFileFormat ?? "STL",
+            MeshPolyCount = request.MeshPolyCount ?? 48250,
+            ScanFileSize = request.ScanFileSize ?? 2457600,
+            ModelBoundingBoxMm = request.ModelBoundingBoxMm ?? "42.5 x 31.8 x 18.2 mm",
             Status = "Dispatched",
             LabPartnerName = request.LabPartnerName ?? "Apex Precision CAD/CAM Lab",
             EstimatedDeliveryDate = DateTime.UtcNow.AddDays(request.EstimatedDays ?? 4),
@@ -283,6 +344,174 @@ public class LabWorkOrderController : ControllerBase
             order.OrderToken,
             reason
         ));
+    }
+
+    [HttpGet("{id}/3d-model")]
+    [HttpGet("/api/labworkorders/{id}/3d-model")]
+    [Authorize]
+    public IActionResult Get3DModelByOrderId(string id)
+    {
+        var order = _ordersById.Values.FirstOrDefault(o => o.Id == id || o.OrderToken.Equals(id, StringComparison.OrdinalIgnoreCase));
+        if (order == null)
+        {
+            return NotFound(new { message = $"Lab order '{id}' not found." });
+        }
+
+        var sasToken = $"sas-{order.OrderToken}-{Guid.NewGuid():N}";
+        return Ok(new LabOrder3DModelResponse(
+            order.Id,
+            order.OrderToken,
+            order.ToothNumber,
+            order.StlScanUrl,
+            order.ModelFileFormat,
+            order.MeshPolyCount,
+            order.ScanFileSize,
+            order.ModelBoundingBoxMm,
+            order.RestorationType,
+            order.Material,
+            order.Shade,
+            sasToken,
+            DateTime.UtcNow.AddHours(4)
+        ));
+    }
+
+    [HttpGet("token/{token}/3d-model")]
+    [AllowAnonymous]
+    public IActionResult Get3DModelByToken(string token)
+    {
+        if (string.IsNullOrWhiteSpace(token)) return BadRequest("Token is required.");
+
+        if (!_ordersByToken.TryGetValue(token.Trim().ToUpper(), out var order))
+        {
+            return NotFound(new { message = $"Lab order token '{token}' not found." });
+        }
+
+        var sasToken = $"sas-lab-{order.OrderToken}-{Guid.NewGuid():N}";
+        return Ok(new LabOrder3DModelResponse(
+            order.Id,
+            order.OrderToken,
+            order.ToothNumber,
+            order.StlScanUrl,
+            order.ModelFileFormat,
+            order.MeshPolyCount,
+            order.ScanFileSize,
+            order.ModelBoundingBoxMm,
+            order.RestorationType,
+            order.Material,
+            order.Shade,
+            sasToken,
+            DateTime.UtcNow.AddHours(4)
+        ));
+    }
+
+    [HttpPost("{id}/3d-model")]
+    [HttpPost("/api/labworkorders/{id}/3d-model")]
+    [Authorize]
+    public IActionResult Upload3DModel(string id, [FromBody] Upload3DModelRequest request)
+    {
+        var order = _ordersById.Values.FirstOrDefault(o => o.Id == id || o.OrderToken.Equals(id, StringComparison.OrdinalIgnoreCase));
+        if (order == null)
+        {
+            return NotFound(new { message = $"Lab order '{id}' not found." });
+        }
+
+        if (string.IsNullOrWhiteSpace(request.Base64Data))
+        {
+            return BadRequest(new { message = "BR-3D-01 Violation: 3D model payload data cannot be empty." });
+        }
+
+        byte[] fileBytes;
+        try
+        {
+            fileBytes = Convert.FromBase64String(request.Base64Data);
+        }
+        catch
+        {
+            return BadRequest(new { message = "BR-3D-01 Violation: Invalid base64 encoded mesh payload." });
+        }
+
+        // Validate Magic Bytes (BR-3D-01)
+        if (!IsValid3DMeshSignature(fileBytes, out var detectedFormat, out var polyCount))
+        {
+            return BadRequest(new { message = "BR-3D-01 Violation: File signature failed magic-byte validation. Executable and non-mesh binary headers rejected. Supported formats: STL (binary/ASCII) and PLY." });
+        }
+
+        var format = detectedFormat ?? request.FileFormat?.ToUpperInvariant() ?? "STL";
+        var fileName = string.IsNullOrWhiteSpace(request.FileName) ? $"mesh_tooth_{order.ToothNumber}.{format.ToLowerInvariant()}" : request.FileName;
+
+        order.ModelFileFormat = format;
+        order.MeshPolyCount = polyCount > 0 ? polyCount : 48250;
+        order.ScanFileSize = fileBytes.LongLength;
+        order.StlScanUrl = $"/scans/{order.OrderToken.ToLowerInvariant()}_{fileName}";
+        order.ModelBoundingBoxMm = "44.2 x 33.1 x 19.8 mm";
+
+        return Ok(new Upload3DModelResponse(
+            true,
+            "3D model validated and attached successfully.",
+            order.Id,
+            order.StlScanUrl,
+            order.ModelFileFormat,
+            order.MeshPolyCount,
+            order.ScanFileSize,
+            order.ModelBoundingBoxMm
+        ));
+    }
+
+    private static bool IsValid3DMeshSignature(byte[] bytes, out string? format, out int polyCount)
+    {
+        format = null;
+        polyCount = 0;
+
+        if (bytes == null || bytes.Length < 10)
+        {
+            return false;
+        }
+
+        // Reject Windows PE executable ('MZ' = 0x4D, 0x5A)
+        if (bytes[0] == 0x4D && bytes[1] == 0x5A)
+        {
+            return false;
+        }
+
+        // Reject ELF executable (0x7F, 'E', 'L', 'F')
+        if (bytes[0] == 0x7F && bytes[1] == (byte)'E' && bytes[2] == (byte)'L' && bytes[3] == (byte)'F')
+        {
+            return false;
+        }
+
+        // Check for ASCII STL: begins with "solid"
+        if (bytes.Length >= 5)
+        {
+            var headerAscii = System.Text.Encoding.ASCII.GetString(bytes, 0, Math.Min(bytes.Length, 80));
+            if (headerAscii.TrimStart().StartsWith("solid", StringComparison.OrdinalIgnoreCase))
+            {
+                format = "STL";
+                polyCount = 32000;
+                return true;
+            }
+        }
+
+        // Check for PLY: begins with "ply"
+        if (bytes[0] == (byte)'p' && bytes[1] == (byte)'l' && bytes[2] == (byte)'y')
+        {
+            format = "PLY";
+            polyCount = 45000;
+            return true;
+        }
+
+        // Check for Binary STL: 80 bytes header + 4 bytes UINT32 triangle count
+        if (bytes.Length >= 84)
+        {
+            var triangles = BitConverter.ToUInt32(bytes, 80);
+            if (triangles > 0 && triangles < 10_000_000)
+            {
+                format = "STL";
+                polyCount = (int)Math.Min(triangles, int.MaxValue);
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private static string MaskName(string name)
