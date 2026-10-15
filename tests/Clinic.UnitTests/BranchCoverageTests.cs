@@ -436,13 +436,13 @@ public class BranchCoverageTests
         {
             Id = "doc-corrupted",
             AvailabilityDays = "NOT_A_VALID_JSON_STRING",
-            AvailabilityHours = null
+            AvailabilityHours = null!
         };
         doc2.DoctorClinics.Add(new DoctorClinic
         {
             ClinicId = "c-2",
             AvailabilityDays = "INVALID_JSON_INSIDE_CLINIC",
-            AvailabilityHours = null
+            AvailabilityHours = null!
         });
 
         // Doctor with null availability
