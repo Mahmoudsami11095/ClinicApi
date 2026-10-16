@@ -831,6 +831,87 @@ public class LabWorkOrderIntegrationTests
         Assert.False(dto.IsRestorationApproved);
         Assert.Contains("BR-CROWN-03 WARNING", dto.StatusMessage);
     }
+
+    // --- Release v11.0.0 Dual-Modality CBCT-DICOM & Intraoral STL Fusion Tests ---
+
+    [Fact]
+    public void REQ_FUSION_01_GetFusionPlan_Returns_Default_Fusion_Plan()
+    {
+        // Act
+        var result = _controller.GetFusionPlan("lab-seed-03");
+
+        // Assert
+        var okResult = Assert.IsType<OkObjectResult>(result);
+        var dto = Assert.IsType<LabWorkOrderController.DualModalityFusionPlanDto>(okResult.Value);
+
+        Assert.Equal("lab-seed-03", dto.OrderId);
+        Assert.True(dto.RegistrationLandmarks.Count >= 3);
+        Assert.True(dto.RmsErrorMm <= 0.35); // Clinical compliance threshold
+        Assert.False(dto.HasNerveSafetyWarning);
+        Assert.True(dto.IsFusionApproved);
+    }
+
+    [Fact]
+    public void BR_FUSION_01_SaveFusionPlan_Computes_Rms_CoRegistration()
+    {
+        // Arrange
+        var landmarks = new List<LabWorkOrderController.FusionPointPairDto>
+        {
+            new(10.0, 5.0, 15.0, 10.1, 5.1, 15.0, "Cusp 1"),
+            new(-10.0, 5.0, 15.0, -9.9, 5.0, 15.1, "Cusp 2"),
+            new(0.0, -8.0, 12.0, 0.1, -8.1, 12.0, "Cingulum")
+        };
+
+        var req = new LabWorkOrderController.SaveDualModalityFusionRequest(
+            DicomSeriesUid: "1.2.840.10008.5.1.4.1.1.2.999",
+            RegistrationLandmarks: landmarks,
+            BoneOpacityPercent: 60.0,
+            SoftTissueOpacityPercent: 40.0,
+            SubsurfaceBoneClearanceMm: 3.5,
+            NerveDistanceMm: 3.8,
+            IsFusionApproved: true
+        );
+
+        // Act
+        var result = _controller.SaveFusionPlan("lab-seed-02", req);
+
+        // Assert
+        var okResult = Assert.IsType<OkObjectResult>(result);
+        var dto = Assert.IsType<LabWorkOrderController.DualModalityFusionPlanDto>(okResult.Value);
+
+        Assert.Equal("lab-seed-02", dto.OrderId);
+        Assert.Equal(3, dto.RegistrationLandmarks.Count);
+        Assert.True(dto.RmsErrorMm <= 0.35);
+        Assert.False(dto.HasNerveSafetyWarning);
+        Assert.True(dto.IsFusionApproved);
+        Assert.Contains("Dual-modality fusion approved", dto.StatusMessage);
+    }
+
+    [Fact]
+    public void BR_FUSION_03_SaveFusionPlan_Enforces_Mandibular_Nerve_Safety_Warning()
+    {
+        // Arrange: Subsurface nerve distance < 2.0mm violates clinical safety buffer
+        var req = new LabWorkOrderController.SaveDualModalityFusionRequest(
+            DicomSeriesUid: "1.2.840.10008.5.1.4.1.1.2.999",
+            RegistrationLandmarks: null,
+            BoneOpacityPercent: 50.0,
+            SoftTissueOpacityPercent: 50.0,
+            SubsurfaceBoneClearanceMm: 2.5,
+            NerveDistanceMm: 1.4, // Dangerous proximity (< 2.0mm)
+            IsFusionApproved: null
+        );
+
+        // Act
+        var result = _controller.SaveFusionPlan("lab-seed-01", req);
+
+        // Assert
+        var okResult = Assert.IsType<OkObjectResult>(result);
+        var dto = Assert.IsType<LabWorkOrderController.DualModalityFusionPlanDto>(okResult.Value);
+
+        Assert.True(dto.HasNerveSafetyWarning);
+        Assert.False(dto.IsFusionApproved);
+        Assert.Contains("BR-FUSION-03 WARNING", dto.StatusMessage);
+    }
 }
 
 
