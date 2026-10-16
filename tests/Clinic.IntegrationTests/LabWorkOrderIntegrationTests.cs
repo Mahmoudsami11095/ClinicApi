@@ -299,4 +299,75 @@ public class LabWorkOrderIntegrationTests
         Assert.Equal("mm", dto.Unit);
         Assert.Equal("distance", dto.Mode);
     }
+
+    [Fact]
+    public void REQ_HEAT_01_GetClearanceHeatmap_ReturnsSeededHeatmap()
+    {
+        // Act
+        var result = _controller.GetClearanceHeatmap("lab-seed-01");
+
+        // Assert
+        var okResult = Assert.IsType<OkObjectResult>(result);
+        var dto = Assert.IsType<LabWorkOrderController.ClearanceHeatmapDto>(okResult.Value);
+
+        Assert.Equal("lab-seed-01", dto.OrderId);
+        Assert.Equal(0.0, dto.UndercutSurfacePercent);
+        Assert.True(dto.IsCompliant);
+        Assert.True(dto.MinClearanceMm >= 1.0);
+    }
+
+    [Fact]
+    public void REQ_HEAT_02_SaveClearanceHeatmap_WithUndercuts_ComputesCompliance()
+    {
+        // Arrange
+        var req = new LabWorkOrderController.SaveClearanceHeatmapRequest(
+            UndercutSurfacePercent: 4.8,
+            MinClearanceMm: 0.85,
+            MaxClearanceMm: 2.10,
+            InsertionTiltMesialDistalDeg: 5.0,
+            InsertionTiltBuccalLingualDeg: 0.0,
+            IsCompliant: false,
+            StatusMessage: "Undercut detected (4.8%). Path of insertion adjustment required."
+        );
+
+        // Act
+        var result = _controller.SaveClearanceHeatmap("lab-seed-02", req);
+
+        // Assert
+        var okResult = Assert.IsType<OkObjectResult>(result);
+        var dto = Assert.IsType<LabWorkOrderController.ClearanceHeatmapDto>(okResult.Value);
+
+        Assert.Equal("lab-seed-02", dto.OrderId);
+        Assert.Equal(4.8, dto.UndercutSurfacePercent);
+        Assert.False(dto.IsCompliant);
+        Assert.Equal(5.0, dto.InsertionTiltMesialDistalDeg);
+        Assert.Contains("Undercut detected", dto.StatusMessage);
+    }
+
+    [Fact]
+    public void REQ_HEAT_03_SaveClearanceHeatmap_OptimalClearance_ReturnsCompliant()
+    {
+        // Arrange
+        var req = new LabWorkOrderController.SaveClearanceHeatmapRequest(
+            UndercutSurfacePercent: 0.0,
+            MinClearanceMm: 1.65,
+            MaxClearanceMm: 2.25,
+            InsertionTiltMesialDistalDeg: 0.0,
+            InsertionTiltBuccalLingualDeg: 0.0,
+            IsCompliant: null,
+            StatusMessage: null
+        );
+
+        // Act
+        var result = _controller.SaveClearanceHeatmap("lab-seed-03", req);
+
+        // Assert
+        var okResult = Assert.IsType<OkObjectResult>(result);
+        var dto = Assert.IsType<LabWorkOrderController.ClearanceHeatmapDto>(okResult.Value);
+
+        Assert.Equal("lab-seed-03", dto.OrderId);
+        Assert.Equal(0.0, dto.UndercutSurfacePercent);
+        Assert.True(dto.IsCompliant);
+        Assert.Contains("within clinical tolerance", dto.StatusMessage);
+    }
 }
