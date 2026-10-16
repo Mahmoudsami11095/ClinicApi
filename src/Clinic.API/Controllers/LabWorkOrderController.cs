@@ -20,6 +20,7 @@ public class LabWorkOrderController : ControllerBase
     private static readonly ConcurrentDictionary<string, ArticulatorSettingsDto> _articulatorsByOrder = new();
     private static readonly ConcurrentDictionary<string, MarginLineDto> _marginLinesByOrder = new();
     private static readonly ConcurrentDictionary<string, CamToolpathResultDto> _camToolpathsByOrder = new();
+    private static readonly ConcurrentDictionary<string, ImplantSurgicalGuideDto> _surgicalGuidesByOrder = new();
 
     static LabWorkOrderController()
     {
@@ -403,6 +404,36 @@ public class LabWorkOrderController : ControllerBase
         string GCodeContent,
         IReadOnlyList<CamToolpathLayerDto> Layers,
         DateTime GeneratedAtUtc
+    );
+
+    public record ImplantSurgicalGuideDto(
+        string OrderId,
+        string ImplantSystem,
+        double SleeveDiameterMm,
+        double SleeveInnerDiameterMm,
+        double SleeveHeightMm,
+        double DrillOffsetMm,
+        double BuccoLingualAngleDeg,
+        double MesioDistalAngleDeg,
+        double StentWallThicknessMm,
+        double SafetyClearanceMm,
+        bool HasInspectionWindow,
+        bool HasSafetyWarning,
+        string StatusMessage,
+        DateTime PlannedAtUtc
+    );
+
+    public record SaveImplantSurgicalGuideRequest(
+        string? ImplantSystem,
+        double? SleeveDiameterMm,
+        double? SleeveInnerDiameterMm,
+        double? SleeveHeightMm,
+        double? DrillOffsetMm,
+        double? BuccoLingualAngleDeg,
+        double? MesioDistalAngleDeg,
+        double? StentWallThicknessMm,
+        double? SafetyClearanceMm,
+        bool? HasInspectionWindow
     );
 
     [HttpGet]
@@ -978,6 +1009,89 @@ public class LabWorkOrderController : ControllerBase
         var toolpath = GenerateCompliantCamToolpath(order, request);
         _camToolpathsByOrder[order.Id] = toolpath;
         return Ok(toolpath);
+    }
+
+    [HttpGet("{id}/surgical-guide")]
+    [HttpGet("/api/labworkorders/{id}/surgical-guide")]
+    [Authorize]
+    public IActionResult GetSurgicalGuide(string id)
+    {
+        var order = _ordersById.Values.FirstOrDefault(o => o.Id == id || o.OrderToken.Equals(id, StringComparison.OrdinalIgnoreCase));
+        if (order == null)
+        {
+            return NotFound(new { message = $"Lab order '{id}' not found." });
+        }
+
+        var guide = _surgicalGuidesByOrder.GetOrAdd(order.Id, _ => GenerateDefaultSurgicalGuide(order));
+        return Ok(guide);
+    }
+
+    [HttpPost("{id}/surgical-guide")]
+    [HttpPost("/api/labworkorders/{id}/surgical-guide")]
+    [Authorize]
+    public IActionResult SaveSurgicalGuide(string id, [FromBody] SaveImplantSurgicalGuideRequest request)
+    {
+        var order = _ordersById.Values.FirstOrDefault(o => o.Id == id || o.OrderToken.Equals(id, StringComparison.OrdinalIgnoreCase));
+        if (order == null)
+        {
+            return NotFound(new { message = $"Lab order '{id}' not found." });
+        }
+
+        var system = string.IsNullOrWhiteSpace(request?.ImplantSystem) ? "NobelActive" : request.ImplantSystem;
+        var sleeveDia = request?.SleeveDiameterMm ?? (system == "StraumannBLX" ? 4.8 : (system == "ZimmerTSV" ? 5.2 : 5.0));
+        var innerDia = request?.SleeveInnerDiameterMm ?? (system == "StraumannBLX" ? 4.0 : (system == "ZimmerTSV" ? 4.4 : 4.2));
+        var height = request?.SleeveHeightMm ?? 5.0;
+        var offset = request?.DrillOffsetMm ?? (system == "StraumannBLX" ? 10.0 : 9.0);
+        var blAngle = Math.Clamp(request?.BuccoLingualAngleDeg ?? 0.0, -15.0, 15.0);
+        var mdAngle = Math.Clamp(request?.MesioDistalAngleDeg ?? 0.0, -10.0, 10.0);
+        var wallThickness = Math.Max(2.5, request?.StentWallThicknessMm ?? 2.5); // BR-SG-02: >= 2.5mm
+        var clearance = request?.SafetyClearanceMm ?? 3.4;
+        var hasWarning = clearance < 2.0; // BR-SG-01: minimum 2.0mm
+        var window = request?.HasInspectionWindow ?? true;
+
+        var message = hasWarning
+            ? $"BR-SG-01 WARNING: Planned safety clearance ({clearance:F1} mm) violates minimum 2.0 mm buffer from critical anatomical structures."
+            : $"Surgical guide approved ({system}). Titanium master sleeve ⌀{sleeveDia:F1} mm, offset {offset:F1} mm. Anatomical safety clearance: {clearance:F1} mm.";
+
+        var guide = new ImplantSurgicalGuideDto(
+            order.Id,
+            system,
+            sleeveDia,
+            innerDia,
+            height,
+            offset,
+            blAngle,
+            mdAngle,
+            wallThickness,
+            clearance,
+            window,
+            hasWarning,
+            message,
+            DateTime.UtcNow
+        );
+
+        _surgicalGuidesByOrder[order.Id] = guide;
+        return Ok(guide);
+    }
+
+    private static ImplantSurgicalGuideDto GenerateDefaultSurgicalGuide(LabWorkOrder order)
+    {
+        return new ImplantSurgicalGuideDto(
+            order.Id,
+            "NobelActive",
+            5.0,
+            4.2,
+            5.0,
+            9.0,
+            0.0,
+            0.0,
+            2.5,
+            3.4,
+            true,
+            false,
+            $"Default implant surgical guide initialized for Tooth #{order.ToothNumber}. NobelActive master sleeve ⌀5.0 mm, safety clearance 3.4 mm.",
+            DateTime.UtcNow
+        );
     }
 
     private static CamToolpathResultDto GenerateCompliantCamToolpath(LabWorkOrder order, GenerateCamGCodeRequest request)
