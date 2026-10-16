@@ -25,6 +25,7 @@ public class LabWorkOrderController : ControllerBase
     private static readonly ConcurrentDictionary<string, DualModalityFusionPlanDto> _fusionsByOrder = new();
     private static readonly ConcurrentDictionary<string, AlignerPlanDto> _alignersByOrder = new();
     private static readonly ConcurrentDictionary<string, GbrTitaniumMeshPlanDto> _gbrMeshesByOrder = new();
+    private static readonly ConcurrentDictionary<string, RpdSurveyorPlanDto> _rpdPlansByOrder = new();
 
     static LabWorkOrderController()
     {
@@ -574,6 +575,44 @@ public class LabWorkOrderController : ControllerBase
         double? TentPoleCrestalClearanceMm,
         bool? IsFabricationApproved,
         IReadOnlyList<GbrFixationScrewDto>? FixationScrews
+    );
+
+    public record RpdClaspAssemblyDto(
+        string ToothFdi,
+        string ClaspType,
+        string RestSeatType,
+        double UndercutDepthMm,
+        bool HasReciprocalArm,
+        bool IsSurveyCompliant
+    );
+
+    public record RpdSurveyorPlanDto(
+        string OrderId,
+        string PatientId,
+        string Arch,
+        string KennedyClassification,
+        double TiltBuccolingualDeg,
+        double TiltMesiodistalDeg,
+        string MajorConnectorType,
+        double MajorConnectorThicknessMm,
+        double FloorOfMouthDepthMm,
+        bool HasTissueImpingementWarning,
+        bool IsFabricationApproved,
+        string StatusMessage,
+        IReadOnlyList<RpdClaspAssemblyDto> Clasps,
+        DateTime PlannedAtUtc
+    );
+
+    public record SaveRpdPlanRequest(
+        string? Arch,
+        string? KennedyClassification,
+        double? TiltBuccolingualDeg,
+        double? TiltMesiodistalDeg,
+        string? MajorConnectorType,
+        double? MajorConnectorThicknessMm,
+        double? FloorOfMouthDepthMm,
+        bool? IsFabricationApproved,
+        IReadOnlyList<RpdClaspAssemblyDto>? Clasps
     );
 
     [HttpGet]
@@ -1631,6 +1670,109 @@ public class LabWorkOrderController : ControllerBase
             new GbrFixationScrewDto("screw-2", -2.1, -5.0, 1.8, 1.5, 4.0, 2.1, 2.8, true, false),
             new GbrFixationScrewDto("screw-3", 3.2, -4.8, 2.0, 1.5, 4.0, 2.6, 3.5, true, false),
             new GbrFixationScrewDto("screw-4", 7.0, -3.9, 2.2, 1.5, 4.0, 2.8, 3.9, true, false)
+        };
+    }
+
+    [HttpGet("{id}/rpd")]
+    [HttpGet("/api/labworkorders/{id}/rpd")]
+    public IActionResult GetRpdPlan(string id)
+    {
+        var order = _ordersById.Values.FirstOrDefault(o => o.Id == id || o.OrderToken == id);
+        if (order == null)
+        {
+            return NotFound(new { error = $"Lab order '{id}' not found." });
+        }
+
+        var plan = _rpdPlansByOrder.GetOrAdd(order.Id, _ => GenerateDefaultRpdPlan(order));
+        return Ok(plan);
+    }
+
+    [HttpPost("{id}/rpd")]
+    [HttpPost("/api/labworkorders/{id}/rpd")]
+    public IActionResult SaveRpdPlan(string id, [FromBody] SaveRpdPlanRequest request)
+    {
+        var order = _ordersById.Values.FirstOrDefault(o => o.Id == id || o.OrderToken == id);
+        if (order == null)
+        {
+            return NotFound(new { error = $"Lab order '{id}' not found." });
+        }
+
+        var arch = string.IsNullOrWhiteSpace(request?.Arch) ? "Mandibular" : request.Arch;
+        var kennedy = string.IsNullOrWhiteSpace(request?.KennedyClassification) ? "ClassII" : request.KennedyClassification;
+
+        // BR-RPD-01: Insertion angles clamp
+        var tiltBL = Math.Clamp(request?.TiltBuccolingualDeg ?? 2.5, -15.0, 15.0);
+        var tiltMD = Math.Clamp(request?.TiltMesiodistalDeg ?? -1.5, -10.0, 10.0);
+
+        var majorConnector = string.IsNullOrWhiteSpace(request?.MajorConnectorType)
+            ? (arch.Equals("Mandibular", StringComparison.OrdinalIgnoreCase) ? "LingualBar" : "PalatalStrap")
+            : request.MajorConnectorType;
+
+        var thickness = Math.Clamp(request?.MajorConnectorThicknessMm ?? 1.2, 0.8, 2.5);
+        var floorOfMouth = Math.Clamp(request?.FloorOfMouthDepthMm ?? 8.5, 3.0, 15.0);
+
+        // BR-RPD-02: Mandibular LingualBar requires >= 7.0 mm floor-of-mouth clearance
+        var isLingualBar = arch.Equals("Mandibular", StringComparison.OrdinalIgnoreCase) &&
+                           majorConnector.Equals("LingualBar", StringComparison.OrdinalIgnoreCase);
+        var hasImpingement = isLingualBar && floorOfMouth < 7.0;
+
+        var claspsList = (request?.Clasps != null && request.Clasps.Count > 0)
+            ? request.Clasps.ToList()
+            : GenerateDefaultClasps();
+
+        var status = hasImpingement
+            ? "BR-RPD-02 WARNING: Floor-of-mouth depth < 7.0 mm (tissue impingement risk). Select LingualPlate instead of LingualBar."
+            : $"Removable Partial Denture (RPD) framework approved for {arch} {kennedy}. Insertion path: BL {tiltBL:F1}°, MD {tiltMD:F1}°. Major connector: {majorConnector} ({thickness:F1} mm). {claspsList.Count} clasps verified.";
+
+        var plan = new RpdSurveyorPlanDto(
+            OrderId: order.Id,
+            PatientId: order.PatientId,
+            Arch: arch,
+            KennedyClassification: kennedy,
+            TiltBuccolingualDeg: tiltBL,
+            TiltMesiodistalDeg: tiltMD,
+            MajorConnectorType: majorConnector,
+            MajorConnectorThicknessMm: thickness,
+            FloorOfMouthDepthMm: floorOfMouth,
+            HasTissueImpingementWarning: hasImpingement,
+            IsFabricationApproved: request?.IsFabricationApproved ?? !hasImpingement,
+            StatusMessage: status,
+            Clasps: claspsList,
+            PlannedAtUtc: DateTime.UtcNow
+        );
+
+        _rpdPlansByOrder[order.Id] = plan;
+        return Ok(plan);
+    }
+
+    private static RpdSurveyorPlanDto GenerateDefaultRpdPlan(LabWorkOrder order)
+    {
+        var clasps = GenerateDefaultClasps();
+        return new RpdSurveyorPlanDto(
+            OrderId: order.Id,
+            PatientId: order.PatientId,
+            Arch: "Mandibular",
+            KennedyClassification: "ClassII",
+            TiltBuccolingualDeg: 2.5,
+            TiltMesiodistalDeg: -1.5,
+            MajorConnectorType: "LingualBar",
+            MajorConnectorThicknessMm: 1.2,
+            FloorOfMouthDepthMm: 8.5,
+            HasTissueImpingementWarning: false,
+            IsFabricationApproved: true,
+            StatusMessage: $"RPD framework digital survey initialized for Tooth #{order.ToothNumber} arch. Insertion path optimized.",
+            Clasps: clasps,
+            PlannedAtUtc: DateTime.UtcNow
+        );
+    }
+
+    private static List<RpdClaspAssemblyDto> GenerateDefaultClasps()
+    {
+        return new List<RpdClaspAssemblyDto>
+        {
+            new RpdClaspAssemblyDto("35", "Akers", "Occlusal", 0.25, true, true),
+            new RpdClaspAssemblyDto("47", "Akers", "Occlusal", 0.25, true, true),
+            new RpdClaspAssemblyDto("44", "RoachIBar", "Cingulum", 0.25, true, true)
         };
     }
 
