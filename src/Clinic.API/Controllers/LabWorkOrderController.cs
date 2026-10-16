@@ -26,6 +26,7 @@ public class LabWorkOrderController : ControllerBase
     private static readonly ConcurrentDictionary<string, AlignerPlanDto> _alignersByOrder = new();
     private static readonly ConcurrentDictionary<string, GbrTitaniumMeshPlanDto> _gbrMeshesByOrder = new();
     private static readonly ConcurrentDictionary<string, RpdSurveyorPlanDto> _rpdPlansByOrder = new();
+    private static readonly ConcurrentDictionary<string, DsdSmilePlanDto> _dsdPlansByOrder = new();
 
     static LabWorkOrderController()
     {
@@ -613,6 +614,41 @@ public class LabWorkOrderController : ControllerBase
         double? FloorOfMouthDepthMm,
         bool? IsFabricationApproved,
         IReadOnlyList<RpdClaspAssemblyDto>? Clasps
+    );
+
+    public record DsdToothProportionDto(
+        string ToothFdi,
+        double WidthMm,
+        double LengthMm,
+        double WidthToLengthRatio,
+        double GoldenRatioDeviationPercent,
+        bool IsGoldenProportionCompliant
+    );
+
+    public record DsdSmilePlanDto(
+        string OrderId,
+        string PatientId,
+        double FacialMidlineOffsetMm,
+        double InterpupillaryAngleDeg,
+        double SmileArcCurvatureRadiusMm,
+        double CentralIncisorWidthMm,
+        double CentralIncisorLengthMm,
+        double TargetWidthToLengthRatio,
+        bool IsAestheticHarmonized,
+        string StatusMessage,
+        IReadOnlyList<DsdToothProportionDto> Proportions,
+        DateTime PlannedAtUtc
+    );
+
+    public record SaveDsdSmilePlanRequest(
+        double? FacialMidlineOffsetMm,
+        double? InterpupillaryAngleDeg,
+        double? SmileArcCurvatureRadiusMm,
+        double? CentralIncisorWidthMm,
+        double? CentralIncisorLengthMm,
+        double? TargetWidthToLengthRatio,
+        bool? IsAestheticHarmonized,
+        IReadOnlyList<DsdToothProportionDto>? Proportions
     );
 
     [HttpGet]
@@ -1773,6 +1809,108 @@ public class LabWorkOrderController : ControllerBase
             new RpdClaspAssemblyDto("35", "Akers", "Occlusal", 0.25, true, true),
             new RpdClaspAssemblyDto("47", "Akers", "Occlusal", 0.25, true, true),
             new RpdClaspAssemblyDto("44", "RoachIBar", "Cingulum", 0.25, true, true)
+        };
+    }
+
+    [HttpGet("{id}/dsd")]
+    [HttpGet("/api/labworkorders/{id}/dsd")]
+    public IActionResult GetDsdSmilePlan(string id)
+    {
+        var order = _ordersById.Values.FirstOrDefault(o => o.Id == id || o.OrderToken == id);
+        if (order == null)
+        {
+            return NotFound(new { error = $"Lab order '{id}' not found." });
+        }
+
+        var plan = _dsdPlansByOrder.GetOrAdd(order.Id, _ => GenerateDefaultDsdPlan(order));
+        return Ok(plan);
+    }
+
+    [HttpPost("{id}/dsd")]
+    [HttpPost("/api/labworkorders/{id}/dsd")]
+    public IActionResult SaveDsdSmilePlan(string id, [FromBody] SaveDsdSmilePlanRequest request)
+    {
+        var order = _ordersById.Values.FirstOrDefault(o => o.Id == id || o.OrderToken == id);
+        if (order == null)
+        {
+            return NotFound(new { error = $"Lab order '{id}' not found." });
+        }
+
+        var midlineOffset = Math.Clamp(request?.FacialMidlineOffsetMm ?? 0.0, -3.0, 3.0);
+        var ipaAngle = Math.Clamp(request?.InterpupillaryAngleDeg ?? 0.0, -5.0, 5.0);
+        var curvatureRadius = Math.Clamp(request?.SmileArcCurvatureRadiusMm ?? 42.0, 25.0, 65.0);
+        var widthCI = Math.Clamp(request?.CentralIncisorWidthMm ?? 8.5, 7.0, 10.5);
+        var lengthCI = Math.Clamp(request?.CentralIncisorLengthMm ?? 10.5, 8.5, 13.0);
+        var targetRatio = Math.Clamp(request?.TargetWidthToLengthRatio ?? 80.0, 75.0, 85.0);
+
+        var actualRatio = Math.Round((widthCI / lengthCI) * 100.0, 1);
+        var isRatioCompliant = actualRatio >= 75.0 && actualRatio <= 85.0;
+
+        var proportions = (request?.Proportions != null && request.Proportions.Count > 0)
+            ? request.Proportions.ToList()
+            : GenerateDefaultProportions(widthCI, lengthCI);
+
+        var hasDeviationWarning = proportions.Any(p => Math.Abs(p.GoldenRatioDeviationPercent) > 15.0);
+
+        var status = hasDeviationWarning
+            ? $"BR-DSD-02 WARNING: One or more anterior teeth deviate >15% from divine golden proportion. Aesthetic veneer mock-up recommended."
+            : $"Digital Smile Design (DSD) aesthetic plan approved. Central incisor W/L ratio: {actualRatio:F1}% (target {targetRatio:F1}%). 6 anterior proportions harmonized.";
+
+        var plan = new DsdSmilePlanDto(
+            OrderId: order.Id,
+            PatientId: order.PatientId,
+            FacialMidlineOffsetMm: midlineOffset,
+            InterpupillaryAngleDeg: ipaAngle,
+            SmileArcCurvatureRadiusMm: curvatureRadius,
+            CentralIncisorWidthMm: widthCI,
+            CentralIncisorLengthMm: lengthCI,
+            TargetWidthToLengthRatio: targetRatio,
+            IsAestheticHarmonized: request?.IsAestheticHarmonized ?? (isRatioCompliant && !hasDeviationWarning),
+            StatusMessage: status,
+            Proportions: proportions,
+            PlannedAtUtc: DateTime.UtcNow
+        );
+
+        _dsdPlansByOrder[order.Id] = plan;
+        return Ok(plan);
+    }
+
+    private static DsdSmilePlanDto GenerateDefaultDsdPlan(LabWorkOrder order)
+    {
+        var widthCI = 8.5;
+        var lengthCI = 10.5;
+        var proportions = GenerateDefaultProportions(widthCI, lengthCI);
+        return new DsdSmilePlanDto(
+            OrderId: order.Id,
+            PatientId: order.PatientId,
+            FacialMidlineOffsetMm: 0.0,
+            InterpupillaryAngleDeg: 0.0,
+            SmileArcCurvatureRadiusMm: 42.0,
+            CentralIncisorWidthMm: widthCI,
+            CentralIncisorLengthMm: lengthCI,
+            TargetWidthToLengthRatio: 80.0,
+            IsAestheticHarmonized: true,
+            StatusMessage: $"Digital Smile Design (DSD) initialized for Tooth #{order.ToothNumber} arch. 80.9% central incisor W/L ratio.",
+            Proportions: proportions,
+            PlannedAtUtc: DateTime.UtcNow
+        );
+    }
+
+    private static List<DsdToothProportionDto> GenerateDefaultProportions(double widthCI, double lengthCI)
+    {
+        var widthLI = Math.Round(widthCI / 1.618, 2);
+        var widthC = Math.Round(widthLI / 1.618, 2);
+        var lengthLI = Math.Round(lengthCI * 0.90, 2);
+        var lengthC = Math.Round(lengthCI * 1.05, 2);
+
+        return new List<DsdToothProportionDto>
+        {
+            new DsdToothProportionDto("13", widthC, lengthC, Math.Round((widthC / lengthC) * 100.0, 1), 0.0, true),
+            new DsdToothProportionDto("12", widthLI, lengthLI, Math.Round((widthLI / lengthLI) * 100.0, 1), 0.0, true),
+            new DsdToothProportionDto("11", widthCI, lengthCI, Math.Round((widthCI / lengthCI) * 100.0, 1), 0.0, true),
+            new DsdToothProportionDto("21", widthCI, lengthCI, Math.Round((widthCI / lengthCI) * 100.0, 1), 0.0, true),
+            new DsdToothProportionDto("22", widthLI, lengthLI, Math.Round((widthLI / lengthLI) * 100.0, 1), 0.0, true),
+            new DsdToothProportionDto("23", widthC, lengthC, Math.Round((widthC / lengthC) * 100.0, 1), 0.0, true)
         };
     }
 
