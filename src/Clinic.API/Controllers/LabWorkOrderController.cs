@@ -16,6 +16,7 @@ public class LabWorkOrderController : ControllerBase
     private static readonly ConcurrentDictionary<string, LabWorkOrder> _ordersByToken = new();
     private static readonly ConcurrentDictionary<string, LabWorkOrder> _ordersById = new();
     private static readonly ConcurrentDictionary<string, List<ModelMeasurementDto>> _measurementsByOrder = new();
+    private static readonly ConcurrentDictionary<string, ClearanceHeatmapDto> _heatmapsByOrder = new();
 
     static LabWorkOrderController()
     {
@@ -115,6 +116,18 @@ public class LabWorkOrderController : ControllerBase
             new ModelMeasurementDto("meas-seed-1", order1.Id, "Occlusal Reduction", 1.85, "mm", "distance", DateTime.UtcNow.AddHours(-2)),
             new ModelMeasurementDto("meas-seed-2", order1.Id, "Axial Convergence", 6.4, "deg", "angle", DateTime.UtcNow.AddHours(-2))
         };
+
+        _heatmapsByOrder[order1.Id] = new ClearanceHeatmapDto(
+            order1.Id,
+            0.0,
+            1.85,
+            2.40,
+            0.0,
+            0.0,
+            true,
+            "Zero Undercuts Detected. Optimal Occlusal Reduction.",
+            DateTime.UtcNow.AddHours(-1)
+        );
     }
 
     public record CreateLabWorkOrderRequest(
@@ -220,6 +233,28 @@ public class LabWorkOrderController : ControllerBase
         double Value,
         string? Unit,
         string? Mode
+    );
+
+    public record ClearanceHeatmapDto(
+        string OrderId,
+        double UndercutSurfacePercent,
+        double MinClearanceMm,
+        double MaxClearanceMm,
+        double InsertionTiltMesialDistalDeg,
+        double InsertionTiltBuccalLingualDeg,
+        bool IsCompliant,
+        string StatusMessage,
+        DateTime EvaluatedAtUtc
+    );
+
+    public record SaveClearanceHeatmapRequest(
+        double UndercutSurfacePercent,
+        double MinClearanceMm,
+        double MaxClearanceMm,
+        double InsertionTiltMesialDistalDeg,
+        double InsertionTiltBuccalLingualDeg,
+        bool? IsCompliant,
+        string? StatusMessage
     );
 
     [HttpGet]
@@ -537,6 +572,64 @@ public class LabWorkOrderController : ControllerBase
         }
 
         return Ok(measurement);
+    }
+
+    [HttpGet("{id}/clearance-heatmap")]
+    [HttpGet("/api/labworkorders/{id}/clearance-heatmap")]
+    [Authorize]
+    public IActionResult GetClearanceHeatmap(string id)
+    {
+        var order = _ordersById.Values.FirstOrDefault(o => o.Id == id || o.OrderToken.Equals(id, StringComparison.OrdinalIgnoreCase));
+        if (order == null)
+        {
+            return NotFound(new { message = $"Lab order '{id}' not found." });
+        }
+
+        var heatmap = _heatmapsByOrder.GetOrAdd(order.Id, _ => new ClearanceHeatmapDto(
+            order.Id,
+            0.0,
+            1.85,
+            2.40,
+            0.0,
+            0.0,
+            true,
+            "Zero Undercuts Detected. Optimal Occlusal Reduction.",
+            DateTime.UtcNow
+        ));
+
+        return Ok(heatmap);
+    }
+
+    [HttpPost("{id}/clearance-heatmap")]
+    [HttpPost("/api/labworkorders/{id}/clearance-heatmap")]
+    [Authorize]
+    public IActionResult SaveClearanceHeatmap(string id, [FromBody] SaveClearanceHeatmapRequest request)
+    {
+        var order = _ordersById.Values.FirstOrDefault(o => o.Id == id || o.OrderToken.Equals(id, StringComparison.OrdinalIgnoreCase));
+        if (order == null)
+        {
+            return NotFound(new { message = $"Lab order '{id}' not found." });
+        }
+
+        var isCompliant = request.IsCompliant ?? (request.UndercutSurfacePercent == 0.0 && request.MinClearanceMm >= 1.0);
+        var status = request.StatusMessage ?? (isCompliant
+            ? "Clearance within clinical tolerance. Insertion path validated."
+            : $"Undercut detected ({request.UndercutSurfacePercent:F1}%). Path of insertion adjustment required.");
+
+        var heatmap = new ClearanceHeatmapDto(
+            order.Id,
+            request.UndercutSurfacePercent,
+            request.MinClearanceMm,
+            request.MaxClearanceMm,
+            request.InsertionTiltMesialDistalDeg,
+            request.InsertionTiltBuccalLingualDeg,
+            isCompliant,
+            status,
+            DateTime.UtcNow
+        );
+
+        _heatmapsByOrder[order.Id] = heatmap;
+        return Ok(heatmap);
     }
 
     private static bool IsValid3DMeshSignature(byte[] bytes, out string? format, out int polyCount)
