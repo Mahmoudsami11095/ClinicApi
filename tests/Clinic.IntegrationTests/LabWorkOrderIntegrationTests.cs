@@ -984,6 +984,89 @@ public class LabWorkOrderIntegrationTests
         Assert.True(plan.TotalStages > 10); // Automatically subdivided
         Assert.Contains("BR-ALIGN-01 WARNING", plan.StatusMessage);
     }
+
+    [Fact]
+    public void REQ_GBR_01_GetGbrMeshPlan_Returns_Default_Mesh_Plan()
+    {
+        // Act
+        var result = _controller.GetGbrMeshPlan("lab-seed-03");
+
+        // Assert
+        var okResult = Assert.IsType<OkObjectResult>(result);
+        var plan = Assert.IsType<LabWorkOrderController.GbrTitaniumMeshPlanDto>(okResult.Value);
+
+        Assert.Equal("lab-seed-03", plan.OrderId);
+        Assert.Equal(450.0, plan.DefectVolumeMm3);
+        Assert.Equal(517.5, plan.RecommendedGraftVolumeMm3);
+        Assert.Equal(0.15, plan.MeshThicknessMm);
+        Assert.Equal(50.0, plan.PorosityPercent);
+        Assert.Equal(4, plan.FixationScrewsCount);
+        Assert.False(plan.HasSafetyCorridorViolation);
+        Assert.True(plan.IsFabricationApproved);
+        Assert.NotEmpty(plan.FixationScrews);
+    }
+
+    [Fact]
+    public void BR_GBR_01_SaveGbrMeshPlan_Compliant_Screws_Approves_Plan()
+    {
+        // Arrange: 600 mm3 defect requires 690 mm3 graft (+15%)
+        var req = new LabWorkOrderController.SaveGbrMeshPlanRequest(
+            DefectVolumeMm3: 600.0,
+            MeshThicknessMm: 0.18,
+            PorosityPercent: 48.0,
+            PoreDiameterMm: 1.1,
+            TentPoleCrestalClearanceMm: 2.8,
+            IsFabricationApproved: true,
+            FixationScrews: null
+        );
+
+        // Act
+        var result = _controller.SaveGbrMeshPlan("lab-seed-02", req);
+
+        // Assert
+        var okResult = Assert.IsType<OkObjectResult>(result);
+        var plan = Assert.IsType<LabWorkOrderController.GbrTitaniumMeshPlanDto>(okResult.Value);
+
+        Assert.Equal("lab-seed-02", plan.OrderId);
+        Assert.Equal(600.0, plan.DefectVolumeMm3);
+        Assert.Equal(690.0, plan.RecommendedGraftVolumeMm3); // +15% overfill
+        Assert.Equal(0.18, plan.MeshThicknessMm);
+        Assert.False(plan.HasSafetyCorridorViolation);
+        Assert.True(plan.IsFabricationApproved);
+        Assert.Contains("approved", plan.StatusMessage, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void BR_GBR_03_SaveGbrMeshPlan_Corridor_Violation_Flags_Warning()
+    {
+        // Arrange: Screw-2 has 0.8 mm nerve clearance (< 2.0 mm safety corridor)
+        var unsafeScrews = new List<LabWorkOrderController.GbrFixationScrewDto>
+        {
+            new("screw-1", -6.5, -4.2, 2.1, 1.5, 4.0, 2.4, 3.2, true, false),
+            new("screw-2", -2.1, -5.0, 1.8, 1.5, 4.0, 2.1, 0.8, true, true) // Safety corridor breach
+        };
+
+        var req = new LabWorkOrderController.SaveGbrMeshPlanRequest(
+            DefectVolumeMm3: 500.0,
+            MeshThicknessMm: 0.15,
+            PorosityPercent: 50.0,
+            PoreDiameterMm: 1.0,
+            TentPoleCrestalClearanceMm: 2.5,
+            IsFabricationApproved: null,
+            FixationScrews: unsafeScrews
+        );
+
+        // Act
+        var result = _controller.SaveGbrMeshPlan("lab-seed-01", req);
+
+        // Assert
+        var okResult = Assert.IsType<OkObjectResult>(result);
+        var plan = Assert.IsType<LabWorkOrderController.GbrTitaniumMeshPlanDto>(okResult.Value);
+
+        Assert.True(plan.HasSafetyCorridorViolation);
+        Assert.False(plan.IsFabricationApproved);
+        Assert.Contains("BR-GBR-03 WARNING", plan.StatusMessage);
+    }
 }
 
 

@@ -24,6 +24,7 @@ public class LabWorkOrderController : ControllerBase
     private static readonly ConcurrentDictionary<string, CrownMorphologyPlanDto> _crownsByOrder = new();
     private static readonly ConcurrentDictionary<string, DualModalityFusionPlanDto> _fusionsByOrder = new();
     private static readonly ConcurrentDictionary<string, AlignerPlanDto> _alignersByOrder = new();
+    private static readonly ConcurrentDictionary<string, GbrTitaniumMeshPlanDto> _gbrMeshesByOrder = new();
 
     static LabWorkOrderController()
     {
@@ -532,6 +533,47 @@ public class LabWorkOrderController : ControllerBase
         double? TotalIprMm,
         double? FoilThicknessMm,
         bool? IsTreatmentApproved
+    );
+
+    public record GbrFixationScrewDto(
+        string ScrewId,
+        double PositionX,
+        double PositionY,
+        double PositionZ,
+        double DiameterMm,
+        double LengthMm,
+        double BoneClearanceMm,
+        double NerveClearanceMm,
+        bool IsCorticalEngaged,
+        bool HasSafetyCorridorViolation
+    );
+
+    public record GbrTitaniumMeshPlanDto(
+        string OrderId,
+        string PatientId,
+        double DefectVolumeMm3,
+        double RecommendedGraftVolumeMm3,
+        double MeshThicknessMm,
+        double PorosityPercent,
+        double PoreDiameterMm,
+        double TentPoleCrestalClearanceMm,
+        int FixationScrewsCount,
+        bool HasSafetyCorridorViolation,
+        bool IsFabricationApproved,
+        string StatusMessage,
+        IReadOnlyList<GbrFixationScrewDto> FixationScrews,
+        int FlatPatternContourPointsCount,
+        DateTime PlannedAtUtc
+    );
+
+    public record SaveGbrMeshPlanRequest(
+        double? DefectVolumeMm3,
+        double? MeshThicknessMm,
+        double? PorosityPercent,
+        double? PoreDiameterMm,
+        double? TentPoleCrestalClearanceMm,
+        bool? IsFabricationApproved,
+        IReadOnlyList<GbrFixationScrewDto>? FixationScrews
     );
 
     [HttpGet]
@@ -1487,6 +1529,109 @@ public class LabWorkOrderController : ControllerBase
             Stages: stagesList,
             PlannedAtUtc: DateTime.UtcNow
         );
+    }
+
+    [HttpGet("{id}/gbr-mesh")]
+    [HttpGet("/api/labworkorders/{id}/gbr-mesh")]
+    public IActionResult GetGbrMeshPlan(string id)
+    {
+        var order = _ordersById.Values.FirstOrDefault(o => o.Id == id || o.OrderToken == id);
+        if (order == null)
+        {
+            return NotFound(new { error = $"Lab order '{id}' not found." });
+        }
+
+        var plan = _gbrMeshesByOrder.GetOrAdd(order.Id, _ => GenerateDefaultGbrMeshPlan(order));
+        return Ok(plan);
+    }
+
+    [HttpPost("{id}/gbr-mesh")]
+    [HttpPost("/api/labworkorders/{id}/gbr-mesh")]
+    public IActionResult SaveGbrMeshPlan(string id, [FromBody] SaveGbrMeshPlanRequest request)
+    {
+        var order = _ordersById.Values.FirstOrDefault(o => o.Id == id || o.OrderToken == id);
+        if (order == null)
+        {
+            return NotFound(new { error = $"Lab order '{id}' not found." });
+        }
+
+        var defectVol = Math.Clamp(request?.DefectVolumeMm3 ?? 450.0, 50.0, 2500.0);
+        // BR-GBR-01: +15% biological overfill factor
+        var graftVol = Math.Round(defectVol * 1.15, 1);
+        // BR-GBR-02: Foil thickness 0.10 to 0.20 mm (default 0.15 mm)
+        var thickness = Math.Clamp(request?.MeshThicknessMm ?? 0.15, 0.10, 0.20);
+        // BR-GBR-02: Porosity 40% to 60% (default 50%)
+        var porosity = Math.Clamp(request?.PorosityPercent ?? 50.0, 40.0, 60.0);
+        var poreDiameter = Math.Clamp(request?.PoreDiameterMm ?? 1.0, 0.8, 1.2);
+        var crestClearance = Math.Clamp(request?.TentPoleCrestalClearanceMm ?? 2.5, 1.5, 5.0);
+
+        // BR-GBR-03: Validate fixation screw safety corridors (root >= 1.5 mm, nerve canal >= 2.0 mm)
+        var screwsList = (request?.FixationScrews != null && request.FixationScrews.Count > 0)
+            ? request.FixationScrews.ToList()
+            : GenerateDefaultScrews();
+
+        var hasViolation = screwsList.Any(s => s.NerveClearanceMm < 2.0 || s.BoneClearanceMm < 1.5 || s.HasSafetyCorridorViolation);
+
+        var status = hasViolation
+            ? "BR-GBR-03 WARNING: Fixation screw safety corridor violated (root clearance < 1.5 mm or nerve clearance < 2.0 mm). Relocate screws to healthy basal cortical bone."
+            : $"Guided bone regeneration (GBR) titanium mesh plan approved. Defect volume: {defectVol:F1} mm³, graft volume: {graftVol:F1} mm³ (+15% overfill), {screwsList.Count} fixation screws verified.";
+
+        var plan = new GbrTitaniumMeshPlanDto(
+            OrderId: order.Id,
+            PatientId: order.PatientId,
+            DefectVolumeMm3: defectVol,
+            RecommendedGraftVolumeMm3: graftVol,
+            MeshThicknessMm: thickness,
+            PorosityPercent: porosity,
+            PoreDiameterMm: poreDiameter,
+            TentPoleCrestalClearanceMm: crestClearance,
+            FixationScrewsCount: screwsList.Count,
+            HasSafetyCorridorViolation: hasViolation,
+            IsFabricationApproved: request?.IsFabricationApproved ?? !hasViolation,
+            StatusMessage: status,
+            FixationScrews: screwsList,
+            FlatPatternContourPointsCount: 32,
+            PlannedAtUtc: DateTime.UtcNow
+        );
+
+        _gbrMeshesByOrder[order.Id] = plan;
+        return Ok(plan);
+    }
+
+    private static GbrTitaniumMeshPlanDto GenerateDefaultGbrMeshPlan(LabWorkOrder order)
+    {
+        var defectVol = 450.0;
+        var graftVol = Math.Round(defectVol * 1.15, 1);
+        var screws = GenerateDefaultScrews();
+
+        return new GbrTitaniumMeshPlanDto(
+            OrderId: order.Id,
+            PatientId: order.PatientId,
+            DefectVolumeMm3: defectVol,
+            RecommendedGraftVolumeMm3: graftVol,
+            MeshThicknessMm: 0.15,
+            PorosityPercent: 50.0,
+            PoreDiameterMm: 1.0,
+            TentPoleCrestalClearanceMm: 2.5,
+            FixationScrewsCount: screws.Count,
+            HasSafetyCorridorViolation: false,
+            IsFabricationApproved: true,
+            StatusMessage: $"GBR titanium mesh scaffold designed for Tooth #{order.ToothNumber} site. Defect volume: {defectVol} mm³, graft volume: {graftVol} mm³ (+15% overfill).",
+            FixationScrews: screws,
+            FlatPatternContourPointsCount: 32,
+            PlannedAtUtc: DateTime.UtcNow
+        );
+    }
+
+    private static List<GbrFixationScrewDto> GenerateDefaultScrews()
+    {
+        return new List<GbrFixationScrewDto>
+        {
+            new GbrFixationScrewDto("screw-1", -6.5, -4.2, 2.1, 1.5, 4.0, 2.4, 3.2, true, false),
+            new GbrFixationScrewDto("screw-2", -2.1, -5.0, 1.8, 1.5, 4.0, 2.1, 2.8, true, false),
+            new GbrFixationScrewDto("screw-3", 3.2, -4.8, 2.0, 1.5, 4.0, 2.6, 3.5, true, false),
+            new GbrFixationScrewDto("screw-4", 7.0, -3.9, 2.2, 1.5, 4.0, 2.8, 3.9, true, false)
+        };
     }
 
     private static CamToolpathResultDto GenerateCompliantCamToolpath(LabWorkOrder order, GenerateCamGCodeRequest request)
