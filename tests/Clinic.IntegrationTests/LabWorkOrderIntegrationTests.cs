@@ -1151,6 +1151,92 @@ public class LabWorkOrderIntegrationTests
         Assert.Contains("BR-RPD-02 WARNING", plan.StatusMessage);
         Assert.Contains("LingualPlate", plan.StatusMessage);
     }
+
+    [Fact]
+    public void BR_DSD_01_GetDsdSmilePlan_Returns_Default_Plan()
+    {
+        // Act
+        var result = _controller.GetDsdSmilePlan("lab-seed-03");
+
+        // Assert
+        var okResult = Assert.IsType<OkObjectResult>(result);
+        var plan = Assert.IsType<LabWorkOrderController.DsdSmilePlanDto>(okResult.Value);
+
+        Assert.Equal("lab-seed-03", plan.OrderId);
+        Assert.Equal(8.5, plan.CentralIncisorWidthMm);
+        Assert.Equal(10.5, plan.CentralIncisorLengthMm);
+        Assert.Equal(80.0, plan.TargetWidthToLengthRatio);
+        Assert.True(plan.IsAestheticHarmonized);
+        Assert.Equal(6, plan.Proportions.Count);
+        Assert.Contains(plan.Proportions, p => p.ToothFdi == "11" && p.WidthMm == 8.5);
+        Assert.Contains(plan.Proportions, p => p.ToothFdi == "12" && p.IsGoldenProportionCompliant);
+    }
+
+    [Fact]
+    public void BR_DSD_02_SaveDsdSmilePlan_Compliant_Returns_Approved()
+    {
+        // Arrange: Ideal 80% central incisor ratio (8.8 mm / 11.0 mm)
+        var req = new LabWorkOrderController.SaveDsdSmilePlanRequest(
+            FacialMidlineOffsetMm: 0.2,
+            InterpupillaryAngleDeg: -0.5,
+            SmileArcCurvatureRadiusMm: 44.0,
+            CentralIncisorWidthMm: 8.8,
+            CentralIncisorLengthMm: 11.0,
+            TargetWidthToLengthRatio: 80.0,
+            IsAestheticHarmonized: true,
+            Proportions: null
+        );
+
+        // Act
+        var result = _controller.SaveDsdSmilePlan("lab-seed-02", req);
+
+        // Assert
+        var okResult = Assert.IsType<OkObjectResult>(result);
+        var plan = Assert.IsType<LabWorkOrderController.DsdSmilePlanDto>(okResult.Value);
+
+        Assert.Equal("lab-seed-02", plan.OrderId);
+        Assert.Equal(8.8, plan.CentralIncisorWidthMm);
+        Assert.Equal(11.0, plan.CentralIncisorLengthMm);
+        Assert.True(plan.IsAestheticHarmonized);
+        Assert.Contains("approved", plan.StatusMessage, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void BR_DSD_02_SaveDsdSmilePlan_Deviation_Flags_Warning()
+    {
+        // Arrange: Microdontic lateral incisor #22 with -25% golden ratio deviation
+        var proportionsWithDefect = new List<LabWorkOrderController.DsdToothProportionDto>
+        {
+            new("13", 3.25, 11.0, 29.5, 0.0, true),
+            new("12", 5.25, 9.5, 55.3, 0.0, true),
+            new("11", 8.5, 10.5, 81.0, 0.0, true),
+            new("21", 8.5, 10.5, 81.0, 0.0, true),
+            new("22", 3.9, 9.5, 41.1, -25.7, false), // > 15% deviation
+            new("23", 3.25, 11.0, 29.5, 0.0, true)
+        };
+
+        var req = new LabWorkOrderController.SaveDsdSmilePlanRequest(
+            FacialMidlineOffsetMm: 0.0,
+            InterpupillaryAngleDeg: 0.0,
+            SmileArcCurvatureRadiusMm: 42.0,
+            CentralIncisorWidthMm: 8.5,
+            CentralIncisorLengthMm: 10.5,
+            TargetWidthToLengthRatio: 80.0,
+            IsAestheticHarmonized: null,
+            Proportions: proportionsWithDefect
+        );
+
+        // Act
+        var result = _controller.SaveDsdSmilePlan("lab-seed-01", req);
+
+        // Assert
+        var okResult = Assert.IsType<OkObjectResult>(result);
+        var plan = Assert.IsType<LabWorkOrderController.DsdSmilePlanDto>(okResult.Value);
+
+        Assert.False(plan.IsAestheticHarmonized);
+        Assert.Contains("BR-DSD-02 WARNING", plan.StatusMessage);
+        Assert.Contains("aesthetic veneer mock-up", plan.StatusMessage, StringComparison.OrdinalIgnoreCase);
+    }
 }
 
 
