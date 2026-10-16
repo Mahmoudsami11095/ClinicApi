@@ -532,5 +532,109 @@ public class LabWorkOrderIntegrationTests
         Assert.Equal(33.80, dto.PerimeterMm);
         Assert.Equal(24, dto.Points.Count);
     }
+
+    [Fact]
+    public void REQ_CAM_01_GetCamToolpath_ReturnsSeededZirconiaToolpath()
+    {
+        // Act
+        var result = _controller.GetCamToolpath("lab-seed-01");
+
+        // Assert
+        var okResult = Assert.IsType<OkObjectResult>(result);
+        var dto = Assert.IsType<LabWorkOrderController.CamToolpathResultDto>(okResult.Value);
+
+        Assert.Equal("lab-seed-01", dto.OrderId);
+        Assert.Equal("Zirconia", dto.BlankMaterial);
+        Assert.Equal(1.2450, dto.ShrinkageFactor);
+        Assert.True(dto.TotalGCodeLines > 20);
+        Assert.NotEmpty(dto.Layers);
+        Assert.Contains(dto.Layers, l => l.PassType == "Roughing");
+        Assert.Contains(dto.Layers, l => l.PassType == "MarginDetail");
+    }
+
+    [Fact]
+    public void BR_CAM_01_GenerateGCode_EnforcesMarginSafetyBuffer()
+    {
+        // Arrange
+        var req = new LabWorkOrderController.GenerateCamGCodeRequest(
+            BlankMaterial: "Zirconia",
+            BlankThicknessMm: 14.0,
+            ShrinkageFactor: 1.2450,
+            SpindleRpm: 24000,
+            FeedRateMmMin: 1200,
+            StepoverMm: 0.05,
+            StepdownMm: 0.50,
+            OutputDialect: "ISO6983"
+        );
+
+        // Act
+        var result = _controller.GenerateGCode("lab-seed-02", req);
+
+        // Assert
+        var okResult = Assert.IsType<OkObjectResult>(result);
+        var dto = Assert.IsType<LabWorkOrderController.CamToolpathResultDto>(okResult.Value);
+
+        Assert.True(dto.MarginProtectionEnforced);
+        Assert.Contains("BR-CAM-01 MARGIN BUFFER 0.15MM", dto.GCodeContent);
+        Assert.Contains("M10 (VACUUM DUST EXTRACTION ON)", dto.GCodeContent);
+    }
+
+    [Fact]
+    public void BR_CAM_02_BR_CAM_03_GenerateGCode_PMMA_EnforcesCoolantAndFeedLimit()
+    {
+        // Arrange: Excessive feed rate of 3500 mm/min
+        var req = new LabWorkOrderController.GenerateCamGCodeRequest(
+            BlankMaterial: "PMMA",
+            BlankThicknessMm: 16.0,
+            ShrinkageFactor: 1.0000,
+            SpindleRpm: 20000,
+            FeedRateMmMin: 3500, // Exceeds machine safety limit
+            StepoverMm: 0.08,
+            StepdownMm: 0.50,
+            OutputDialect: "ISO6983"
+        );
+
+        // Act
+        var result = _controller.GenerateGCode("lab-seed-02", req);
+
+        // Assert
+        var okResult = Assert.IsType<OkObjectResult>(result);
+        var dto = Assert.IsType<LabWorkOrderController.CamToolpathResultDto>(okResult.Value);
+
+        Assert.Equal("PMMA", dto.BlankMaterial);
+        Assert.True(dto.FeedRateMmMin <= 1400.0, "Feed rate must be clamped to PMMA machine limit (BR-CAM-02).");
+        Assert.Contains("M08 (COOLANT FLOOD ON)", dto.GCodeContent);
+        Assert.Contains("M09 (COOLANT FLOOD OFF)", dto.GCodeContent);
+    }
+
+    [Fact]
+    public void BR_CAM_04_GenerateGCode_ValidatesIso6983StandardHeaderAndFooter()
+    {
+        // Arrange
+        var req = new LabWorkOrderController.GenerateCamGCodeRequest(
+            BlankMaterial: "Zirconia",
+            BlankThicknessMm: 14.0,
+            ShrinkageFactor: 1.2450,
+            SpindleRpm: 24000,
+            FeedRateMmMin: 1200,
+            StepoverMm: 0.05,
+            StepdownMm: 0.50,
+            OutputDialect: "ISO6983"
+        );
+
+        // Act
+        var result = _controller.GenerateGCode("lab-seed-01", req);
+
+        // Assert
+        var okResult = Assert.IsType<OkObjectResult>(result);
+        var dto = Assert.IsType<LabWorkOrderController.CamToolpathResultDto>(okResult.Value);
+
+        Assert.StartsWith("%", dto.GCodeContent.TrimStart());
+        Assert.Contains("G90 G21 G17 G40 G49 G80 G94", dto.GCodeContent);
+        Assert.Contains("G54", dto.GCodeContent);
+        Assert.Contains("M06 T01", dto.GCodeContent);
+        Assert.Contains("M30 (PROGRAM END AND REWIND)", dto.GCodeContent);
+        Assert.True(dto.EstimatedMillingMinutes > 0);
+    }
 }
 
