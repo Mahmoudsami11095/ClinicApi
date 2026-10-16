@@ -259,4 +259,44 @@ public class LabWorkOrderIntegrationTests
         var badRequest = Assert.IsType<BadRequestObjectResult>(result);
         Assert.NotNull(badRequest.Value);
     }
+
+    [Fact]
+    public void REQ_CAL_01_GetMeasurements_ReturnsSeededMeasurements()
+    {
+        // Act
+        var result = _controller.GetMeasurements("lab-seed-01");
+
+        // Assert
+        var okResult = Assert.IsType<OkObjectResult>(result);
+        var measurements = Assert.IsType<List<LabWorkOrderController.ModelMeasurementDto>>(okResult.Value);
+
+        Assert.NotEmpty(measurements);
+        Assert.Contains(measurements, m => m.Label == "Occlusal Reduction" && m.Unit == "mm");
+    }
+
+    [Fact]
+    public void REQ_CAL_02_SaveMeasurement_ValidDistance_PersistsAndReturnsDto()
+    {
+        // Arrange
+        var req = new LabWorkOrderController.SaveModelMeasurementRequest(
+            Label: "Margin Thickness",
+            Value: 1.45,
+            Unit: "mm",
+            Mode: "distance"
+        );
+
+        // Act
+        var result = _controller.SaveMeasurement("lab-seed-02", req);
+
+        // Assert
+        var okResult = Assert.IsType<OkObjectResult>(result);
+        var dto = Assert.IsType<LabWorkOrderController.ModelMeasurementDto>(okResult.Value);
+
+        Assert.Equal("lab-seed-02", dto.OrderId);
+
+        Assert.Equal("Margin Thickness", dto.Label);
+        Assert.Equal(1.45, dto.Value);
+        Assert.Equal("mm", dto.Unit);
+        Assert.Equal("distance", dto.Mode);
+    }
 }
