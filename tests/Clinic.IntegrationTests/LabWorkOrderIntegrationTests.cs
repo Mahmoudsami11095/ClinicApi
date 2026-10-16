@@ -912,6 +912,78 @@ public class LabWorkOrderIntegrationTests
         Assert.False(dto.IsFusionApproved);
         Assert.Contains("BR-FUSION-03 WARNING", dto.StatusMessage);
     }
+
+    [Fact]
+    public void REQ_ALIGN_01_GetAlignerPlan_Returns_Default_Staging_Plan()
+    {
+        // Act
+        var result = _controller.GetAlignerPlan("lab-seed-03");
+
+        // Assert
+        var okResult = Assert.IsType<OkObjectResult>(result);
+        var plan = Assert.IsType<LabWorkOrderController.AlignerPlanDto>(okResult.Value);
+
+        Assert.Equal("lab-seed-03", plan.OrderId);
+        Assert.Equal(16, plan.TotalStages);
+        Assert.True(plan.IsVelocityCompliant);
+        Assert.True(plan.IsTreatmentApproved);
+        Assert.NotEmpty(plan.Stages);
+    }
+
+    [Fact]
+    public void BR_ALIGN_01_SaveAlignerPlan_Compliant_Velocity_Approves_Plan()
+    {
+        // Arrange
+        var req = new LabWorkOrderController.SaveAlignerPlanRequest(
+            TotalStages: 18,
+            CurrentStage: 1,
+            MaxTranslationDeltaMm: 0.22,
+            MaxRotationDeltaDeg: 1.8,
+            TotalIprMm: 1.5,
+            FoilThicknessMm: 0.75,
+            IsTreatmentApproved: true
+        );
+
+        // Act
+        var result = _controller.SaveAlignerPlan("lab-seed-02", req);
+
+        // Assert
+        var okResult = Assert.IsType<OkObjectResult>(result);
+        var plan = Assert.IsType<LabWorkOrderController.AlignerPlanDto>(okResult.Value);
+
+        Assert.Equal("lab-seed-02", plan.OrderId);
+        Assert.Equal(18, plan.TotalStages);
+        Assert.True(plan.IsVelocityCompliant);
+        Assert.True(plan.IsTreatmentApproved);
+        Assert.Contains("approved", plan.StatusMessage, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void BR_ALIGN_01_SaveAlignerPlan_Velocity_Violation_Subdivides_Stages()
+    {
+        // Arrange: 0.35 mm translation exceeds 0.25 mm physiological limit
+        var req = new LabWorkOrderController.SaveAlignerPlanRequest(
+            TotalStages: 10,
+            CurrentStage: 1,
+            MaxTranslationDeltaMm: 0.35, // Velocity violation (> 0.25 mm)
+            MaxRotationDeltaDeg: 2.5,   // Velocity violation (> 2.0 deg)
+            TotalIprMm: 1.0,
+            FoilThicknessMm: 0.75,
+            IsTreatmentApproved: null
+        );
+
+        // Act
+        var result = _controller.SaveAlignerPlan("lab-seed-01", req);
+
+        // Assert
+        var okResult = Assert.IsType<OkObjectResult>(result);
+        var plan = Assert.IsType<LabWorkOrderController.AlignerPlanDto>(okResult.Value);
+
+        Assert.False(plan.IsVelocityCompliant);
+        Assert.False(plan.IsTreatmentApproved);
+        Assert.True(plan.TotalStages > 10); // Automatically subdivided
+        Assert.Contains("BR-ALIGN-01 WARNING", plan.StatusMessage);
+    }
 }
 
 
