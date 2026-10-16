@@ -15,6 +15,7 @@ public class LabWorkOrderController : ControllerBase
 {
     private static readonly ConcurrentDictionary<string, LabWorkOrder> _ordersByToken = new();
     private static readonly ConcurrentDictionary<string, LabWorkOrder> _ordersById = new();
+    private static readonly ConcurrentDictionary<string, List<ModelMeasurementDto>> _measurementsByOrder = new();
 
     static LabWorkOrderController()
     {
@@ -108,6 +109,12 @@ public class LabWorkOrderController : ControllerBase
 
         _ordersByToken[order3.OrderToken] = order3;
         _ordersById[order3.Id] = order3;
+
+        _measurementsByOrder[order1.Id] = new List<ModelMeasurementDto>
+        {
+            new ModelMeasurementDto("meas-seed-1", order1.Id, "Occlusal Reduction", 1.85, "mm", "distance", DateTime.UtcNow.AddHours(-2)),
+            new ModelMeasurementDto("meas-seed-2", order1.Id, "Axial Convergence", 6.4, "deg", "angle", DateTime.UtcNow.AddHours(-2))
+        };
     }
 
     public record CreateLabWorkOrderRequest(
@@ -196,6 +203,23 @@ public class LabWorkOrderController : ControllerBase
         int MeshPolyCount,
         long ScanFileSize,
         string ModelBoundingBoxMm
+    );
+
+    public record ModelMeasurementDto(
+        string Id,
+        string OrderId,
+        string Label,
+        double Value,
+        string Unit,
+        string Mode,
+        DateTime CreatedAtUtc
+    );
+
+    public record SaveModelMeasurementRequest(
+        string Label,
+        double Value,
+        string? Unit,
+        string? Mode
     );
 
     [HttpGet]
@@ -455,6 +479,64 @@ public class LabWorkOrderController : ControllerBase
             order.ScanFileSize,
             order.ModelBoundingBoxMm
         ));
+    }
+
+    [HttpGet("{id}/measurements")]
+    [HttpGet("/api/labworkorders/{id}/measurements")]
+    [Authorize]
+    public IActionResult GetMeasurements(string id)
+    {
+        var order = _ordersById.Values.FirstOrDefault(o => o.Id == id || o.OrderToken.Equals(id, StringComparison.OrdinalIgnoreCase));
+        if (order == null)
+        {
+            return NotFound(new { message = $"Lab order '{id}' not found." });
+        }
+
+        var list = _measurementsByOrder.GetOrAdd(order.Id, _ => new List<ModelMeasurementDto>
+        {
+            new ModelMeasurementDto($"meas-seed-1", order.Id, "Occlusal Reduction", 1.85, "mm", "distance", DateTime.UtcNow.AddHours(-2)),
+            new ModelMeasurementDto($"meas-seed-2", order.Id, "Axial Convergence", 6.4, "deg", "angle", DateTime.UtcNow.AddHours(-2))
+        });
+
+        lock (list)
+        {
+            return Ok(list.ToList());
+        }
+    }
+
+    [HttpPost("{id}/measurements")]
+    [HttpPost("/api/labworkorders/{id}/measurements")]
+    [Authorize]
+    public IActionResult SaveMeasurement(string id, [FromBody] SaveModelMeasurementRequest request)
+    {
+        var order = _ordersById.Values.FirstOrDefault(o => o.Id == id || o.OrderToken.Equals(id, StringComparison.OrdinalIgnoreCase));
+        if (order == null)
+        {
+            return NotFound(new { message = $"Lab order '{id}' not found." });
+        }
+
+        if (string.IsNullOrWhiteSpace(request.Label))
+        {
+            return BadRequest(new { message = "Measurement label cannot be empty." });
+        }
+
+        var measurement = new ModelMeasurementDto(
+            $"meas-{Guid.NewGuid():N}",
+            order.Id,
+            request.Label,
+            request.Value,
+            request.Unit ?? (request.Mode == "angle" ? "deg" : "mm"),
+            request.Mode ?? "distance",
+            DateTime.UtcNow
+        );
+
+        var list = _measurementsByOrder.GetOrAdd(order.Id, _ => new List<ModelMeasurementDto>());
+        lock (list)
+        {
+            list.Add(measurement);
+        }
+
+        return Ok(measurement);
     }
 
     private static bool IsValid3DMeshSignature(byte[] bytes, out string? format, out int polyCount)
