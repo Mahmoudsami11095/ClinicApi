@@ -17,6 +17,7 @@ public class LabWorkOrderController : ControllerBase
     private static readonly ConcurrentDictionary<string, LabWorkOrder> _ordersById = new();
     private static readonly ConcurrentDictionary<string, List<ModelMeasurementDto>> _measurementsByOrder = new();
     private static readonly ConcurrentDictionary<string, ClearanceHeatmapDto> _heatmapsByOrder = new();
+    private static readonly ConcurrentDictionary<string, ArticulatorSettingsDto> _articulatorsByOrder = new();
 
     static LabWorkOrderController()
     {
@@ -127,6 +128,19 @@ public class LabWorkOrderController : ControllerBase
             true,
             "Zero Undercuts Detected. Optimal Occlusal Reduction.",
             DateTime.UtcNow.AddHours(-1)
+        );
+
+        _articulatorsByOrder[order1.Id] = new ArticulatorSettingsDto(
+            order1.Id,
+            35.0,
+            15.0,
+            0.0,
+            "Centric",
+            0.0,
+            12,
+            false,
+            "Optimal Centric Occlusion. No dynamic interference.",
+            DateTime.UtcNow.AddMinutes(-30)
         );
     }
 
@@ -254,6 +268,30 @@ public class LabWorkOrderController : ControllerBase
         double InsertionTiltMesialDistalDeg,
         double InsertionTiltBuccalLingualDeg,
         bool? IsCompliant,
+        string? StatusMessage
+    );
+
+    public record ArticulatorSettingsDto(
+        string OrderId,
+        double CondylarInclinationDeg,
+        double BennettAngleDeg,
+        double IncisalPinOpeningMm,
+        string ExcursionType,
+        double MaxInterferenceMm,
+        int ActiveContactCount,
+        bool HasInterferenceWarning,
+        string StatusMessage,
+        DateTime EvaluatedAtUtc
+    );
+
+    public record SaveArticulatorSettingsRequest(
+        double CondylarInclinationDeg,
+        double BennettAngleDeg,
+        double IncisalPinOpeningMm,
+        string ExcursionType,
+        double MaxInterferenceMm,
+        int ActiveContactCount,
+        bool? HasInterferenceWarning,
         string? StatusMessage
     );
 
@@ -630,6 +668,66 @@ public class LabWorkOrderController : ControllerBase
 
         _heatmapsByOrder[order.Id] = heatmap;
         return Ok(heatmap);
+    }
+
+    [HttpGet("{id}/articulator")]
+    [HttpGet("/api/labworkorders/{id}/articulator")]
+    [Authorize]
+    public IActionResult GetArticulatorSettings(string id)
+    {
+        var order = _ordersById.Values.FirstOrDefault(o => o.Id == id || o.OrderToken.Equals(id, StringComparison.OrdinalIgnoreCase));
+        if (order == null)
+        {
+            return NotFound(new { message = $"Lab order '{id}' not found." });
+        }
+
+        var settings = _articulatorsByOrder.GetOrAdd(order.Id, _ => new ArticulatorSettingsDto(
+            order.Id,
+            35.0,
+            15.0,
+            0.0,
+            "Centric",
+            0.0,
+            12,
+            false,
+            "Optimal Centric Occlusion. No dynamic interference.",
+            DateTime.UtcNow
+        ));
+
+        return Ok(settings);
+    }
+
+    [HttpPost("{id}/articulator")]
+    [HttpPost("/api/labworkorders/{id}/articulator")]
+    [Authorize]
+    public IActionResult SaveArticulatorSettings(string id, [FromBody] SaveArticulatorSettingsRequest request)
+    {
+        var order = _ordersById.Values.FirstOrDefault(o => o.Id == id || o.OrderToken.Equals(id, StringComparison.OrdinalIgnoreCase));
+        if (order == null)
+        {
+            return NotFound(new { message = $"Lab order '{id}' not found." });
+        }
+
+        var hasWarning = request.HasInterferenceWarning ?? (request.MaxInterferenceMm > 0.05);
+        var status = request.StatusMessage ?? (hasWarning
+            ? $"High-spot premature interference detected ({request.MaxInterferenceMm:F2} mm). Occlusal adjustment advised."
+            : "Articulator kinematic excursion validated. Physiological contact pattern confirmed.");
+
+        var settings = new ArticulatorSettingsDto(
+            order.Id,
+            request.CondylarInclinationDeg,
+            request.BennettAngleDeg,
+            request.IncisalPinOpeningMm,
+            request.ExcursionType ?? "Centric",
+            request.MaxInterferenceMm,
+            request.ActiveContactCount,
+            hasWarning,
+            status,
+            DateTime.UtcNow
+        );
+
+        _articulatorsByOrder[order.Id] = settings;
+        return Ok(settings);
     }
 
     private static bool IsValid3DMeshSignature(byte[] bytes, out string? format, out int polyCount)

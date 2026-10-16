@@ -370,4 +370,78 @@ public class LabWorkOrderIntegrationTests
         Assert.True(dto.IsCompliant);
         Assert.Contains("within clinical tolerance", dto.StatusMessage);
     }
+
+    [Fact]
+    public void REQ_ART_01_GetArticulatorSettings_ReturnsSeedSettings()
+    {
+        // Act
+        var result = _controller.GetArticulatorSettings("lab-seed-01");
+
+        // Assert
+        var okResult = Assert.IsType<OkObjectResult>(result);
+        var dto = Assert.IsType<LabWorkOrderController.ArticulatorSettingsDto>(okResult.Value);
+
+        Assert.Equal("lab-seed-01", dto.OrderId);
+        Assert.Equal(35.0, dto.CondylarInclinationDeg);
+        Assert.Equal(15.0, dto.BennettAngleDeg);
+        Assert.Equal("Centric", dto.ExcursionType);
+        Assert.False(dto.HasInterferenceWarning);
+    }
+
+    [Fact]
+    public void REQ_ART_02_SaveArticulatorSettings_WithPrematureInterference_FlagsWarning()
+    {
+        // Arrange
+        var req = new LabWorkOrderController.SaveArticulatorSettingsRequest(
+            CondylarInclinationDeg: 40.0,
+            BennettAngleDeg: 20.0,
+            IncisalPinOpeningMm: 0.5,
+            ExcursionType: "RightLateral",
+            MaxInterferenceMm: 0.35,
+            ActiveContactCount: 4,
+            HasInterferenceWarning: null,
+            StatusMessage: null
+        );
+
+        // Act
+        var result = _controller.SaveArticulatorSettings("lab-seed-02", req);
+
+        // Assert
+        var okResult = Assert.IsType<OkObjectResult>(result);
+        var dto = Assert.IsType<LabWorkOrderController.ArticulatorSettingsDto>(okResult.Value);
+
+        Assert.Equal("lab-seed-02", dto.OrderId);
+        Assert.Equal("RightLateral", dto.ExcursionType);
+        Assert.Equal(0.35, dto.MaxInterferenceMm);
+        Assert.True(dto.HasInterferenceWarning);
+        Assert.Contains("High-spot premature interference detected", dto.StatusMessage);
+    }
+
+    [Fact]
+    public void REQ_ART_03_SaveArticulatorSettings_OptimalKinematics_ReturnsValidated()
+    {
+        // Arrange
+        var req = new LabWorkOrderController.SaveArticulatorSettingsRequest(
+            CondylarInclinationDeg: 30.0,
+            BennettAngleDeg: 10.0,
+            IncisalPinOpeningMm: 0.0,
+            ExcursionType: "Protrusive",
+            MaxInterferenceMm: 0.02,
+            ActiveContactCount: 8,
+            HasInterferenceWarning: false,
+            StatusMessage: "Protrusive guidance clear."
+        );
+
+        // Act
+        var result = _controller.SaveArticulatorSettings("lab-seed-03", req);
+
+        // Assert
+        var okResult = Assert.IsType<OkObjectResult>(result);
+        var dto = Assert.IsType<LabWorkOrderController.ArticulatorSettingsDto>(okResult.Value);
+
+        Assert.Equal("lab-seed-03", dto.OrderId);
+        Assert.Equal("Protrusive", dto.ExcursionType);
+        Assert.False(dto.HasInterferenceWarning);
+        Assert.Equal("Protrusive guidance clear.", dto.StatusMessage);
+    }
 }
