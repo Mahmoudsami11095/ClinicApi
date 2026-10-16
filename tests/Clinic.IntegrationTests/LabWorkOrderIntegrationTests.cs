@@ -758,6 +758,79 @@ public class LabWorkOrderIntegrationTests
         Assert.Equal(4.4, dto2.SleeveInnerDiameterMm);
         Assert.Equal(9.0, dto2.DrillOffsetMm);
     }
+
+    [Fact]
+    public void GetCrownMorphology_ReturnsDefaultCrownPlan()
+    {
+        // Act: use unmutated order
+        var result = _controller.GetCrownMorphology("lab-seed-02");
+
+        // Assert
+        var okResult = Assert.IsType<OkObjectResult>(result);
+        var dto = Assert.IsType<LabWorkOrderController.CrownMorphologyPlanDto>(okResult.Value);
+
+        Assert.Equal("lab-seed-02", dto.OrderId);
+        Assert.Equal("Incisor", dto.ToothType);
+        Assert.Equal(40, dto.CementSpacerMicrons);
+        Assert.Equal(0.5, dto.MarginCollarMm);
+        Assert.Equal(1.8, dto.OcclusalReductionMm);
+        Assert.False(dto.HasOcclusalWarning);
+        Assert.True(dto.IsRestorationApproved);
+    }
+
+    [Fact]
+    public void BR_CROWN_01_SaveCrownMorphology_EnforcesCementSpacerAndCollar()
+    {
+        // Arrange
+        var req = new LabWorkOrderController.SaveCrownMorphologyRequest(
+            ToothType: "Molar",
+            CementSpacerMicrons: 45,
+            MarginCollarMm: 0.6,
+            OcclusalReductionMm: 1.8,
+            ProximalContactStrength: "Tight",
+            CuspHeightScale: 1.1,
+            IsRestorationApproved: true
+        );
+
+        // Act
+        var result = _controller.SaveCrownMorphology("lab-seed-01", req);
+
+        // Assert
+        var okResult = Assert.IsType<OkObjectResult>(result);
+        var dto = Assert.IsType<LabWorkOrderController.CrownMorphologyPlanDto>(okResult.Value);
+
+        Assert.Equal(45, dto.CementSpacerMicrons);
+        Assert.Equal(0.6, dto.MarginCollarMm);
+        Assert.Equal("Tight", dto.ProximalContactStrength);
+        Assert.False(dto.HasOcclusalWarning);
+        Assert.True(dto.IsRestorationApproved);
+    }
+
+    [Fact]
+    public void BR_CROWN_03_SaveCrownMorphology_EnforcesOcclusalReductionSafetyWarning()
+    {
+        // Arrange: Inadequate occlusal reduction (< 1.5mm for Zirconia)
+        var req = new LabWorkOrderController.SaveCrownMorphologyRequest(
+            ToothType: "Molar",
+            CementSpacerMicrons: 40,
+            MarginCollarMm: 0.5,
+            OcclusalReductionMm: 1.2, // Below 1.5mm threshold
+            ProximalContactStrength: "Normal",
+            CuspHeightScale: 1.0,
+            IsRestorationApproved: null
+        );
+
+        // Act
+        var result = _controller.SaveCrownMorphology("lab-seed-01", req);
+
+        // Assert
+        var okResult = Assert.IsType<OkObjectResult>(result);
+        var dto = Assert.IsType<LabWorkOrderController.CrownMorphologyPlanDto>(okResult.Value);
+
+        Assert.True(dto.HasOcclusalWarning);
+        Assert.False(dto.IsRestorationApproved);
+        Assert.Contains("BR-CROWN-03 WARNING", dto.StatusMessage);
+    }
 }
 
 

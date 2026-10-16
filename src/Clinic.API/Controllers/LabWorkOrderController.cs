@@ -21,6 +21,7 @@ public class LabWorkOrderController : ControllerBase
     private static readonly ConcurrentDictionary<string, MarginLineDto> _marginLinesByOrder = new();
     private static readonly ConcurrentDictionary<string, CamToolpathResultDto> _camToolpathsByOrder = new();
     private static readonly ConcurrentDictionary<string, ImplantSurgicalGuideDto> _surgicalGuidesByOrder = new();
+    private static readonly ConcurrentDictionary<string, CrownMorphologyPlanDto> _crownsByOrder = new();
 
     static LabWorkOrderController()
     {
@@ -434,6 +435,30 @@ public class LabWorkOrderController : ControllerBase
         double? StentWallThicknessMm,
         double? SafetyClearanceMm,
         bool? HasInspectionWindow
+    );
+
+    public record CrownMorphologyPlanDto(
+        string OrderId,
+        string ToothType,
+        int CementSpacerMicrons,
+        double MarginCollarMm,
+        double OcclusalReductionMm,
+        string ProximalContactStrength,
+        double CuspHeightScale,
+        bool IsRestorationApproved,
+        bool HasOcclusalWarning,
+        string StatusMessage,
+        DateTime DesignedAtUtc
+    );
+
+    public record SaveCrownMorphologyRequest(
+        string? ToothType,
+        int? CementSpacerMicrons,
+        double? MarginCollarMm,
+        double? OcclusalReductionMm,
+        string? ProximalContactStrength,
+        double? CuspHeightScale,
+        bool? IsRestorationApproved
     );
 
     [HttpGet]
@@ -1090,6 +1115,84 @@ public class LabWorkOrderController : ControllerBase
             true,
             false,
             $"Default implant surgical guide initialized for Tooth #{order.ToothNumber}. NobelActive master sleeve ⌀5.0 mm, safety clearance 3.4 mm.",
+            DateTime.UtcNow
+        );
+    }
+
+    [HttpGet("{id}/crown")]
+    [HttpGet("/api/labworkorders/{id}/crown")]
+    [Authorize]
+    public IActionResult GetCrownMorphology(string id)
+    {
+        var order = _ordersById.Values.FirstOrDefault(o => o.Id == id || o.OrderToken.Equals(id, StringComparison.OrdinalIgnoreCase));
+        if (order == null)
+        {
+            return NotFound(new { message = $"Lab order '{id}' not found." });
+        }
+
+        var crown = _crownsByOrder.GetOrAdd(order.Id, _ => GenerateDefaultCrownMorphology(order));
+        return Ok(crown);
+    }
+
+    [HttpPost("{id}/crown")]
+    [HttpPost("/api/labworkorders/{id}/crown")]
+    [Authorize]
+    public IActionResult SaveCrownMorphology(string id, [FromBody] SaveCrownMorphologyRequest request)
+    {
+        var order = _ordersById.Values.FirstOrDefault(o => o.Id == id || o.OrderToken.Equals(id, StringComparison.OrdinalIgnoreCase));
+        if (order == null)
+        {
+            return NotFound(new { message = $"Lab order '{id}' not found." });
+        }
+
+        var toothType = string.IsNullOrWhiteSpace(request?.ToothType)
+            ? (order.ToothNumber % 10 >= 6 ? "Molar" : (order.ToothNumber % 10 >= 4 ? "Premolar" : "Incisor"))
+            : request.ToothType;
+        var spacer = Math.Clamp(request?.CementSpacerMicrons ?? 40, 20, 100); // BR-CROWN-01: 20-100 um
+        var collar = Math.Max(0.5, request?.MarginCollarMm ?? 0.5); // Minimum 0.5 mm collar
+        var reduction = Math.Max(1.0, request?.OcclusalReductionMm ?? 1.8);
+        var isZirconia = order.Material?.Contains("Zirconia", StringComparison.OrdinalIgnoreCase) ?? true;
+        var hasWarning = isZirconia && reduction < 1.5; // BR-CROWN-03: >= 1.5mm for Zirconia
+        var contact = string.IsNullOrWhiteSpace(request?.ProximalContactStrength) ? "Normal" : request.ProximalContactStrength;
+        var cuspScale = Math.Clamp(request?.CuspHeightScale ?? 1.0, 0.8, 1.2);
+        var approved = request?.IsRestorationApproved ?? !hasWarning;
+
+        var message = hasWarning
+            ? $"BR-CROWN-03 WARNING: Occlusal reduction ({reduction:F1} mm) is below 1.5 mm minimum required for {order.Material}."
+            : $"Crown morphology auto-designed ({toothType}). Cement spacer {spacer} µm with {collar:F1} mm margin collar. Occlusal reduction: {reduction:F1} mm. Physiological proximal contact: {contact}.";
+
+        var crown = new CrownMorphologyPlanDto(
+            order.Id,
+            toothType,
+            spacer,
+            collar,
+            reduction,
+            contact,
+            cuspScale,
+            approved,
+            hasWarning,
+            message,
+            DateTime.UtcNow
+        );
+
+        _crownsByOrder[order.Id] = crown;
+        return Ok(crown);
+    }
+
+    private static CrownMorphologyPlanDto GenerateDefaultCrownMorphology(LabWorkOrder order)
+    {
+        var toothType = order.ToothNumber % 10 >= 6 ? "Molar" : (order.ToothNumber % 10 >= 4 ? "Premolar" : "Incisor");
+        return new CrownMorphologyPlanDto(
+            order.Id,
+            toothType,
+            40,
+            0.5,
+            1.8,
+            "Normal",
+            1.0,
+            true,
+            false,
+            $"Default crown morphology initialized for Tooth #{order.ToothNumber} ({toothType}). Die cement spacer 40 µm, occlusal reduction 1.8 mm.",
             DateTime.UtcNow
         );
     }
