@@ -23,6 +23,7 @@ public class LabWorkOrderController : ControllerBase
     private static readonly ConcurrentDictionary<string, ImplantSurgicalGuideDto> _surgicalGuidesByOrder = new();
     private static readonly ConcurrentDictionary<string, CrownMorphologyPlanDto> _crownsByOrder = new();
     private static readonly ConcurrentDictionary<string, DualModalityFusionPlanDto> _fusionsByOrder = new();
+    private static readonly ConcurrentDictionary<string, AlignerPlanDto> _alignersByOrder = new();
 
     static LabWorkOrderController()
     {
@@ -496,6 +497,41 @@ public class LabWorkOrderController : ControllerBase
         double? SubsurfaceBoneClearanceMm,
         double? NerveDistanceMm,
         bool? IsFusionApproved
+    );
+
+    public record AlignerStageDto(
+        int StageNumber,
+        double TranslationDeltaMm,
+        double RotationDeltaDeg,
+        bool AttachmentRequired,
+        double IprRequiredMm,
+        int EstimatedDaysWear
+    );
+
+    public record AlignerPlanDto(
+        string OrderId,
+        string PatientId,
+        int TotalStages,
+        int CurrentStage,
+        double MaxTranslationDeltaMm,
+        double MaxRotationDeltaDeg,
+        double TotalIprMm,
+        double FoilThicknessMm,
+        bool IsVelocityCompliant,
+        bool IsTreatmentApproved,
+        string StatusMessage,
+        IReadOnlyList<AlignerStageDto> Stages,
+        DateTime PlannedAtUtc
+    );
+
+    public record SaveAlignerPlanRequest(
+        int? TotalStages,
+        int? CurrentStage,
+        double? MaxTranslationDeltaMm,
+        double? MaxRotationDeltaDeg,
+        double? TotalIprMm,
+        double? FoilThicknessMm,
+        bool? IsTreatmentApproved
     );
 
     [HttpGet]
@@ -1337,6 +1373,119 @@ public class LabWorkOrderController : ControllerBase
             true,
             $"Dual-modality fusion registered (Tooth #{order.ToothNumber}). RMS error: 0.26 mm. Mandibular nerve distance: 3.2 mm.",
             DateTime.UtcNow
+        );
+    }
+
+    [HttpGet("{id}/aligner")]
+    [HttpGet("/api/labworkorders/{id}/aligner")]
+    public IActionResult GetAlignerPlan(string id)
+    {
+        var order = _ordersById.Values.FirstOrDefault(o => o.Id == id || o.OrderToken == id);
+        if (order == null)
+        {
+            return NotFound(new { error = $"Lab order '{id}' not found." });
+        }
+
+        var plan = _alignersByOrder.GetOrAdd(order.Id, _ => GenerateDefaultAlignerPlan(order));
+        return Ok(plan);
+    }
+
+    [HttpPost("{id}/aligner")]
+    [HttpPost("/api/labworkorders/{id}/aligner")]
+    public IActionResult SaveAlignerPlan(string id, [FromBody] SaveAlignerPlanRequest request)
+    {
+        var order = _ordersById.Values.FirstOrDefault(o => o.Id == id || o.OrderToken == id);
+        if (order == null)
+        {
+            return NotFound(new { error = $"Lab order '{id}' not found." });
+        }
+
+        var maxTranslation = request?.MaxTranslationDeltaMm ?? 0.22;
+        var maxRotation = request?.MaxRotationDeltaDeg ?? 1.8;
+
+        // BR-ALIGN-01: Max translation <= 0.25 mm, max rotation <= 2.0 deg
+        var hasVelocityViolation = maxTranslation > 0.25 || maxRotation > 2.0;
+
+        // BR-ALIGN-02: Total stages calculation (clamped between 5 and 45)
+        var totalStages = Math.Clamp(request?.TotalStages ?? 16, 5, 45);
+        if (hasVelocityViolation)
+        {
+            totalStages = Math.Min(45, (int)Math.Ceiling(totalStages * 1.5));
+        }
+
+        var currentStage = Math.Clamp(request?.CurrentStage ?? 1, 1, totalStages);
+        var totalIpr = Math.Max(0.0, request?.TotalIprMm ?? 1.2);
+        var foilThickness = Math.Max(0.5, request?.FoilThicknessMm ?? 0.75);
+
+        var status = hasVelocityViolation
+            ? $"BR-ALIGN-01 WARNING: Velocity limit exceeded (translation: {maxTranslation:F2} mm > 0.25 mm or rotation: {maxRotation:F1}° > 2.0°). Plan subdivided into {totalStages} stages."
+            : $"Clear aligner orthodontic staging approved. Total stages: {totalStages} ({totalStages * 10} days total wear). Velocity compliant.";
+
+        var stagesList = new List<AlignerStageDto>();
+        for (int i = 1; i <= totalStages; i++)
+        {
+            var isAttachment = i >= 3 && i <= 8;
+            var stageIpr = i == 1 ? 0.3 : (i == 4 ? 0.2 : 0.0);
+            stagesList.Add(new AlignerStageDto(
+                StageNumber: i,
+                TranslationDeltaMm: Math.Round(Math.Min(0.24, maxTranslation), 2),
+                RotationDeltaDeg: Math.Round(Math.Min(1.9, maxRotation), 1),
+                AttachmentRequired: isAttachment,
+                IprRequiredMm: stageIpr,
+                EstimatedDaysWear: 10
+            ));
+        }
+
+        var plan = new AlignerPlanDto(
+            OrderId: order.Id,
+            PatientId: order.PatientId,
+            TotalStages: totalStages,
+            CurrentStage: currentStage,
+            MaxTranslationDeltaMm: maxTranslation,
+            MaxRotationDeltaDeg: maxRotation,
+            TotalIprMm: totalIpr,
+            FoilThicknessMm: foilThickness,
+            IsVelocityCompliant: !hasVelocityViolation,
+            IsTreatmentApproved: request?.IsTreatmentApproved ?? !hasVelocityViolation,
+            StatusMessage: status,
+            Stages: stagesList,
+            PlannedAtUtc: DateTime.UtcNow
+        );
+
+        _alignersByOrder[order.Id] = plan;
+        return Ok(plan);
+    }
+
+    private static AlignerPlanDto GenerateDefaultAlignerPlan(LabWorkOrder order)
+    {
+        var totalStages = 16;
+        var stagesList = new List<AlignerStageDto>();
+        for (int i = 1; i <= totalStages; i++)
+        {
+            stagesList.Add(new AlignerStageDto(
+                StageNumber: i,
+                TranslationDeltaMm: 0.20,
+                RotationDeltaDeg: 1.5,
+                AttachmentRequired: i >= 3 && i <= 8,
+                IprRequiredMm: i == 1 ? 0.3 : 0.0,
+                EstimatedDaysWear: 10
+            ));
+        }
+
+        return new AlignerPlanDto(
+            OrderId: order.Id,
+            PatientId: order.PatientId,
+            TotalStages: totalStages,
+            CurrentStage: 1,
+            MaxTranslationDeltaMm: 0.20,
+            MaxRotationDeltaDeg: 1.5,
+            TotalIprMm: 1.2,
+            FoilThicknessMm: 0.75,
+            IsVelocityCompliant: true,
+            IsTreatmentApproved: true,
+            StatusMessage: $"Clear aligner staging plan initialized for Tooth #{order.ToothNumber}. 16 active stages (160 days total treatment).",
+            Stages: stagesList,
+            PlannedAtUtc: DateTime.UtcNow
         );
     }
 
