@@ -1067,6 +1067,90 @@ public class LabWorkOrderIntegrationTests
         Assert.False(plan.IsFabricationApproved);
         Assert.Contains("BR-GBR-03 WARNING", plan.StatusMessage);
     }
+
+    [Fact]
+    public void BR_RPD_01_GetRpdPlan_Returns_Default_Plan()
+    {
+        // Act
+        var result = _controller.GetRpdPlan("lab-seed-01");
+
+        // Assert
+        var okResult = Assert.IsType<OkObjectResult>(result);
+        var plan = Assert.IsType<LabWorkOrderController.RpdSurveyorPlanDto>(okResult.Value);
+
+        Assert.Equal("lab-seed-01", plan.OrderId);
+        Assert.Equal("Mandibular", plan.Arch);
+        Assert.Equal("ClassII", plan.KennedyClassification);
+        Assert.Equal(2.5, plan.TiltBuccolingualDeg);
+        Assert.Equal(-1.5, plan.TiltMesiodistalDeg);
+        Assert.Equal("LingualBar", plan.MajorConnectorType);
+        Assert.Equal(8.5, plan.FloorOfMouthDepthMm);
+        Assert.False(plan.HasTissueImpingementWarning);
+        Assert.True(plan.IsFabricationApproved);
+        Assert.NotEmpty(plan.Clasps);
+        Assert.Contains(plan.Clasps, c => c.ClaspType == "Akers" && c.UndercutDepthMm == 0.25);
+    }
+
+    [Fact]
+    public void BR_RPD_02_SaveRpdPlan_Compliant_Returns_Approved()
+    {
+        // Arrange: Maxillary Class III with Palatal Strap
+        var req = new LabWorkOrderController.SaveRpdPlanRequest(
+            Arch: "Maxillary",
+            KennedyClassification: "ClassIII",
+            TiltBuccolingualDeg: 1.0,
+            TiltMesiodistalDeg: 0.5,
+            MajorConnectorType: "PalatalStrap",
+            MajorConnectorThicknessMm: 1.2,
+            FloorOfMouthDepthMm: 9.0,
+            IsFabricationApproved: true,
+            Clasps: null
+        );
+
+        // Act
+        var result = _controller.SaveRpdPlan("lab-seed-02", req);
+
+        // Assert
+        var okResult = Assert.IsType<OkObjectResult>(result);
+        var plan = Assert.IsType<LabWorkOrderController.RpdSurveyorPlanDto>(okResult.Value);
+
+        Assert.Equal("lab-seed-02", plan.OrderId);
+        Assert.Equal("Maxillary", plan.Arch);
+        Assert.Equal("ClassIII", plan.KennedyClassification);
+        Assert.Equal("PalatalStrap", plan.MajorConnectorType);
+        Assert.False(plan.HasTissueImpingementWarning);
+        Assert.True(plan.IsFabricationApproved);
+        Assert.Contains("approved", plan.StatusMessage, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void BR_RPD_02_SaveRpdPlan_FloorOfMouth_LessThan_7mm_Flags_Impingement()
+    {
+        // Arrange: Mandibular LingualBar with only 5.2 mm depth (< 7.0 mm threshold)
+        var req = new LabWorkOrderController.SaveRpdPlanRequest(
+            Arch: "Mandibular",
+            KennedyClassification: "ClassI",
+            TiltBuccolingualDeg: 2.0,
+            TiltMesiodistalDeg: -1.0,
+            MajorConnectorType: "LingualBar",
+            MajorConnectorThicknessMm: 1.5,
+            FloorOfMouthDepthMm: 5.2, // Contraindicated for LingualBar
+            IsFabricationApproved: null,
+            Clasps: null
+        );
+
+        // Act
+        var result = _controller.SaveRpdPlan("lab-seed-01", req);
+
+        // Assert
+        var okResult = Assert.IsType<OkObjectResult>(result);
+        var plan = Assert.IsType<LabWorkOrderController.RpdSurveyorPlanDto>(okResult.Value);
+
+        Assert.True(plan.HasTissueImpingementWarning);
+        Assert.False(plan.IsFabricationApproved);
+        Assert.Contains("BR-RPD-02 WARNING", plan.StatusMessage);
+        Assert.Contains("LingualPlate", plan.StatusMessage);
+    }
 }
 
 
