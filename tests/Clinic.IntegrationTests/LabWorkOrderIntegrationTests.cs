@@ -444,4 +444,93 @@ public class LabWorkOrderIntegrationTests
         Assert.False(dto.HasInterferenceWarning);
         Assert.Equal("Protrusive guidance clear.", dto.StatusMessage);
     }
+
+    // --- Release v9.4.0 AI Gingival Finish Line & Margin Auto-Tracing Integration Tests ---
+
+    [Fact]
+    public void REQ_MAR_01_GetMarginLine_WhenOrderExists_ReturnsMarginWithNodes()
+    {
+        // Act
+        var result = _controller.GetMarginLine("lab-seed-01");
+
+        // Assert
+        var okResult = Assert.IsType<OkObjectResult>(result);
+        var dto = Assert.IsType<LabWorkOrderController.MarginLineDto>(okResult.Value);
+
+        Assert.Equal("lab-seed-01", dto.OrderId);
+        Assert.Equal("Chamfer", dto.ProfileType);
+        Assert.True(dto.IsClosed);
+        Assert.NotEmpty(dto.Points);
+        Assert.True(dto.Points.Count >= 16);
+    }
+
+    [Fact]
+    public void BR_MAR_02_SaveMarginLine_WhenChamferWidthUnderHalfMm_FlagsWarning()
+    {
+        // Arrange: 0.35 mm width is below 0.50 mm minimum for Zirconia chamfer
+        var points = new List<LabWorkOrderController.MarginPointDto>();
+        for (int i = 0; i < 20; i++)
+        {
+            points.Add(new LabWorkOrderController.MarginPointDto(i * 0.5, 0.1, i * 0.3, i));
+        }
+
+        var req = new LabWorkOrderController.SaveMarginLineRequest(
+            ProfileType: "Chamfer",
+            PerimeterMm: 31.5,
+            AverageWidthMm: 0.35,
+            SmoothingTension: 0.5,
+            IsClosed: true,
+            IsApproved: false,
+            HasMarginWarning: null,
+            StatusMessage: null,
+            Points: points
+        );
+
+        // Act
+        var result = _controller.SaveMarginLine("lab-seed-02", req);
+
+        // Assert
+        var okResult = Assert.IsType<OkObjectResult>(result);
+        var dto = Assert.IsType<LabWorkOrderController.MarginLineDto>(okResult.Value);
+
+        Assert.True(dto.HasMarginWarning);
+        Assert.Contains("below clinical minimum", dto.StatusMessage, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void REQ_MAR_04_SaveMarginLine_WhenCompliantAndApproved_PersistsSuccessfully()
+    {
+        // Arrange: Compliant 0.65 mm chamfer with 24 closed points
+        var points = new List<LabWorkOrderController.MarginPointDto>();
+        for (int i = 0; i < 24; i++)
+        {
+            points.Add(new LabWorkOrderController.MarginPointDto(Math.Cos(i) * 5, 0.2, Math.Sin(i) * 5, i));
+        }
+
+        var req = new LabWorkOrderController.SaveMarginLineRequest(
+            ProfileType: "Chamfer",
+            PerimeterMm: 33.80,
+            AverageWidthMm: 0.65,
+            SmoothingTension: 0.60,
+            IsClosed: true,
+            IsApproved: true,
+            HasMarginWarning: false,
+            StatusMessage: "Clinically certified finish line ready for 5-axis toolpath compilation.",
+            Points: points
+        );
+
+        // Act
+        var result = _controller.SaveMarginLine("lab-seed-03", req);
+
+        // Assert
+        var okResult = Assert.IsType<OkObjectResult>(result);
+        var dto = Assert.IsType<LabWorkOrderController.MarginLineDto>(okResult.Value);
+
+        Assert.Equal("lab-seed-03", dto.OrderId);
+        Assert.True(dto.IsApproved);
+        Assert.False(dto.HasMarginWarning);
+        Assert.Equal(33.80, dto.PerimeterMm);
+        Assert.Equal(24, dto.Points.Count);
+    }
 }
+

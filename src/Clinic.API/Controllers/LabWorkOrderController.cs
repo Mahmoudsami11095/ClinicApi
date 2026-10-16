@@ -18,6 +18,7 @@ public class LabWorkOrderController : ControllerBase
     private static readonly ConcurrentDictionary<string, List<ModelMeasurementDto>> _measurementsByOrder = new();
     private static readonly ConcurrentDictionary<string, ClearanceHeatmapDto> _heatmapsByOrder = new();
     private static readonly ConcurrentDictionary<string, ArticulatorSettingsDto> _articulatorsByOrder = new();
+    private static readonly ConcurrentDictionary<string, MarginLineDto> _marginLinesByOrder = new();
 
     static LabWorkOrderController()
     {
@@ -141,6 +142,32 @@ public class LabWorkOrderController : ControllerBase
             false,
             "Optimal Centric Occlusion. No dynamic interference.",
             DateTime.UtcNow.AddMinutes(-30)
+        );
+
+        var seedPoints = new List<MarginPointDto>();
+        for (int i = 0; i < 24; i++)
+        {
+            double angle = i * (Math.PI * 2 / 24);
+            seedPoints.Add(new MarginPointDto(
+                Math.Cos(angle) * 7.5,
+                0.2 + Math.Sin(angle * 2) * 0.4,
+                Math.Sin(angle) * 6.5,
+                i
+            ));
+        }
+
+        _marginLinesByOrder[order1.Id] = new MarginLineDto(
+            order1.Id,
+            "Chamfer",
+            34.20,
+            0.65,
+            0.50,
+            true,
+            true,
+            false,
+            "Continuous closed margin line validated. Chamfer geometry (0.65 mm) compliant with Zirconia milling requirements.",
+            seedPoints,
+            DateTime.UtcNow.AddMinutes(-15)
         );
     }
 
@@ -293,6 +320,39 @@ public class LabWorkOrderController : ControllerBase
         int ActiveContactCount,
         bool? HasInterferenceWarning,
         string? StatusMessage
+    );
+
+    public record MarginPointDto(
+        double X,
+        double Y,
+        double Z,
+        int Index
+    );
+
+    public record MarginLineDto(
+        string OrderId,
+        string ProfileType,
+        double PerimeterMm,
+        double AverageWidthMm,
+        double SmoothingTension,
+        bool IsClosed,
+        bool IsApproved,
+        bool HasMarginWarning,
+        string StatusMessage,
+        IReadOnlyList<MarginPointDto> Points,
+        DateTime EvaluatedAtUtc
+    );
+
+    public record SaveMarginLineRequest(
+        string ProfileType,
+        double PerimeterMm,
+        double AverageWidthMm,
+        double SmoothingTension,
+        bool IsClosed,
+        bool? IsApproved,
+        bool? HasMarginWarning,
+        string? StatusMessage,
+        List<MarginPointDto>? Points
     );
 
     [HttpGet]
@@ -728,6 +788,105 @@ public class LabWorkOrderController : ControllerBase
 
         _articulatorsByOrder[order.Id] = settings;
         return Ok(settings);
+    }
+
+    [HttpGet("{id}/margin-line")]
+    [HttpGet("/api/labworkorders/{id}/margin-line")]
+    [Authorize]
+    public IActionResult GetMarginLine(string id)
+    {
+        var order = _ordersById.Values.FirstOrDefault(o => o.Id == id || o.OrderToken.Equals(id, StringComparison.OrdinalIgnoreCase));
+        if (order == null)
+        {
+            return NotFound(new { message = $"Lab order '{id}' not found." });
+        }
+
+        var margin = _marginLinesByOrder.GetOrAdd(order.Id, _ =>
+        {
+            var defaultPoints = new List<MarginPointDto>();
+            for (int i = 0; i < 20; i++)
+            {
+                double angle = i * (Math.PI * 2 / 20);
+                defaultPoints.Add(new MarginPointDto(
+                    Math.Cos(angle) * 7.0,
+                    0.0 + Math.Sin(angle * 2) * 0.3,
+                    Math.Sin(angle) * 6.0,
+                    i
+                ));
+            }
+
+            return new MarginLineDto(
+                order.Id,
+                "Chamfer",
+                32.50,
+                0.60,
+                0.50,
+                true,
+                false,
+                false,
+                "Auto-detected closed gingival finish line. Ready for clinical verification.",
+                defaultPoints,
+                DateTime.UtcNow
+            );
+        });
+
+        return Ok(margin);
+    }
+
+    [HttpPost("{id}/margin-line")]
+    [HttpPost("/api/labworkorders/{id}/margin-line")]
+    [Authorize]
+    public IActionResult SaveMarginLine(string id, [FromBody] SaveMarginLineRequest request)
+    {
+        var order = _ordersById.Values.FirstOrDefault(o => o.Id == id || o.OrderToken.Equals(id, StringComparison.OrdinalIgnoreCase));
+        if (order == null)
+        {
+            return NotFound(new { message = $"Lab order '{id}' not found." });
+        }
+
+        var profile = request.ProfileType ?? "Chamfer";
+        var isUnderwidth = profile.Equals("Chamfer", StringComparison.OrdinalIgnoreCase)
+            ? request.AverageWidthMm < 0.50
+            : request.AverageWidthMm < 0.80;
+
+        var points = request.Points ?? new List<MarginPointDto>();
+        var isIncomplete = points.Count < 16 || !request.IsClosed;
+        var hasWarning = request.HasMarginWarning ?? (isUnderwidth || isIncomplete);
+
+        string status;
+        if (request.StatusMessage != null)
+        {
+            status = request.StatusMessage;
+        }
+        else if (isUnderwidth)
+        {
+            status = $"Margin width ({request.AverageWidthMm:F2} mm) is below clinical minimum for {profile} profile. Risk of marginal chipping.";
+        }
+        else if (isIncomplete)
+        {
+            status = "Finish line loop is unclosed or has insufficient node density (<16 points).";
+        }
+        else
+        {
+            status = $"Gingival finish line validated ({profile}, {request.PerimeterMm:F1} mm perimeter). Ready for CAM toolpathing.";
+        }
+
+        var margin = new MarginLineDto(
+            order.Id,
+            profile,
+            request.PerimeterMm,
+            request.AverageWidthMm,
+            request.SmoothingTension,
+            request.IsClosed,
+            request.IsApproved ?? false,
+            hasWarning,
+            status,
+            points,
+            DateTime.UtcNow
+        );
+
+        _marginLinesByOrder[order.Id] = margin;
+        return Ok(margin);
     }
 
     private static bool IsValid3DMeshSignature(byte[] bytes, out string? format, out int polyCount)
