@@ -636,5 +636,128 @@ public class LabWorkOrderIntegrationTests
         Assert.Contains("M30 (PROGRAM END AND REWIND)", dto.GCodeContent);
         Assert.True(dto.EstimatedMillingMinutes > 0);
     }
+
+    [Fact]
+    public void GetSurgicalGuide_ReturnsDefaultNobelActiveConfiguration()
+    {
+        // Act: use pristine order lab-seed-02 to verify default initialization
+        var result = _controller.GetSurgicalGuide("lab-seed-02");
+
+        // Assert
+        var okResult = Assert.IsType<OkObjectResult>(result);
+        var dto = Assert.IsType<LabWorkOrderController.ImplantSurgicalGuideDto>(okResult.Value);
+
+        Assert.Equal("NobelActive", dto.ImplantSystem);
+        Assert.Equal(5.0, dto.SleeveDiameterMm);
+        Assert.Equal(4.2, dto.SleeveInnerDiameterMm);
+        Assert.Equal(9.0, dto.DrillOffsetMm);
+        Assert.Equal(2.5, dto.StentWallThicknessMm);
+        Assert.True(dto.SafetyClearanceMm >= 2.0);
+        Assert.False(dto.HasSafetyWarning);
+        Assert.True(dto.HasInspectionWindow);
+    }
+
+    [Fact]
+    public void BR_SG_01_SaveSurgicalGuide_EnforcesSafetyClearanceWarning()
+    {
+        // Arrange: Clearance drops to 1.2 mm (< 2.0 mm limit)
+        var req = new LabWorkOrderController.SaveImplantSurgicalGuideRequest(
+            ImplantSystem: "NobelActive",
+            SleeveDiameterMm: 5.0,
+            SleeveInnerDiameterMm: 4.2,
+            SleeveHeightMm: 5.0,
+            DrillOffsetMm: 9.0,
+            BuccoLingualAngleDeg: 5.0,
+            MesioDistalAngleDeg: 2.0,
+            StentWallThicknessMm: 2.5,
+            SafetyClearanceMm: 1.2,
+            HasInspectionWindow: true
+        );
+
+        // Act
+        var result = _controller.SaveSurgicalGuide("lab-seed-01", req);
+
+        // Assert
+        var okResult = Assert.IsType<OkObjectResult>(result);
+        var dto = Assert.IsType<LabWorkOrderController.ImplantSurgicalGuideDto>(okResult.Value);
+
+        Assert.True(dto.HasSafetyWarning, "BR-SG-01: Must flag warning when safety clearance is below 2.0 mm.");
+        Assert.Contains("BR-SG-01 WARNING", dto.StatusMessage);
+        Assert.Equal(1.2, dto.SafetyClearanceMm);
+    }
+
+    [Fact]
+    public void BR_SG_02_SaveSurgicalGuide_EnforcesMinimumStentWallThickness()
+    {
+        // Arrange: User requests 1.0 mm (violates 2.5 mm minimum)
+        var req = new LabWorkOrderController.SaveImplantSurgicalGuideRequest(
+            ImplantSystem: "NobelActive",
+            SleeveDiameterMm: 5.0,
+            SleeveInnerDiameterMm: 4.2,
+            SleeveHeightMm: 5.0,
+            DrillOffsetMm: 9.0,
+            BuccoLingualAngleDeg: 0.0,
+            MesioDistalAngleDeg: 0.0,
+            StentWallThicknessMm: 1.0,
+            SafetyClearanceMm: 3.5,
+            HasInspectionWindow: true
+        );
+
+        // Act
+        var result = _controller.SaveSurgicalGuide("lab-seed-01", req);
+
+        // Assert
+        var okResult = Assert.IsType<OkObjectResult>(result);
+        var dto = Assert.IsType<LabWorkOrderController.ImplantSurgicalGuideDto>(okResult.Value);
+
+        Assert.Equal(2.5, dto.StentWallThicknessMm); // Clamped to minimum 2.5 mm
+    }
+
+    [Fact]
+    public void BR_SG_04_SaveSurgicalGuide_AppliesStraumannAndZimmerDimensions()
+    {
+        // Act: Straumann
+        var reqStraumann = new LabWorkOrderController.SaveImplantSurgicalGuideRequest(
+            ImplantSystem: "StraumannBLX",
+            SleeveDiameterMm: null,
+            SleeveInnerDiameterMm: null,
+            SleeveHeightMm: null,
+            DrillOffsetMm: null,
+            BuccoLingualAngleDeg: 3.0,
+            MesioDistalAngleDeg: 1.0,
+            StentWallThicknessMm: 2.8,
+            SafetyClearanceMm: 3.8,
+            HasInspectionWindow: true
+        );
+        var res1 = Assert.IsType<OkObjectResult>(_controller.SaveSurgicalGuide("lab-seed-01", reqStraumann));
+        var dto1 = Assert.IsType<LabWorkOrderController.ImplantSurgicalGuideDto>(res1.Value);
+
+        Assert.Equal("StraumannBLX", dto1.ImplantSystem);
+        Assert.Equal(4.8, dto1.SleeveDiameterMm);
+        Assert.Equal(4.0, dto1.SleeveInnerDiameterMm);
+        Assert.Equal(10.0, dto1.DrillOffsetMm);
+
+        // Act: Zimmer
+        var reqZimmer = new LabWorkOrderController.SaveImplantSurgicalGuideRequest(
+            ImplantSystem: "ZimmerTSV",
+            SleeveDiameterMm: null,
+            SleeveInnerDiameterMm: null,
+            SleeveHeightMm: null,
+            DrillOffsetMm: null,
+            BuccoLingualAngleDeg: 0.0,
+            MesioDistalAngleDeg: 0.0,
+            StentWallThicknessMm: 2.5,
+            SafetyClearanceMm: 4.0,
+            HasInspectionWindow: true
+        );
+        var res2 = Assert.IsType<OkObjectResult>(_controller.SaveSurgicalGuide("lab-seed-01", reqZimmer));
+        var dto2 = Assert.IsType<LabWorkOrderController.ImplantSurgicalGuideDto>(res2.Value);
+
+        Assert.Equal("ZimmerTSV", dto2.ImplantSystem);
+        Assert.Equal(5.2, dto2.SleeveDiameterMm);
+        Assert.Equal(4.4, dto2.SleeveInnerDiameterMm);
+        Assert.Equal(9.0, dto2.DrillOffsetMm);
+    }
 }
+
 
