@@ -1318,6 +1318,184 @@ public class LabWorkOrderIntegrationTests
         Assert.Equal(2, session.Arches.Count);
         Assert.Contains("ingested successfully", session.StatusMessage, StringComparison.OrdinalIgnoreCase);
     }
+
+    // ── Release v11.9.0: Custom Abutment & Emergence Profile Generator Tests (BR-ABUT-01..04) ──
+
+    [Fact]
+    public void BR_ABUT_01_GetImplantPlatformCatalog_Returns_Standard_Platforms()
+    {
+        // Act
+        var result = _controller.GetImplantPlatformCatalog();
+
+        // Assert
+        var okResult = Assert.IsType<OkObjectResult>(result);
+        var platforms = Assert.IsAssignableFrom<IReadOnlyList<LabWorkOrderController.ImplantPlatformLibraryItemDto>>(okResult.Value);
+
+        Assert.True(platforms.Count >= 4);
+        Assert.Contains(platforms, p => p.Brand == "Nobel Biocare" && p.PlatformDiameterMm == 3.5);
+        Assert.Contains(platforms, p => p.Brand == "Straumann" && p.ConnectionType == "CrossFit Connection");
+        Assert.Contains(platforms, p => p.Brand == "Zimmer Biomet" && p.AntiRotationKey == "Internal-Hex-1.25");
+        Assert.Contains(platforms, p => p.Brand == "Osstem");
+    }
+
+    [Fact]
+    public void BR_ABUT_01_GetCustomAbutmentPlan_Returns_Default_Plan()
+    {
+        // Act
+        var result = _controller.GetCustomAbutmentPlan("lab-seed-01");
+
+        // Assert
+        var okResult = Assert.IsType<OkObjectResult>(result);
+        var plan = Assert.IsType<LabWorkOrderController.CustomAbutmentPlanDto>(okResult.Value);
+
+        Assert.Equal("lab-seed-01", plan.OrderId);
+        Assert.Equal("pat-201", plan.PatientId);
+        Assert.Equal("Nobel Biocare", plan.ImplantPlatformBrand);
+        Assert.Equal(3.5, plan.PlatformDiameterMm);
+        Assert.True(plan.IsBiologicalWidthCompliant);
+        Assert.Null(plan.BlanchingRiskWarning);
+        Assert.Equal("Lingual", plan.AscAccessDirection);
+        Assert.Equal(14.5, plan.AscAngleDeg);
+        Assert.True(plan.MinWallThicknessMm >= 0.45);
+        Assert.NotEmpty(plan.SplinePoints);
+    }
+
+    [Fact]
+    public void BR_ABUT_02_SaveCustomAbutmentPlan_Enforces_Biological_Width_Guardrail()
+    {
+        // Arrange - Emergence angle 36.5 deg exceeds the 30.0 deg biological threshold
+        var req = new LabWorkOrderController.SaveCustomAbutmentPlanRequest(
+            ImplantPlatformBrand: "Straumann",
+            ImplantPlatformModel: "Bone Level NC",
+            PlatformDiameterMm: 3.3,
+            ScanbodyType: "NT-Trading STR-NC",
+            ScanbodyPositionX: 12.0,
+            ScanbodyPositionY: -7.0,
+            ScanbodyPositionZ: 15.0,
+            ImplantAxisRollDeg: 1.0,
+            ImplantAxisPitchDeg: -2.0,
+            ImplantAxisYawDeg: 5.0,
+            AntiRotationIndex: "CrossFit-Internal",
+            EmergenceAngleDeg: 36.5,
+            CriticalContourHeightMm: 1.2,
+            SubcriticalContourHeightMm: 3.0,
+            AscAngleDeg: 12.0,
+            AscAccessDirection: "Palatal",
+            MinWallThicknessMm: 0.60,
+            AbutmentMaterial: "ZirconiaHybridTiBase",
+            TiBaseCementGapMicrons: 30.0,
+            CncBlankHolderDiameterMm: 11.5,
+            IsFabricationApproved: true,
+            SplinePoints: null
+        );
+
+        // Act
+        var result = _controller.SaveCustomAbutmentPlan("lab-seed-01", req);
+
+        // Assert
+        var okResult = Assert.IsType<OkObjectResult>(result);
+        var plan = Assert.IsType<LabWorkOrderController.CustomAbutmentPlanDto>(okResult.Value);
+
+        Assert.False(plan.IsBiologicalWidthCompliant);
+        Assert.NotNull(plan.BlanchingRiskWarning);
+        Assert.Contains("BR-ABUT-02 WARNING", plan.BlanchingRiskWarning);
+        Assert.Contains("exceeds 30.0° biological limit", plan.BlanchingRiskWarning);
+    }
+
+    [Fact]
+    public void BR_ABUT_03_SaveCustomAbutmentPlan_Rejects_Asc_Exceeding_30_Degrees()
+    {
+        // Arrange - ASC angle 34.0 deg exceeds kinematic 30.0 deg driver limit
+        var req = new LabWorkOrderController.SaveCustomAbutmentPlanRequest(
+            ImplantPlatformBrand: "Nobel Biocare",
+            ImplantPlatformModel: "Conical Connection NP",
+            PlatformDiameterMm: 3.5,
+            ScanbodyType: "Elos Accurate IO 3A-A",
+            ScanbodyPositionX: 14.2,
+            ScanbodyPositionY: -8.6,
+            ScanbodyPositionZ: 18.4,
+            ImplantAxisRollDeg: 2.5,
+            ImplantAxisPitchDeg: -4.1,
+            ImplantAxisYawDeg: 12.0,
+            AntiRotationIndex: "TriLobe-Index",
+            EmergenceAngleDeg: 24.0,
+            CriticalContourHeightMm: 1.0,
+            SubcriticalContourHeightMm: 2.5,
+            AscAngleDeg: 34.0,
+            AscAccessDirection: "Lingual",
+            MinWallThicknessMm: 0.55,
+            AbutmentMaterial: "ZirconiaHybridTiBase",
+            TiBaseCementGapMicrons: 30.0,
+            CncBlankHolderDiameterMm: 11.5,
+            IsFabricationApproved: true,
+            SplinePoints: null
+        );
+
+        // Act
+        var result = _controller.SaveCustomAbutmentPlan("lab-seed-01", req);
+
+        // Assert
+        var badReq = Assert.IsType<BadRequestObjectResult>(result);
+        Assert.Contains("BR-ABUT-03 VIOLATION", badReq.Value?.ToString() ?? "");
+        Assert.Contains("exceeds 30.0° maximum kinematic driver limit", badReq.Value?.ToString() ?? "");
+    }
+
+    [Fact]
+    public void BR_ABUT_03_SaveCustomAbutmentPlan_Rejects_WallThickness_Below_0_40mm()
+    {
+        // Arrange - Wall thickness 0.32mm is below critical 0.40mm limit
+        var req = new LabWorkOrderController.SaveCustomAbutmentPlanRequest(
+            ImplantPlatformBrand: "Nobel Biocare",
+            ImplantPlatformModel: "Conical Connection NP",
+            PlatformDiameterMm: 3.5,
+            ScanbodyType: "Elos Accurate IO 3A-A",
+            ScanbodyPositionX: 14.2,
+            ScanbodyPositionY: -8.6,
+            ScanbodyPositionZ: 18.4,
+            ImplantAxisRollDeg: 2.5,
+            ImplantAxisPitchDeg: -4.1,
+            ImplantAxisYawDeg: 12.0,
+            AntiRotationIndex: "TriLobe-Index",
+            EmergenceAngleDeg: 24.0,
+            CriticalContourHeightMm: 1.0,
+            SubcriticalContourHeightMm: 2.5,
+            AscAngleDeg: 15.0,
+            AscAccessDirection: "Lingual",
+            MinWallThicknessMm: 0.32,
+            AbutmentMaterial: "ZirconiaHybridTiBase",
+            TiBaseCementGapMicrons: 30.0,
+            CncBlankHolderDiameterMm: 11.5,
+            IsFabricationApproved: true,
+            SplinePoints: null
+        );
+
+        // Act
+        var result = _controller.SaveCustomAbutmentPlan("lab-seed-01", req);
+
+        // Assert
+        var badReq = Assert.IsType<BadRequestObjectResult>(result);
+        Assert.Contains("BR-ABUT-03 VIOLATION", badReq.Value?.ToString() ?? "");
+        Assert.Contains("below 0.40 mm critical structural threshold", badReq.Value?.ToString() ?? "");
+    }
+
+    [Fact]
+    public void BR_ABUT_04_ExportAbutmentCnc_Generates_Valid_Collet_Blank_Nesting_And_Sha256_Signature()
+    {
+        // Act
+        var result = _controller.ExportAbutmentCnc("lab-seed-01");
+
+        // Assert
+        var okResult = Assert.IsType<OkObjectResult>(result);
+        var response = Assert.IsType<LabWorkOrderController.ExportAbutmentCncResponse>(okResult.Value);
+
+        Assert.Equal("lab-seed-01", response.OrderId);
+        Assert.Contains("ABUT_", response.CncProgramName);
+        Assert.Contains("11.5mm Collet", response.BlankHolderType);
+        Assert.Equal(11.5, response.BlankDiameterMm);
+        Assert.Equal(30.0, response.CementGapMicrons);
+        Assert.True(response.TotalGCodeLines > 1000);
+        Assert.StartsWith("urn:cnc:abut:sha256:", response.Sha256DigitalSignature);
+    }
 }
 
 

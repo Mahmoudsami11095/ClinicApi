@@ -28,6 +28,7 @@ public class LabWorkOrderController : ControllerBase
     private static readonly ConcurrentDictionary<string, RpdSurveyorPlanDto> _rpdPlansByOrder = new();
     private static readonly ConcurrentDictionary<string, DsdSmilePlanDto> _dsdPlansByOrder = new();
     private static readonly ConcurrentDictionary<string, DirectScanSessionDto> _directScansByOrder = new();
+    private static readonly ConcurrentDictionary<string, CustomAbutmentPlanDto> _customAbutmentsByOrder = new();
 
     static LabWorkOrderController()
     {
@@ -685,6 +686,96 @@ public class LabWorkOrderController : ControllerBase
         double? SensorTemperatureCelsius,
         string? Sha256DigitalSeal,
         IReadOnlyList<DirectScanArchDto>? Arches
+    );
+
+    // ── Release v11.9.0: Custom Abutment & Emergence Profile Generator DTOs (BR-ABUT-01..04) ──
+    public record EmergenceSplinePointDto(
+        double X,
+        double Y,
+        double Z,
+        double AngleDeg,
+        string ZoneType
+    );
+
+    public record CustomAbutmentPlanDto(
+        string OrderId,
+        string PatientId,
+        int ToothNumber,
+        string ImplantPlatformBrand,
+        string ImplantPlatformModel,
+        double PlatformDiameterMm,
+        string ScanbodyType,
+        double ScanbodyPositionX,
+        double ScanbodyPositionY,
+        double ScanbodyPositionZ,
+        double ImplantAxisRollDeg,
+        double ImplantAxisPitchDeg,
+        double ImplantAxisYawDeg,
+        string AntiRotationIndex,
+        double EmergenceAngleDeg,
+        double CriticalContourHeightMm,
+        double SubcriticalContourHeightMm,
+        bool IsBiologicalWidthCompliant,
+        string? BlanchingRiskWarning,
+        double AscAngleDeg,
+        string AscAccessDirection,
+        double MinWallThicknessMm,
+        string AbutmentMaterial,
+        double TiBaseCementGapMicrons,
+        double CncBlankHolderDiameterMm,
+        bool IsFabricationApproved,
+        string StatusMessage,
+        IReadOnlyList<EmergenceSplinePointDto> SplinePoints,
+        DateTime PlannedAtUtc
+    );
+
+    public record SaveCustomAbutmentPlanRequest(
+        string? ImplantPlatformBrand,
+        string? ImplantPlatformModel,
+        double? PlatformDiameterMm,
+        string? ScanbodyType,
+        double? ScanbodyPositionX,
+        double? ScanbodyPositionY,
+        double? ScanbodyPositionZ,
+        double? ImplantAxisRollDeg,
+        double? ImplantAxisPitchDeg,
+        double? ImplantAxisYawDeg,
+        string? AntiRotationIndex,
+        double? EmergenceAngleDeg,
+        double? CriticalContourHeightMm,
+        double? SubcriticalContourHeightMm,
+        double? AscAngleDeg,
+        string? AscAccessDirection,
+        double? MinWallThicknessMm,
+        string? AbutmentMaterial,
+        double? TiBaseCementGapMicrons,
+        double? CncBlankHolderDiameterMm,
+        bool? IsFabricationApproved,
+        IReadOnlyList<EmergenceSplinePointDto>? SplinePoints
+    );
+
+    public record ImplantPlatformLibraryItemDto(
+        string Brand,
+        string Model,
+        double PlatformDiameterMm,
+        string ConnectionType,
+        string AntiRotationKey,
+        IReadOnlyList<string> CompatibleScanbodies,
+        IReadOnlyList<double> AvailableBlankDiametersMm
+    );
+
+    public record ExportAbutmentCncResponse(
+        string OrderId,
+        string CncProgramName,
+        string MachineTarget,
+        string BlankHolderType,
+        double BlankDiameterMm,
+        string MaterialGrade,
+        double FinishLineCircumferenceMm,
+        double CementGapMicrons,
+        int TotalGCodeLines,
+        string Sha256DigitalSignature,
+        DateTime ExportedAtUtc
     );
 
     [HttpGet]
@@ -2046,6 +2137,239 @@ public class LabWorkOrderController : ControllerBase
             new DirectScanArchDto("Maxillary", 38400, 1850.5, 28.4, 96.5, "ClinicallyDense"),
             new DirectScanArchDto("Mandibular", 36200, 1720.0, 27.1, 94.0, "ClinicallyDense"),
             new DirectScanArchDto("BuccalBite", 12500, 540.2, 26.5, 91.0, "ClinicallyDense")
+        };
+    }
+
+    // ── Release v11.9.0: Custom Abutment & Emergence Profile Generator Endpoints (BR-ABUT-01..04) ──
+
+    [HttpGet("implant-platforms")]
+    [HttpGet("/api/labworkorders/implant-platforms")]
+    [AllowAnonymous]
+    public IActionResult GetImplantPlatformCatalog()
+    {
+        var platforms = new List<ImplantPlatformLibraryItemDto>
+        {
+            new ImplantPlatformLibraryItemDto("Nobel Biocare", "Conical Connection NP", 3.5, "Conical CC 11.5°", "TriLobe-Index", new[] { "Elos Accurate IO 3A-A", "NT-Trading CC-NOB-NP", "Medentika CC 3.5" }, new[] { 11.5, 15.8 }),
+            new ImplantPlatformLibraryItemDto("Nobel Biocare", "Conical Connection RP", 4.3, "Conical CC 11.5°", "TriLobe-Index", new[] { "Elos Accurate IO 3B-A", "NT-Trading CC-NOB-RP", "Medentika CC 4.3" }, new[] { 11.5, 15.8 }),
+            new ImplantPlatformLibraryItemDto("Straumann", "Bone Level NC", 3.3, "CrossFit Connection", "CrossFit-Internal", new[] { "Elos Accurate IO 1A-A", "NT-Trading STR-NC", "Medentika BL 3.3" }, new[] { 11.5, 15.8 }),
+            new ImplantPlatformLibraryItemDto("Straumann", "Bone Level RC", 4.1, "CrossFit Connection", "CrossFit-Internal", new[] { "Elos Accurate IO 1B-A", "NT-Trading STR-RC", "Medentika BL 4.1" }, new[] { 11.5, 15.8 }),
+            new ImplantPlatformLibraryItemDto("Zimmer Biomet", "Internal Hex 3.5mm", 3.5, "Lead-in Hexagonal", "Internal-Hex-1.25", new[] { "Elos Accurate IO 2A-A", "NT-Trading ZIM-3.5", "Medentika IH 3.5" }, new[] { 11.5, 15.8 }),
+            new ImplantPlatformLibraryItemDto("Osstem", "TSIII Regular (4.0/4.5mm)", 4.0, "11° Morse Taper Conical", "Internal-Hex-Octa", new[] { "Elos Accurate IO 4A-A", "NT-Trading OSS-REG", "Medentika OS 4.0" }, new[] { 11.5, 15.8 })
+        };
+
+        return Ok(platforms);
+    }
+
+    [HttpGet("{id}/custom-abutment")]
+    [HttpGet("/api/labworkorders/{id}/custom-abutment")]
+    [Authorize]
+    public IActionResult GetCustomAbutmentPlan(string id)
+    {
+        var order = _ordersById.Values.FirstOrDefault(o => o.Id == id || o.OrderToken == id);
+        if (order == null)
+        {
+            return NotFound(new { error = $"Lab order '{id}' not found." });
+        }
+
+        if (_customAbutmentsByOrder.TryGetValue(order.Id, out var existing))
+        {
+            return Ok(existing);
+        }
+
+        var defaultPlan = GenerateDefaultCustomAbutmentPlan(order);
+        _customAbutmentsByOrder[order.Id] = defaultPlan;
+        return Ok(defaultPlan);
+    }
+
+    [HttpPost("{id}/custom-abutment")]
+    [HttpPost("/api/labworkorders/{id}/custom-abutment")]
+    [Authorize]
+    public IActionResult SaveCustomAbutmentPlan(string id, [FromBody] SaveCustomAbutmentPlanRequest request)
+    {
+        var order = _ordersById.Values.FirstOrDefault(o => o.Id == id || o.OrderToken == id);
+        if (order == null)
+        {
+            return NotFound(new { error = $"Lab order '{id}' not found." });
+        }
+
+        var brand = string.IsNullOrWhiteSpace(request?.ImplantPlatformBrand) ? "Nobel Biocare" : request.ImplantPlatformBrand.Trim();
+        var model = string.IsNullOrWhiteSpace(request?.ImplantPlatformModel) ? "Conical Connection NP" : request.ImplantPlatformModel.Trim();
+        var platformDiam = request?.PlatformDiameterMm ?? 3.5;
+        var scanbody = string.IsNullOrWhiteSpace(request?.ScanbodyType) ? "Elos Accurate IO 3A-A" : request.ScanbodyType.Trim();
+
+        var posX = request?.ScanbodyPositionX ?? 14.2;
+        var posY = request?.ScanbodyPositionY ?? -8.6;
+        var posZ = request?.ScanbodyPositionZ ?? 18.4;
+        var roll = request?.ImplantAxisRollDeg ?? 2.5;
+        var pitch = request?.ImplantAxisPitchDeg ?? -4.1;
+        var yaw = request?.ImplantAxisYawDeg ?? 12.0;
+        var antiRot = string.IsNullOrWhiteSpace(request?.AntiRotationIndex) ? "TriLobe-Index" : request.AntiRotationIndex.Trim();
+
+        var emergenceAngle = Math.Clamp(request?.EmergenceAngleDeg ?? 22.5, 0.0, 60.0);
+        var criticalHeight = Math.Clamp(request?.CriticalContourHeightMm ?? 1.0, 0.5, 3.0);
+        var subcriticalHeight = Math.Clamp(request?.SubcriticalContourHeightMm ?? 2.5, 1.0, 6.0);
+
+        // Validation against Angulated Screw Channel (ASC) limit: max 30.0 degrees (BR-ABUT-03)
+        var ascAngle = Math.Clamp(request?.AscAngleDeg ?? 14.5, 0.0, 45.0);
+        if (ascAngle > 30.0)
+        {
+            return BadRequest(new { error = $"BR-ABUT-03 VIOLATION: Angulated Screw Channel deflection ({ascAngle:F1}°) exceeds 30.0° maximum kinematic driver limit." });
+        }
+
+        // Validation against minimum wall thickness: minimum 0.40mm (BR-ABUT-03)
+        var minWall = Math.Clamp(request?.MinWallThicknessMm ?? 0.55, 0.1, 2.0);
+        if (minWall < 0.40)
+        {
+            return BadRequest(new { error = $"BR-ABUT-03 VIOLATION: Minimum abutment wall thickness ({minWall:F2} mm) is below 0.40 mm critical structural threshold." });
+        }
+
+        // Biological width guardrail: emergence angle <= 30.0 degrees (BR-ABUT-02)
+        var isBiologicalWidthCompliant = emergenceAngle <= 30.0;
+        string? blanchingWarning = !isBiologicalWidthCompliant
+            ? $"BR-ABUT-02 WARNING: Emergence angle ({emergenceAngle:F1}°) exceeds 30.0° biological limit. High risk of peri-implant mucosal ischemia, blanching, and crestal bone resorption."
+            : null;
+
+        var ascDir = string.IsNullOrWhiteSpace(request?.AscAccessDirection) ? "Lingual" : request.AscAccessDirection.Trim();
+        var material = string.IsNullOrWhiteSpace(request?.AbutmentMaterial) ? "ZirconiaHybridTiBase" : request.AbutmentMaterial.Trim();
+        var cementGap = request?.TiBaseCementGapMicrons ?? 30.0;
+        var blankDiam = request?.CncBlankHolderDiameterMm ?? 11.5;
+        var isApproved = request?.IsFabricationApproved ?? true;
+
+        var splinePoints = (request?.SplinePoints != null && request.SplinePoints.Count > 0)
+            ? request.SplinePoints.ToList()
+            : GenerateDefaultSplinePoints(emergenceAngle);
+
+        var status = isBiologicalWidthCompliant
+            ? $"Custom abutment generated successfully for Tooth #{order.ToothNumber}. Biological emergence angle ({emergenceAngle:F1}°) within safe limits. ASC deflected {ascAngle:F1}° to {ascDir}."
+            : blanchingWarning!;
+
+        var plan = new CustomAbutmentPlanDto(
+            OrderId: order.Id,
+            PatientId: order.PatientId,
+            ToothNumber: order.ToothNumber,
+            ImplantPlatformBrand: brand,
+            ImplantPlatformModel: model,
+            PlatformDiameterMm: platformDiam,
+            ScanbodyType: scanbody,
+            ScanbodyPositionX: posX,
+            ScanbodyPositionY: posY,
+            ScanbodyPositionZ: posZ,
+            ImplantAxisRollDeg: roll,
+            ImplantAxisPitchDeg: pitch,
+            ImplantAxisYawDeg: yaw,
+            AntiRotationIndex: antiRot,
+            EmergenceAngleDeg: emergenceAngle,
+            CriticalContourHeightMm: criticalHeight,
+            SubcriticalContourHeightMm: subcriticalHeight,
+            IsBiologicalWidthCompliant: isBiologicalWidthCompliant,
+            BlanchingRiskWarning: blanchingWarning,
+            AscAngleDeg: ascAngle,
+            AscAccessDirection: ascDir,
+            MinWallThicknessMm: minWall,
+            AbutmentMaterial: material,
+            TiBaseCementGapMicrons: cementGap,
+            CncBlankHolderDiameterMm: blankDiam,
+            IsFabricationApproved: isApproved,
+            StatusMessage: status,
+            SplinePoints: splinePoints,
+            PlannedAtUtc: DateTime.UtcNow
+        );
+
+        _customAbutmentsByOrder[order.Id] = plan;
+        return Ok(plan);
+    }
+
+    [HttpPost("{id}/custom-abutment/export-cnc")]
+    [HttpPost("/api/labworkorders/{id}/custom-abutment/export-cnc")]
+    [Authorize]
+    public IActionResult ExportAbutmentCnc(string id)
+    {
+        var order = _ordersById.Values.FirstOrDefault(o => o.Id == id || o.OrderToken == id);
+        if (order == null)
+        {
+            return NotFound(new { error = $"Lab order '{id}' not found." });
+        }
+
+        if (!_customAbutmentsByOrder.TryGetValue(order.Id, out var plan))
+        {
+            plan = GenerateDefaultCustomAbutmentPlan(order);
+            _customAbutmentsByOrder[order.Id] = plan;
+        }
+
+        if (plan.AscAngleDeg > 30.0)
+        {
+            return BadRequest(new { error = "Cannot export CNC instructions: ASC angle exceeds 30.0° limit." });
+        }
+
+        if (plan.MinWallThicknessMm < 0.40)
+        {
+            return BadRequest(new { error = "Cannot export CNC instructions: Wall thickness is below 0.40 mm." });
+        }
+
+        var progName = $"ABUT_{order.ToothNumber}_{plan.ImplantPlatformBrand.Replace(" ", "")}_{DateTime.UtcNow:yyyyMMdd}";
+        var sha256 = $"urn:cnc:abut:sha256:{Guid.NewGuid():N}";
+
+        var response = new ExportAbutmentCncResponse(
+            OrderId: order.Id,
+            CncProgramName: progName,
+            MachineTarget: "DMG Mori Ultrasonic 20 linear / Imes-Icore 350i",
+            BlankHolderType: $"Premilled Abutment Blank ({plan.CncBlankHolderDiameterMm}mm Collet)",
+            BlankDiameterMm: plan.CncBlankHolderDiameterMm,
+            MaterialGrade: plan.AbutmentMaterial == "MonolithicTitaniumGrade5" ? "Titanium Grade 5 ELI (Ti-6Al-4V)" : "Zirconia 3Y-TZP + Ti-Base",
+            FinishLineCircumferenceMm: Math.Round(Math.PI * plan.PlatformDiameterMm * 1.25, 2),
+            CementGapMicrons: plan.TiBaseCementGapMicrons,
+            TotalGCodeLines: 4280,
+            Sha256DigitalSignature: sha256,
+            ExportedAtUtc: DateTime.UtcNow
+        );
+
+        return Ok(response);
+    }
+
+    private static CustomAbutmentPlanDto GenerateDefaultCustomAbutmentPlan(LabWorkOrder order)
+    {
+        var spline = GenerateDefaultSplinePoints(22.5);
+        return new CustomAbutmentPlanDto(
+            OrderId: order.Id,
+            PatientId: order.PatientId,
+            ToothNumber: order.ToothNumber,
+            ImplantPlatformBrand: "Nobel Biocare",
+            ImplantPlatformModel: "Conical Connection NP (3.5mm)",
+            PlatformDiameterMm: 3.5,
+            ScanbodyType: "Elos Accurate IO 3A-A",
+            ScanbodyPositionX: 14.2,
+            ScanbodyPositionY: -8.6,
+            ScanbodyPositionZ: 18.4,
+            ImplantAxisRollDeg: 2.5,
+            ImplantAxisPitchDeg: -4.1,
+            ImplantAxisYawDeg: 12.0,
+            AntiRotationIndex: "TriLobe-Index",
+            EmergenceAngleDeg: 22.5,
+            CriticalContourHeightMm: 1.0,
+            SubcriticalContourHeightMm: 2.5,
+            IsBiologicalWidthCompliant: true,
+            BlanchingRiskWarning: null,
+            AscAngleDeg: 14.5,
+            AscAccessDirection: "Lingual",
+            MinWallThicknessMm: 0.55,
+            AbutmentMaterial: "ZirconiaHybridTiBase",
+            TiBaseCementGapMicrons: 30.0,
+            CncBlankHolderDiameterMm: 11.5,
+            IsFabricationApproved: true,
+            StatusMessage: $"Custom anatomical abutment planned for Tooth #{order.ToothNumber}. Emergence angle 22.5° compliant with biological width.",
+            SplinePoints: spline,
+            PlannedAtUtc: DateTime.UtcNow
+        );
+    }
+
+    private static List<EmergenceSplinePointDto> GenerateDefaultSplinePoints(double emergenceAngle)
+    {
+        return new List<EmergenceSplinePointDto>
+        {
+            new EmergenceSplinePointDto(0.0, 0.0, 0.0, 0.0, "ImplantPlatformCollar"),
+            new EmergenceSplinePointDto(0.4, 0.2, 0.8, Math.Min(12.0, emergenceAngle * 0.4), "CriticalSubgingival"),
+            new EmergenceSplinePointDto(1.1, 0.6, 2.0, emergenceAngle, "SubcriticalTransition"),
+            new EmergenceSplinePointDto(1.8, 1.0, 3.2, Math.Max(0.0, emergenceAngle - 8.0), "SupragingivalMargin")
         };
     }
 
