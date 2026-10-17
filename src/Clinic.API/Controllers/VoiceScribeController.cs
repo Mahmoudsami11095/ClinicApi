@@ -19,7 +19,7 @@ public class VoiceScribeController : ControllerBase
     }
 
     [HttpPost("analyze")]
-    public async Task<IActionResult> AnalyzeAudio([FromForm] IFormFile? audio)
+    public async Task<IActionResult> AnalyzeAudio(IFormFile? audio)
     {
         // In reality, this endpoint would stream the audio chunk or IFormFile to the AI Service.
         // For development/simulation, we accept it (even if null) and return the mock structure.

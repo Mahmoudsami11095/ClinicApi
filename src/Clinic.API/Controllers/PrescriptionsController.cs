@@ -103,7 +103,7 @@ public class PrescriptionsController : ControllerBase
     }
 
     /// <summary>
-    /// BR-RX-02: Prescription Immutability & Audit Lock
+    /// BR-RX-02: Prescription Immutability &amp; Audit Lock
     /// Once finalized, editing medications or details is forbidden.
     /// </summary>
     [HttpPut("{id}")]

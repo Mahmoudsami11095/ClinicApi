@@ -2,6 +2,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Clinic.Domain\Clinic.Domain.csproj" />
+    <ProjectReference Include="..\Clinic.Contracts\Clinic.Contracts.csproj" />
   </ItemGroup>
 
   <ItemGroup>
@@ -12,6 +13,8 @@
     <TargetFramework>net9.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <NoWarn>$(NoWarn);1591</NoWarn>
   </PropertyGroup>
 
 </Project>

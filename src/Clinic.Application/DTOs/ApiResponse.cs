@@ -1,24 +1,21 @@
+using Clinic.Contracts.Common;
+
 namespace Clinic.Application.DTOs;
 
-public class ApiResponse<T>
+public class ApiResponse<T> : Clinic.Contracts.Common.ApiResponse<T>
 {
-    public string Message { get; set; } = string.Empty;
-    public T? Data { get; set; }
-
-    public static ApiResponse<T> Success(T data, string message = "Success")
+    public new static ApiResponse<T> Success(T data, string message = "Success")
         => new() { Data = data, Message = message };
 
-    public static ApiResponse<T> Fail(string message)
+    public new static ApiResponse<T> Fail(string message)
         => new() { Message = message };
 }
 
-public class ApiResponse
+public class ApiResponse : Clinic.Contracts.Common.ApiResponse
 {
-    public string Message { get; set; } = string.Empty;
-
-    public static ApiResponse Success(string message = "Success")
+    public new static ApiResponse Success(string message = "Success")
         => new() { Message = message };
 
-    public static ApiResponse Fail(string message)
+    public new static ApiResponse Fail(string message)
         => new() { Message = message };
 }

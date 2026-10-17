@@ -233,7 +233,7 @@ public class SubscriptionsController : ControllerBase
     }
 
     [HttpPost("upload-receipt")]
-    public async Task<IActionResult> UploadReceipt([FromForm] IFormFile file)
+    public async Task<IActionResult> UploadReceipt(IFormFile file)
     {
         if (file == null || file.Length == 0)
             return BadRequest(new { message = "Receipt file is required." });
