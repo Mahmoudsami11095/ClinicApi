@@ -3,6 +3,7 @@ using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Security.Claims;
+using Clinic.Application.DTOs;
 using Clinic.Domain.Entities;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -29,6 +30,7 @@ public class LabWorkOrderController : ControllerBase
     private static readonly ConcurrentDictionary<string, DsdSmilePlanDto> _dsdPlansByOrder = new();
     private static readonly ConcurrentDictionary<string, DirectScanSessionDto> _directScansByOrder = new();
     private static readonly ConcurrentDictionary<string, CustomAbutmentPlanDto> _customAbutmentsByOrder = new();
+    private static readonly ConcurrentDictionary<string, SurgicalNavigationPlanDto> _surgicalNavPlansByOrder = new();
 
     static LabWorkOrderController()
     {
@@ -2324,6 +2326,231 @@ public class LabWorkOrderController : ControllerBase
         );
 
         return Ok(response);
+    }
+
+    [HttpGet("{id}/surgical-navigation")]
+    [HttpGet("/api/labworkorders/{id}/surgical-navigation")]
+    [Authorize]
+    public IActionResult GetSurgicalNavigationPlan(string id)
+    {
+        var order = _ordersById.Values.FirstOrDefault(o => o.Id == id || o.OrderToken == id);
+        if (order == null)
+        {
+            return NotFound(new { error = $"Lab order '{id}' not found." });
+        }
+
+        var plan = _surgicalNavPlansByOrder.GetOrAdd(order.Id, _ => GenerateDefaultSurgicalNavigationPlan(order));
+        return Ok(plan);
+    }
+
+    [HttpPost("{id}/surgical-navigation")]
+    [HttpPost("/api/labworkorders/{id}/surgical-navigation")]
+    [Authorize]
+    public IActionResult SaveSurgicalNavigationPlan(string id, [FromBody] SaveSurgicalNavigationRequest request)
+    {
+        var order = _ordersById.Values.FirstOrDefault(o => o.Id == id || o.OrderToken == id);
+        if (order == null)
+        {
+            return NotFound(new { error = $"Lab order '{id}' not found." });
+        }
+
+        var minVitalDistance = Math.Min(request.DistanceToNerveMm, request.DistanceToSinusMm);
+        var targetDepth = request.PlannedLengthMm;
+        var safetyBuffer = Math.Round(minVitalDistance - targetDepth, 2);
+        var isSafetyCompliant = safetyBuffer >= 2.0;
+        string? safetyWarning = !isSafetyCompliant
+            ? $"Safety buffer of {safetyBuffer:F2}mm is below the mandated 2.00mm threshold."
+            : null;
+
+        var isRegValid = request.RegistrationRmseMm < 0.50;
+
+        var existingPlan = _surgicalNavPlansByOrder.TryGetValue(order.Id, out var prev) ? prev : GenerateDefaultSurgicalNavigationPlan(order);
+
+        var updatedPlan = new SurgicalNavigationPlanDto(
+            OrderId: order.Id,
+            ToothNumber: request.ToothNumber > 0 ? request.ToothNumber : order.ToothNumber,
+            ImplantBrand: string.IsNullOrWhiteSpace(request.ImplantBrand) ? existingPlan.ImplantBrand : request.ImplantBrand,
+            ImplantModel: string.IsNullOrWhiteSpace(request.ImplantModel) ? existingPlan.ImplantModel : request.ImplantModel,
+            PlannedLengthMm: request.PlannedLengthMm > 0 ? request.PlannedLengthMm : existingPlan.PlannedLengthMm,
+            PlannedDiameterMm: request.PlannedDiameterMm > 0 ? request.PlannedDiameterMm : existingPlan.PlannedDiameterMm,
+            PlannedEntryX: existingPlan.PlannedEntryX,
+            PlannedEntryY: existingPlan.PlannedEntryY,
+            PlannedEntryZ: existingPlan.PlannedEntryZ,
+            PlannedApexX: existingPlan.PlannedApexX,
+            PlannedApexY: existingPlan.PlannedApexY,
+            PlannedApexZ: existingPlan.PlannedEntryZ - (request.PlannedLengthMm > 0 ? request.PlannedLengthMm : existingPlan.PlannedLengthMm),
+            TargetDepthMm: targetDepth,
+            DistanceToNerveMm: request.DistanceToNerveMm,
+            DistanceToSinusMm: request.DistanceToSinusMm,
+            SafetyBufferMm: safetyBuffer,
+            IsSafetyBufferCompliant: isSafetyCompliant,
+            SafetyWarning: safetyWarning,
+            RegistrationRmseMm: request.RegistrationRmseMm,
+            IsRegistrationValid: isRegValid,
+            DrillSequences: GenerateStandardDrillSequence(targetDepth, request.PlannedDiameterMm > 0 ? request.PlannedDiameterMm : existingPlan.PlannedDiameterMm),
+            StatusMessage: isSafetyCompliant 
+                ? $"Implant surgical plan active. Safety buffer {safetyBuffer:F2}mm compliant (>= 2.00mm)."
+                : $"WARNING: Safety buffer {safetyBuffer:F2}mm is below 2.00mm clinical margin.",
+            PlannedAtUtc: DateTime.UtcNow
+        );
+
+        _surgicalNavPlansByOrder[order.Id] = updatedPlan;
+        return Ok(updatedPlan);
+    }
+
+    [HttpPost("{id}/surgical-navigation/evaluate-telemetry")]
+    [HttpPost("/api/labworkorders/{id}/surgical-navigation/evaluate-telemetry")]
+    [Authorize]
+    public IActionResult EvaluateDrillTelemetry(string id, [FromBody] EvaluateDrillTelemetryRequest request)
+    {
+        var order = _ordersById.Values.FirstOrDefault(o => o.Id == id || o.OrderToken == id);
+        if (order == null)
+        {
+            return NotFound(new { error = $"Lab order '{id}' not found." });
+        }
+
+        var plan = _surgicalNavPlansByOrder.GetOrAdd(order.Id, _ => GenerateDefaultSurgicalNavigationPlan(order));
+
+        // Planned vector points along -Z from entry to apex
+        var planVx = plan.PlannedApexX - plan.PlannedEntryX;
+        var planVy = plan.PlannedApexY - plan.PlannedEntryY;
+        var planVz = plan.PlannedApexZ - plan.PlannedEntryZ;
+        var planMag = Math.Sqrt(planVx * planVx + planVy * planVy + planVz * planVz);
+        if (planMag < 0.0001) { planVz = -1.0; planMag = 1.0; }
+        var uPlanX = planVx / planMag;
+        var uPlanY = planVy / planMag;
+        var uPlanZ = planVz / planMag;
+
+        // Handpiece axis unit vector
+        var hpVx = request.AxisVectorX;
+        var hpVy = request.AxisVectorY;
+        var hpVz = request.AxisVectorZ;
+        var hpMag = Math.Sqrt(hpVx * hpVx + hpVy * hpVy + hpVz * hpVz);
+        if (hpMag < 0.0001) { hpVz = -1.0; hpMag = 1.0; }
+        var uHpX = hpVx / hpMag;
+        var uHpY = hpVy / hpMag;
+        var uHpZ = hpVz / hpMag;
+
+        // Angular deviation calculation
+        var dot = (uPlanX * uHpX) + (uPlanY * uHpY) + (uPlanZ * uHpZ);
+        var clampedDot = Math.Clamp(dot, -1.0, 1.0);
+        var angleDeg = Math.Round(Math.Acos(clampedDot) * (180.0 / Math.PI), 2);
+
+        var isOnAxis = angleDeg <= 1.50;
+        var isCautionAxis = angleDeg > 1.50 && angleDeg <= 3.00;
+        var isOffAxisHazard = angleDeg > 3.00;
+
+        // Drill depth along planned vector relative to entry
+        var dX = request.TipPositionX - plan.PlannedEntryX;
+        var dY = request.TipPositionY - plan.PlannedEntryY;
+        var dZ = request.TipPositionZ - plan.PlannedEntryZ;
+        var projDepth = (dX * uPlanX) + (dY * uPlanY) + (dZ * uPlanZ);
+        var currentDepth = Math.Round(Math.Max(0.0, projDepth), 2);
+
+        var minVitalInitial = Math.Min(plan.DistanceToNerveMm, plan.DistanceToSinusMm);
+        var currentDistanceToVital = Math.Round(Math.Max(0.0, minVitalInitial - currentDepth), 2);
+
+        var isSafetyStop = currentDistanceToVital < 1.50 || currentDepth > (plan.TargetDepthMm + 0.50);
+
+        int acousticFreq;
+        string acousticAlertMode;
+        string statusMessage;
+
+        if (isSafetyStop)
+        {
+            acousticFreq = 1500;
+            acousticAlertMode = "Continuous1500";
+            statusMessage = $"EMERGENCY DRILL STOP ENGAGED: Vital structure proximity ({currentDistanceToVital:F2}mm < 1.50mm) or depth exceeded.";
+        }
+        else if (currentDistanceToVital <= 3.00 || currentDepth >= plan.TargetDepthMm)
+        {
+            acousticFreq = 880;
+            acousticAlertMode = "Pulse880";
+            statusMessage = $"CAUTION: Approaching vital structure or target depth ({currentDepth:F2}mm / {plan.TargetDepthMm:F2}mm).";
+        }
+        else if (currentDepth > 1.0)
+        {
+            acousticFreq = 440;
+            acousticAlertMode = "Pulse440";
+            statusMessage = $"ACTIVE GUIDANCE: Depth {currentDepth:F2}mm, trajectory deviation {angleDeg:F1}°.";
+        }
+        else
+        {
+            acousticFreq = 0;
+            acousticAlertMode = "Silent";
+            statusMessage = "Handpiece positioned at osteotomy entry point.";
+        }
+
+        var telemetry = new HandpieceTrackingTelemetryDto(
+            OrderId: order.Id,
+            TipPositionX: request.TipPositionX,
+            TipPositionY: request.TipPositionY,
+            TipPositionZ: request.TipPositionZ,
+            AxisVectorX: uHpX,
+            AxisVectorY: uHpY,
+            AxisVectorZ: uHpZ,
+            CurrentDepthMm: currentDepth,
+            AngularDeviationDeg: angleDeg,
+            IsOnAxis: isOnAxis,
+            IsCautionAxis: isCautionAxis,
+            IsOffAxisHazard: isOffAxisHazard,
+            CurrentDistanceToVitalMm: currentDistanceToVital,
+            IsSafetyStopEngaged: isSafetyStop,
+            AcousticFrequencyHz: acousticFreq,
+            AcousticAlertMode: acousticAlertMode,
+            StatusMessage: statusMessage,
+            EvaluatedAtUtc: DateTime.UtcNow
+        );
+
+        return Ok(telemetry);
+    }
+
+    private static SurgicalNavigationPlanDto GenerateDefaultSurgicalNavigationPlan(LabWorkOrder order)
+    {
+        var targetDepth = 11.5;
+        var plannedDiameter = 4.2;
+        var distanceToNerve = 14.5;
+        var distanceToSinus = 24.0;
+        var safetyBuffer = Math.Round(Math.Min(distanceToNerve, distanceToSinus) - targetDepth, 2);
+
+        return new SurgicalNavigationPlanDto(
+            OrderId: order.Id,
+            ToothNumber: order.ToothNumber,
+            ImplantBrand: "Straumann",
+            ImplantModel: "BLX Roxolid SLActive Ø4.2x11.5mm",
+            PlannedLengthMm: targetDepth,
+            PlannedDiameterMm: plannedDiameter,
+            PlannedEntryX: 12.0,
+            PlannedEntryY: -6.5,
+            PlannedEntryZ: 15.0,
+            PlannedApexX: 12.0,
+            PlannedApexY: -6.5,
+            PlannedApexZ: 15.0 - targetDepth,
+            TargetDepthMm: targetDepth,
+            DistanceToNerveMm: distanceToNerve,
+            DistanceToSinusMm: distanceToSinus,
+            SafetyBufferMm: safetyBuffer,
+            IsSafetyBufferCompliant: safetyBuffer >= 2.0,
+            SafetyWarning: safetyBuffer < 2.0 ? $"Safety buffer {safetyBuffer:F2}mm is below 2.00mm threshold." : null,
+            RegistrationRmseMm: 0.28,
+            IsRegistrationValid: true,
+            DrillSequences: GenerateStandardDrillSequence(targetDepth, plannedDiameter),
+            StatusMessage: $"Dynamic surgical navigation plan initialized for Tooth #{order.ToothNumber}. Safety buffer {safetyBuffer:F2}mm compliant.",
+            PlannedAtUtc: DateTime.UtcNow
+        );
+    }
+
+    private static List<SurgicalDrillStepDto> GenerateStandardDrillSequence(double targetDepth, double finalDiameter)
+    {
+        return new List<SurgicalDrillStepDto>
+        {
+            new SurgicalDrillStepDto(1, "Round Cortical Bur Ø2.0mm", 2.0, 15.0, 2.0, 1200, 35, "External Saline 50mL/min", "Completed"),
+            new SurgicalDrillStepDto(2, "Pilot Drill Ø2.2mm", 2.2, 20.0, targetDepth, 800, 35, "Internal/External Saline 50mL/min", "Active"),
+            new SurgicalDrillStepDto(3, "Twist Drill Ø2.8mm", 2.8, 20.0, targetDepth, 800, 35, "Internal/External Saline 50mL/min", "Pending"),
+            new SurgicalDrillStepDto(4, $"Form Drill Ø{Math.Min(3.5, finalDiameter):F1}mm", Math.Min(3.5, finalDiameter), 20.0, targetDepth, 600, 40, "Internal/External Saline 50mL/min", "Pending"),
+            new SurgicalDrillStepDto(5, $"Final Osteotomy Drill Ø{finalDiameter:F1}mm", finalDiameter, 20.0, targetDepth, 500, 45, "Internal/External Saline 50mL/min", "Pending"),
+            new SurgicalDrillStepDto(6, $"Implant Insertion Ø{finalDiameter:F1}x{targetDepth:F1}mm", finalDiameter, targetDepth, targetDepth, 25, 50, "None", "Pending")
+        };
     }
 
     private static CustomAbutmentPlanDto GenerateDefaultCustomAbutmentPlan(LabWorkOrder order)

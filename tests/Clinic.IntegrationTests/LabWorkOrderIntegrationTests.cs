@@ -1,6 +1,7 @@
 using System;
 using System.Security.Claims;
 using Clinic.API.Controllers;
+using Clinic.Application.DTOs;
 using Clinic.Domain.Entities;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
@@ -1495,6 +1496,138 @@ public class LabWorkOrderIntegrationTests
         Assert.Equal(30.0, response.CementGapMicrons);
         Assert.True(response.TotalGCodeLines > 1000);
         Assert.StartsWith("urn:cnc:abut:sha256:", response.Sha256DigitalSignature);
+    }
+
+    [Fact]
+    public void BR_NAV_01_GetSurgicalNavigationPlan_ReturnsDefaultCompliantPlan()
+    {
+        // Act
+        var result = _controller.GetSurgicalNavigationPlan("lab-seed-01");
+
+        // Assert
+        var okResult = Assert.IsType<OkObjectResult>(result);
+        var plan = Assert.IsType<SurgicalNavigationPlanDto>(okResult.Value);
+
+        Assert.Equal("lab-seed-01", plan.OrderId);
+        Assert.Equal(36, plan.ToothNumber);
+        Assert.Equal(11.5, plan.PlannedLengthMm);
+        Assert.Equal(4.2, plan.PlannedDiameterMm);
+        Assert.True(plan.IsSafetyBufferCompliant);
+        Assert.True(plan.RegistrationRmseMm < 0.50);
+        Assert.True(plan.IsRegistrationValid);
+        Assert.NotEmpty(plan.DrillSequences);
+    }
+
+    [Fact]
+    public void BR_NAV_02_SaveSurgicalNavigationPlan_EnforcesSafetyBufferThreshold()
+    {
+        // Arrange - set nerve distance too close to planned length (buffer = 12.0 - 11.5 = 0.5mm < 2.0mm)
+        var request = new SaveSurgicalNavigationRequest(
+            ToothNumber: 36,
+            ImplantBrand: "Straumann",
+            ImplantModel: "BLX Ø4.2x11.5mm",
+            PlannedLengthMm: 11.5,
+            PlannedDiameterMm: 4.2,
+            DistanceToNerveMm: 12.0,
+            DistanceToSinusMm: 24.0,
+            RegistrationRmseMm: 0.25
+        );
+
+        // Act
+        var result = _controller.SaveSurgicalNavigationPlan("lab-seed-01", request);
+
+        // Assert
+        var okResult = Assert.IsType<OkObjectResult>(result);
+        var plan = Assert.IsType<SurgicalNavigationPlanDto>(okResult.Value);
+
+        Assert.False(plan.IsSafetyBufferCompliant);
+        Assert.NotNull(plan.SafetyWarning);
+        Assert.Contains("below the mandated 2.00mm threshold", plan.SafetyWarning);
+        Assert.Equal(0.5, plan.SafetyBufferMm);
+    }
+
+    [Fact]
+    public void BR_NAV_03_EvaluateDrillTelemetry_CalculatesAngularDeviationAndAlignmentFlags()
+    {
+        // Arrange - handpiece aligned along -Z (0, 0, -1) matching planned trajectory
+        var alignedRequest = new EvaluateDrillTelemetryRequest(
+            TipPositionX: 12.0,
+            TipPositionY: -6.5,
+            TipPositionZ: 14.0,
+            AxisVectorX: 0.0,
+            AxisVectorY: 0.0,
+            AxisVectorZ: -1.0
+        );
+
+        // Act
+        var alignedResult = _controller.EvaluateDrillTelemetry("lab-seed-01", alignedRequest);
+
+        // Assert
+        var okResult = Assert.IsType<OkObjectResult>(alignedResult);
+        var telemetry = Assert.IsType<HandpieceTrackingTelemetryDto>(okResult.Value);
+
+        Assert.True(telemetry.IsOnAxis);
+        Assert.False(telemetry.IsCautionAxis);
+        Assert.False(telemetry.IsOffAxisHazard);
+        Assert.True(telemetry.AngularDeviationDeg <= 1.50);
+
+        // Arrange - handpiece tilted by ~5.7 degrees (sin = 0.1, cos = -0.995)
+        var tiltedRequest = new EvaluateDrillTelemetryRequest(
+            TipPositionX: 12.0,
+            TipPositionY: -6.5,
+            TipPositionZ: 14.0,
+            AxisVectorX: 0.1,
+            AxisVectorY: 0.0,
+            AxisVectorZ: -0.995
+        );
+
+        var tiltedResult = _controller.EvaluateDrillTelemetry("lab-seed-01", tiltedRequest);
+        var tiltedOk = Assert.IsType<OkObjectResult>(tiltedResult);
+        var tiltedTelemetry = Assert.IsType<HandpieceTrackingTelemetryDto>(tiltedOk.Value);
+
+        Assert.True(tiltedTelemetry.AngularDeviationDeg > 3.0);
+        Assert.True(tiltedTelemetry.IsOffAxisHazard);
+        Assert.False(tiltedTelemetry.IsOnAxis);
+    }
+
+    [Fact]
+    public void BR_NAV_04_EvaluateDrillTelemetry_TriggersEmergencySafetyStopWhenVitalProximityViolated()
+    {
+        // Ensure plan is reset to default with distanceToNerve = 14.5
+        var resetReq = new SaveSurgicalNavigationRequest(
+            ToothNumber: 36,
+            ImplantBrand: "Straumann",
+            ImplantModel: "BLX",
+            PlannedLengthMm: 11.5,
+            PlannedDiameterMm: 4.2,
+            DistanceToNerveMm: 14.5,
+            DistanceToSinusMm: 24.0,
+            RegistrationRmseMm: 0.28
+        );
+        _controller.SaveSurgicalNavigationPlan("lab-seed-01", resetReq);
+
+        // Osteotomy entry Z = 15.0. If Tip Z = 1.0, depth = 15.0 - 1.0 = 14.0mm.
+        // Distance to nerve = 14.5 - 14.0 = 0.5mm (< 1.50mm critical safety limit)
+        var hazardTelemetry = new EvaluateDrillTelemetryRequest(
+            TipPositionX: 12.0,
+            TipPositionY: -6.5,
+            TipPositionZ: 1.0,
+            AxisVectorX: 0.0,
+            AxisVectorY: 0.0,
+            AxisVectorZ: -1.0
+        );
+
+        // Act
+        var result = _controller.EvaluateDrillTelemetry("lab-seed-01", hazardTelemetry);
+
+        // Assert
+        var okResult = Assert.IsType<OkObjectResult>(result);
+        var telemetry = Assert.IsType<HandpieceTrackingTelemetryDto>(okResult.Value);
+
+        Assert.True(telemetry.IsSafetyStopEngaged);
+        Assert.Equal(1500, telemetry.AcousticFrequencyHz);
+        Assert.Equal("Continuous1500", telemetry.AcousticAlertMode);
+        Assert.Contains("EMERGENCY DRILL STOP ENGAGED", telemetry.StatusMessage);
     }
 }
 
