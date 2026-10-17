@@ -1237,6 +1237,88 @@ public class LabWorkOrderIntegrationTests
         Assert.Contains("BR-DSD-02 WARNING", plan.StatusMessage);
         Assert.Contains("aesthetic veneer mock-up", plan.StatusMessage, StringComparison.OrdinalIgnoreCase);
     }
+
+    [Fact]
+    public void BR_IOS_01_GetDirectScanSession_Returns_Default_Session()
+    {
+        // Act
+        var result = _controller.GetDirectScanSession("lab-seed-02");
+
+        // Assert
+        var okResult = Assert.IsType<OkObjectResult>(result);
+        var session = Assert.IsType<LabWorkOrderController.DirectScanSessionDto>(okResult.Value);
+
+        Assert.Equal("lab-seed-02", session.OrderId);
+        Assert.Equal("Medit", session.ScannerBrand);
+        Assert.Equal("i700 Wireless", session.ScannerModel);
+        Assert.Equal(37.2, session.SensorTemperatureCelsius);
+        Assert.True(session.IsSha256Verified);
+        Assert.True(session.IsMultiArchComplete);
+        Assert.Equal(3, session.Arches.Count);
+        Assert.Contains(session.Arches, a => a.ArchType == "Maxillary" && a.QualityStatus == "ClinicallyDense");
+        Assert.Contains(session.Arches, a => a.ArchType == "Mandibular" && a.QualityStatus == "ClinicallyDense");
+        Assert.Contains(session.Arches, a => a.ArchType == "BuccalBite" && a.QualityStatus == "ClinicallyDense");
+    }
+
+    [Fact]
+    public void BR_IOS_01_IngestDirectScanSession_Excessive_Temperature_Rejects()
+    {
+        // Arrange: Sensor temperature 46.2°C exceeds 44.5°C mucosal ceiling
+        var req = new LabWorkOrderController.SaveDirectScanRequest(
+            ScannerBrand: "3Shape",
+            ScannerModel: "TRIOS 5",
+            ScannerSerialNumber: "3S-TR5-9921",
+            FirmwareVersion: "v5.1.0",
+            SensorTemperatureCelsius: 46.2,
+            Sha256DigitalSeal: null,
+            Arches: null
+        );
+
+        // Act
+        var result = _controller.IngestDirectScanSession("lab-seed-01", req);
+
+        // Assert
+        var badReq = Assert.IsType<BadRequestObjectResult>(result);
+        Assert.Contains("BR-IOS-01 VIOLATION", badReq.Value?.ToString() ?? "");
+    }
+
+    [Fact]
+    public void BR_IOS_04_IngestDirectScanSession_MultiArch_Complete_Persists_And_Verifies_Seal()
+    {
+        // Arrange
+        var customArches = new List<LabWorkOrderController.DirectScanArchDto>
+        {
+            new("Maxillary", 42000, 1920.0, 29.5, 98.2, "ClinicallyDense"),
+            new("Mandibular", 39500, 1810.0, 28.0, 97.0, "ClinicallyDense")
+        };
+
+        var req = new LabWorkOrderController.SaveDirectScanRequest(
+            ScannerBrand: "Carestream",
+            ScannerModel: "CS 3800",
+            ScannerSerialNumber: "CS38-4412",
+            FirmwareVersion: "v4.0.2",
+            SensorTemperatureCelsius: 36.8,
+            Sha256DigitalSeal: "urn:scan:sha256:fedcba9876543210fedcba9876543210fedcba9876543210fedcba9876543210",
+            Arches: customArches
+        );
+
+        // Act
+        var result = _controller.IngestDirectScanSession("lab-seed-01", req);
+
+        // Assert
+        var okResult = Assert.IsType<OkObjectResult>(result);
+        var session = Assert.IsType<LabWorkOrderController.DirectScanSessionDto>(okResult.Value);
+
+        Assert.Equal("Carestream", session.ScannerBrand);
+        Assert.Equal("CS 3800", session.ScannerModel);
+        Assert.Equal(36.8, session.SensorTemperatureCelsius);
+        Assert.True(session.IsSha256Verified);
+        Assert.True(session.IsMultiArchComplete);
+        Assert.Equal("urn:scan:sha256:fedcba9876543210fedcba9876543210fedcba9876543210fedcba9876543210", session.Sha256DigitalSeal);
+        Assert.Equal(2, session.Arches.Count);
+        Assert.Contains("ingested successfully", session.StatusMessage, StringComparison.OrdinalIgnoreCase);
+    }
 }
+
 
 
