@@ -63,3 +63,46 @@ public class CephalometricReportDto : SaveCephalometricReportDto
     public string DoctorId { get; set; } = string.Empty;
     public string DoctorName { get; set; } = string.Empty;
 }
+
+public class RecalculateCephRequestDto
+{
+    public string RecordId { get; set; } = string.Empty;
+    public List<CephPointDto> Landmarks { get; set; } = new();
+}
+
+public class RickettELineDto
+{
+    public double UpperLipDistanceMm { get; set; }
+    public double LowerLipDistanceMm { get; set; }
+    public string UpperLipStatus { get; set; } = "Retracted"; // Retracted, Normal, Protruded
+    public string LowerLipStatus { get; set; } = "Normal";
+    public double NasolabialAngle { get; set; } = 102.0;
+}
+
+public class CephalometricVtoSimulationRequestDto
+{
+    public string RecordId { get; set; } = string.Empty;
+    public double LeFortIMaxillaryHorizontalMm { get; set; } // + Advancement, - Impaction/Setback
+    public double LeFortIMaxillaryVerticalMm { get; set; } // + Lengthening, - Intrusion
+    public double BssoMandibularHorizontalMm { get; set; } // + Advancement, - Setback
+    public double BssoMandibularVerticalMm { get; set; }
+    public double GenioplastyHorizontalMm { get; set; } // + Chin advancement
+    public double GenioplastyVerticalMm { get; set; }
+    public List<CephPointDto>? BaseLandmarks { get; set; }
+}
+
+public class CephalometricVtoResultDto
+{
+    public string RecordId { get; set; } = string.Empty;
+    public DateTime SimulatedAtUtc { get; set; } = DateTime.UtcNow;
+    public double PredictedSna { get; set; }
+    public double PredictedSnb { get; set; }
+    public double PredictedAnb { get; set; }
+    public string PredictedSkeletalClass { get; set; } = "Class I";
+    public string PredictedSkeletalClassAr { get; set; } = "صنف أول هيكلي (Class I)";
+    public RickettELineDto PredictedELine { get; set; } = new();
+    public List<CephPointDto> DisplacedLandmarks { get; set; } = new();
+    public string SurgicalRecommendationSummary { get; set; } = string.Empty;
+    public string SurgicalRecommendationSummaryAr { get; set; } = string.Empty;
+}
+

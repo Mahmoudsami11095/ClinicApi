@@ -146,4 +146,20 @@ public class RadiologyController : ControllerBase
             return NotFound(new { message = "No cephalometric report found for this record." });
         return Ok(report);
     }
+
+    [HttpPost("records/{id}/ceph-recalculate")]
+    [Authorize(Roles = "admin,doctor,assistant")]
+    public async Task<IActionResult> RecalculateCephalometricAnalysis(string id, [FromBody] RecalculateCephRequestDto request)
+    {
+        var result = await _radiologyService.RecalculateCephalometricAnalysisAsync(id, request);
+        return Ok(result);
+    }
+
+    [HttpPost("records/{id}/ceph-vto")]
+    [Authorize(Roles = "admin,doctor,assistant")]
+    public async Task<IActionResult> SimulateSurgicalVto(string id, [FromBody] CephalometricVtoSimulationRequestDto request)
+    {
+        var result = await _radiologyService.SimulateSurgicalVtoAsync(id, request);
+        return Ok(result);
+    }
 }
