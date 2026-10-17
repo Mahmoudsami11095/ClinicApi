@@ -162,4 +162,31 @@ public class RadiologyController : ControllerBase
         var result = await _radiologyService.SimulateSurgicalVtoAsync(id, request);
         return Ok(result);
     }
+
+    // ── AI Endodontic Working Length & Root Canal Curvature Locator (Release v11.8.0) ──
+    [HttpGet("records/{id}/endodontic")]
+    [Authorize(Roles = "admin,doctor,assistant")]
+    public async Task<IActionResult> GetEndodonticAnalysis(string id, [FromQuery] int toothNumber = 36, [FromQuery] string? canalName = null)
+    {
+        var result = await _radiologyService.AnalyzeEndodonticCanalAsync(id, toothNumber, canalName);
+        return Ok(result);
+    }
+
+    [HttpPost("records/{id}/endodontic/recalculate")]
+    [Authorize(Roles = "admin,doctor,assistant")]
+    public async Task<IActionResult> RecalculateEndodonticCanal(string id, [FromBody] RecalculateEndodonticCanalRequestDto request)
+    {
+        var result = await _radiologyService.RecalculateEndodonticCanalAsync(id, request);
+        return Ok(result);
+    }
+
+    [HttpPost("records/{id}/endodontic")]
+    [Authorize(Roles = "admin,doctor,assistant")]
+    public async Task<IActionResult> SaveEndodonticReport(string id, [FromBody] SaveEndodonticAnalysisRequestDto request)
+    {
+        var doctorId = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value ?? "doc-endo-1";
+        var doctorName = User.Identity?.Name ?? "Attending Endodontist";
+        var result = await _radiologyService.SaveEndodonticReportAsync(id, request, doctorId, doctorName);
+        return Ok(result);
+    }
 }
