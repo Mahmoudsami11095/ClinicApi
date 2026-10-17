@@ -18,7 +18,7 @@ public class CommissionController : ControllerBase
     }
 
     /// <summary>
-    /// REQ-COMM-01: Real-time Doctor Commission & Profit-Sharing Analytics
+    /// REQ-COMM-01: Real-time Doctor Commission &amp; Profit-Sharing Analytics
     /// </summary>
     [HttpGet("analytics")]
     public async Task<IActionResult> GetAnalytics(

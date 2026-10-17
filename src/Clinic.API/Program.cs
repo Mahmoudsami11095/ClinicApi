@@ -29,11 +29,37 @@ builder.Services.AddControllers(options =>
     {
         options.JsonSerializerOptions.PropertyNamingPolicy = JsonNamingPolicy.CamelCase;
         options.JsonSerializerOptions.DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull;
+        options.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter());
     });
 
 // ── Swagger ──
 builder.Services.AddEndpointsApiExplorer();
-builder.Services.AddSwaggerGen();
+builder.Services.AddSwaggerGen(options => 
+{
+    var apiXmlFile = $"{System.Reflection.Assembly.GetExecutingAssembly().GetName().Name}.xml";
+    var apiXmlPath = Path.Combine(AppContext.BaseDirectory, apiXmlFile);
+    if (File.Exists(apiXmlPath))
+    {
+        options.IncludeXmlComments(apiXmlPath, includeControllerXmlComments: true);
+    }
+
+    var appXmlFile = "Clinic.Application.xml";
+    var appXmlPath = Path.Combine(AppContext.BaseDirectory, appXmlFile);
+    if (File.Exists(appXmlPath))
+    {
+        options.IncludeXmlComments(appXmlPath);
+    }
+
+    options.CustomSchemaIds(type =>
+    {
+        if (type.DeclaringType != null)
+        {
+            var parent = type.DeclaringType.Name.Replace("Controller", "");
+            return $"{parent}_{type.Name}";
+        }
+        return type.Name;
+    });
+});
 
 // ── Caching & Performance ──
 builder.Services.AddMemoryCache();

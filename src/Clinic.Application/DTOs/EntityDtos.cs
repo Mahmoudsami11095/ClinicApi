@@ -148,6 +148,7 @@ public class MedicationItemDto
     public string Dosage { get; set; } = string.Empty;
     public string Frequency { get; set; } = string.Empty;
     public string Duration { get; set; } = string.Empty;
+    public string? Instructions { get; set; }
 }
 
 public class PrescriptionDto
@@ -159,6 +160,9 @@ public class PrescriptionDto
     public string Date { get; set; } = string.Empty;
     public List<MedicationItemDto> Medications { get; set; } = new();
     public string? Notes { get; set; }
+    public double? PatientWeightKg { get; set; }
+    public bool? IsPediatric { get; set; }
+    public string? DoctorName { get; set; }
 
     // BR-RX-02 Immutability & Audit Lock
     public bool IsFinalized { get; set; } = false;

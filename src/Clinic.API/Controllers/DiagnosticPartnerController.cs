@@ -186,7 +186,7 @@ public class DiagnosticPartnerController : ControllerBase
     [AllowAnonymous]
     public async Task<IActionResult> UploadOrderResults(
         string token,
-        [FromForm] IFormFileCollection files,
+        IFormFileCollection files,
         [FromForm] string? partnerNotes,
         [FromForm] string? technicianName)
     {

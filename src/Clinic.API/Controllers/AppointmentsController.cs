@@ -395,7 +395,7 @@ public class AppointmentsController : ControllerBase
     }
 
     /// <summary>
-    /// REQ-APT-02 & REQ-CLI-03: Doctor calls patient into exam room.
+    /// REQ-APT-02 &amp; REQ-CLI-03: Doctor calls patient into exam room.
     /// Advances status to "in_consultation", stamps ConsultationStartedAt, and optionally assigns room/chair.
     /// </summary>
     [HttpPost("{id}/start-consultation")]
