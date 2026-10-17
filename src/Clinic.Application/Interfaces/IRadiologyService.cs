@@ -31,4 +31,9 @@ public interface IRadiologyService
     Task<CephalometricReportDto?> GetCephalometricReportAsync(string recordId);
     Task<CephalometricAnalysisResultDto> RecalculateCephalometricAnalysisAsync(string recordId, RecalculateCephRequestDto request);
     Task<CephalometricVtoResultDto> SimulateSurgicalVtoAsync(string recordId, CephalometricVtoSimulationRequestDto request);
+
+    // AI Endodontic Working Length & Root Canal Curvature Locator (Release v11.8.0)
+    Task<EndodonticAnalysisResultDto> AnalyzeEndodonticCanalAsync(string recordId, int toothNumber = 36, string? canalName = null);
+    Task<EndodonticAnalysisResultDto> RecalculateEndodonticCanalAsync(string recordId, RecalculateEndodonticCanalRequestDto request);
+    Task<EndodonticAnalysisResultDto> SaveEndodonticReportAsync(string recordId, SaveEndodonticAnalysisRequestDto request, string doctorId, string doctorName);
 }
